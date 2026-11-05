@@ -11,8 +11,9 @@ object RusuhShapes {
     val large = RoundedCornerShape(16.dp)
 }
 
-internal val RusuhMaterialShapes = Shapes(
-    small = RusuhShapes.small,
-    medium = RusuhShapes.medium,
-    large = RusuhShapes.large,
-)
+internal val RusuhMaterialShapes =
+    Shapes(
+        small = RusuhShapes.small,
+        medium = RusuhShapes.medium,
+        large = RusuhShapes.large,
+    )

@@ -1,0 +1,12 @@
+# Extends detekt defaults (buildUponDefaultConfig = true).
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    maxLineLength: 120
+complexity:
+  LongMethod:
+    ignoreAnnotated: ['Composable']
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
