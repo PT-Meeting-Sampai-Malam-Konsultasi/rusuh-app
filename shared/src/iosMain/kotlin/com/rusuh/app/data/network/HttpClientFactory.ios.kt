@@ -5,6 +5,5 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.darwin.Darwin
 
 actual object HttpClientFactory {
-    actual fun create(config: HttpClientConfig<*>.() -> Unit): HttpClient =
-        HttpClient(Darwin) { config(this) }
+    actual fun create(config: HttpClientConfig<*>.() -> Unit): HttpClient = HttpClient(Darwin) { config(this) }
 }

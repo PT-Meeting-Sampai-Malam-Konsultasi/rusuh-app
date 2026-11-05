@@ -30,11 +30,12 @@ class ApiClient(
         crossinline block: HttpRequestBuilder.() -> Unit = {},
     ): NetworkResult<T> =
         safeCall {
-            val response = client.request {
-                this.method = method
-                url(path.removePrefix("/"))
-                block()
-            }
+            val response =
+                client.request {
+                    this.method = method
+                    url(path.removePrefix("/"))
+                    block()
+                }
             handle(response)
         }
 
@@ -74,12 +75,13 @@ class ApiClient(
         const val CONNECT_TIMEOUT_MS = 15_000L
         const val SOCKET_TIMEOUT_MS = 30_000L
 
-        val defaultJson: Json = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            encodeDefaults = true
-            explicitNulls = false
-        }
+        val defaultJson: Json =
+            Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                encodeDefaults = true
+                explicitNulls = false
+            }
 
         fun createHttpClient(
             baseUrl: String,
@@ -95,9 +97,10 @@ class ApiClient(
                 }
                 if (enableLogging) {
                     install(Logging) {
-                        this.logger = object : Logger {
-                            override fun log(message: String) = logger(message)
-                        }
+                        this.logger =
+                            object : Logger {
+                                override fun log(message: String) = logger(message)
+                            }
                         level = LogLevel.INFO
                     }
                 }

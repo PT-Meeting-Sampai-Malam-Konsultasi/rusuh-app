@@ -1,0 +1,32 @@
+name: Unit Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run shared module tests
+        run: ./gradlew :shared:allTests --stacktrace
+      - name: Run Android unit tests
+        run: ./gradlew :androidApp:testDebugUnitTest --stacktrace
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            shared/build/reports/tests/
+            androidApp/build/reports/tests/

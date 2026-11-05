@@ -15,11 +15,12 @@ object RusuhTextStyles {
     val button = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
 }
 
-internal val RusuhTypography = Typography(
-    headlineLarge = RusuhTextStyles.h1,
-    headlineMedium = RusuhTextStyles.h2,
-    bodyLarge = RusuhTextStyles.body1,
-    bodyMedium = RusuhTextStyles.body2,
-    bodySmall = RusuhTextStyles.caption,
-    labelLarge = RusuhTextStyles.button,
-)
+internal val RusuhTypography =
+    Typography(
+        headlineLarge = RusuhTextStyles.h1,
+        headlineMedium = RusuhTextStyles.h2,
+        bodyLarge = RusuhTextStyles.body1,
+        bodyMedium = RusuhTextStyles.body2,
+        bodySmall = RusuhTextStyles.caption,
+        labelLarge = RusuhTextStyles.button,
+    )
