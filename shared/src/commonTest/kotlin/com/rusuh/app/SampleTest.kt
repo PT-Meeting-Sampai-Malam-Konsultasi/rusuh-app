@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
  */
 class SampleTest {
     @Test
-    fun sampleTest() {
-        assertTrue(true, "Sample test should pass")
+    fun verifyTestSetup() {
+        assertTrue(true, "Test setup should work correctly")
     }
 }
