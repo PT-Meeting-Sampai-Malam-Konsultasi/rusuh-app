@@ -8,6 +8,7 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.request
 import io.ktor.client.request.url
@@ -16,6 +17,8 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CancellationException
+import kotlinx.io.IOException
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 class ApiClient(
@@ -64,8 +67,12 @@ class ApiClient(
             block()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            NetworkResult.Error(message = e.message ?: "Unknown network error", cause = e)
+        } catch (e: HttpRequestTimeoutException) {
+            NetworkResult.Error(message = "Request timed out", cause = e)
+        } catch (e: SerializationException) {
+            NetworkResult.Error(message = "Failed to parse response: ${e.message}", cause = e)
+        } catch (e: IOException) {
+            NetworkResult.Error(message = e.message ?: "Network I/O error", cause = e)
         }
 
     fun close() = client.close()

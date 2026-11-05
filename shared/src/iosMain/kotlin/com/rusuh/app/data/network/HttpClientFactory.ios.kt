@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package com.rusuh.app.data.network
 
 import io.ktor.client.HttpClient
