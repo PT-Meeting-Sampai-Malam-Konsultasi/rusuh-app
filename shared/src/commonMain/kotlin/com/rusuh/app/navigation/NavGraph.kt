@@ -19,7 +19,7 @@ fun RusuhNavGraph(navController: NavHostController) {
         startDestination = Screen.Splash.route,
     ) {
         composable(Screen.Splash.route) {
-            // TODO: Replace with actual Splash screen
+            // Placeholder splash screen - will be replaced with feature implementation
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
