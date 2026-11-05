@@ -15,7 +15,6 @@ plugins {
 subprojects {
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
     apply(plugin = "io.gitlab.arturbosch.detekt")
-    apply(plugin = "org.jetbrains.kotlinx.kover")
 
     extensions.configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
         buildUponDefaultConfig = true
@@ -25,12 +24,21 @@ subprojects {
     }
 }
 
+dependencies {
+    kover(project(":shared"))
+    kover(project(":androidApp"))
+}
+
 kover {
     reports {
         total {
             xml {
                 onCheck = false
                 xmlFile = layout.buildDirectory.file("reports/kover/report.xml")
+            }
+            html {
+                onCheck = false
+                htmlDir = layout.buildDirectory.dir("reports/kover/html")
             }
         }
     }
