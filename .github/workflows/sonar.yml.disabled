@@ -1,0 +1,35 @@
+name: SonarQube Analysis
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate blame
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run tests with coverage
+        run: ./gradlew :shared:allTests :androidApp:testDebugUnitTest koverXmlReport --stacktrace
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v3
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=rusuh-app
+            -Dsonar.sources=shared/src/commonMain,androidApp/src/main
+            -Dsonar.tests=shared/src/commonTest,androidApp/src/test
+            -Dsonar.kotlin.coverage.reportPaths=build/reports/kover/report.xml

@@ -2,6 +2,7 @@ package com.rusuh.app.data.network
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -16,6 +17,8 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CancellationException
+import kotlinx.io.IOException
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 class ApiClient(
@@ -30,11 +33,12 @@ class ApiClient(
         crossinline block: HttpRequestBuilder.() -> Unit = {},
     ): NetworkResult<T> =
         safeCall {
-            val response = client.request {
-                this.method = method
-                url(path.removePrefix("/"))
-                block()
-            }
+            val response =
+                client.request {
+                    this.method = method
+                    url(path.removePrefix("/"))
+                    block()
+                }
             handle(response)
         }
 
@@ -63,8 +67,12 @@ class ApiClient(
             block()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            NetworkResult.Error(message = e.message ?: "Unknown network error", cause = e)
+        } catch (e: HttpRequestTimeoutException) {
+            NetworkResult.Error(message = "Request timed out", cause = e)
+        } catch (e: SerializationException) {
+            NetworkResult.Error(message = "Failed to parse response: ${e.message}", cause = e)
+        } catch (e: IOException) {
+            NetworkResult.Error(message = e.message ?: "Network I/O error", cause = e)
         }
 
     fun close() = client.close()
@@ -74,12 +82,13 @@ class ApiClient(
         const val CONNECT_TIMEOUT_MS = 15_000L
         const val SOCKET_TIMEOUT_MS = 30_000L
 
-        val defaultJson: Json = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            encodeDefaults = true
-            explicitNulls = false
-        }
+        val defaultJson: Json =
+            Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                encodeDefaults = true
+                explicitNulls = false
+            }
 
         fun createHttpClient(
             baseUrl: String,
@@ -95,9 +104,10 @@ class ApiClient(
                 }
                 if (enableLogging) {
                     install(Logging) {
-                        this.logger = object : Logger {
-                            override fun log(message: String) = logger(message)
-                        }
+                        this.logger =
+                            object : Logger {
+                                override fun log(message: String) = logger(message)
+                            }
                         level = LogLevel.INFO
                     }
                 }

@@ -29,22 +29,23 @@ object RusuhColors {
     val Outline = Color(0xFF857370)
 }
 
-internal val RusuhLightColorScheme = lightColorScheme(
-    primary = RusuhColors.Primary,
-    onPrimary = RusuhColors.OnPrimary,
-    primaryContainer = RusuhColors.PrimaryContainer,
-    onPrimaryContainer = RusuhColors.OnPrimaryContainer,
-    secondary = RusuhColors.Secondary,
-    onSecondary = RusuhColors.OnSecondary,
-    secondaryContainer = RusuhColors.SecondaryContainer,
-    onSecondaryContainer = RusuhColors.OnSecondaryContainer,
-    background = RusuhColors.Background,
-    onBackground = RusuhColors.OnBackground,
-    surface = RusuhColors.Surface,
-    onSurface = RusuhColors.OnSurface,
-    surfaceVariant = RusuhColors.SurfaceVariant,
-    onSurfaceVariant = RusuhColors.OnSurfaceVariant,
-    error = RusuhColors.Error,
-    onError = RusuhColors.OnError,
-    outline = RusuhColors.Outline,
-)
+internal val RusuhLightColorScheme =
+    lightColorScheme(
+        primary = RusuhColors.Primary,
+        onPrimary = RusuhColors.OnPrimary,
+        primaryContainer = RusuhColors.PrimaryContainer,
+        onPrimaryContainer = RusuhColors.OnPrimaryContainer,
+        secondary = RusuhColors.Secondary,
+        onSecondary = RusuhColors.OnSecondary,
+        secondaryContainer = RusuhColors.SecondaryContainer,
+        onSecondaryContainer = RusuhColors.OnSecondaryContainer,
+        background = RusuhColors.Background,
+        onBackground = RusuhColors.OnBackground,
+        surface = RusuhColors.Surface,
+        onSurface = RusuhColors.OnSurface,
+        surfaceVariant = RusuhColors.SurfaceVariant,
+        onSurfaceVariant = RusuhColors.OnSurfaceVariant,
+        error = RusuhColors.Error,
+        onError = RusuhColors.OnError,
+        outline = RusuhColors.Outline,
+    )
