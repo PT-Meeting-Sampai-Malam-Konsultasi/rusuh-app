@@ -22,14 +22,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Run tests with coverage
         run: ./gradlew :shared:allTests :androidApp:testDebugUnitTest koverXmlReport --stacktrace
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: kover-report
+          path: build/reports/kover/
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@v3
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >
-            -Dsonar.projectKey=rusuh-app
-            -Dsonar.sources=shared/src/commonMain,androidApp/src/main
-            -Dsonar.tests=shared/src/commonTest,androidApp/src/test
-            -Dsonar.kotlin.coverage.reportPaths=build/reports/kover/report.xml
