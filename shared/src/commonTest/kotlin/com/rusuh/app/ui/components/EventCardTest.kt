@@ -64,4 +64,17 @@ class EventCardTest {
         val desc = buildCardDescription(sampleData(EventStatus.Available))
         assertTrue(desc.endsWith("Status: Antrian dibuka"), desc)
     }
+
+    @Test
+    fun cardDescriptionIncludesPriceWhenPresent() {
+        val desc = buildCardDescription(sampleData(EventStatus.Available))
+        assertTrue(desc.contains("Mulai Rp 325.000"), desc)
+    }
+
+    @Test
+    fun cardDescriptionOmitsPriceWhenNull() {
+        val data = sampleData(EventStatus.Available).copy(priceFrom = null)
+        val desc = buildCardDescription(data)
+        assertTrue(!desc.contains("Rp"), desc)
+    }
 }

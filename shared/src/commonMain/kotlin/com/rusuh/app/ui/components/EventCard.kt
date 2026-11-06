@@ -255,14 +255,14 @@ fun EventStatus.footerText(): String? =
     }
 
 /** Full accessibility description combining event identity and status. */
-internal fun buildCardDescription(data: EventCardData): String {
-    val base =
-        "${data.title} ${data.subtitle}, ${data.format.label}, " +
-            "${data.venue} ${data.city}, ${data.dateTime} ${data.timeZone.name}. " +
-            "Status: ${data.status.badgeLabel()}"
-    val footer = data.status.footerText()
-    return if (footer != null) "$base. $footer" else base
-}
+internal fun buildCardDescription(data: EventCardData): String =
+    buildString {
+        append("${data.title}, ${data.subtitle}, ${data.format.label}, ")
+        append("${data.venue} ${data.city}, ${data.dateTime} ${data.timeZone.name}.")
+        data.priceFrom?.let { append(" $it.") }
+        append(" Status: ${data.status.badgeLabel()}")
+        data.status.footerText()?.let { append(". $it") }
+    }
 
 /** Groups digits with dots (Indonesian thousands separator): 12000 -> "12.000". */
 internal fun Int.formatThousands(): String {
