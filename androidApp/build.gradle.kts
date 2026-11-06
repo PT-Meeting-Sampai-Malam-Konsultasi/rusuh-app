@@ -1,9 +1,21 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.kotlinAndroid)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kover)
+}
+
+// Pin Kotlin's JVM target to 17 so it matches android.compileOptions (17)
+// regardless of the JDK running Gradle. Without this, compileDebugKotlin
+// follows the Gradle JDK (e.g. 21), causing an "Inconsistent JVM-target
+// compatibility" error on JDK21 while CI on JDK17 stays green.
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
 }
 
 android {
