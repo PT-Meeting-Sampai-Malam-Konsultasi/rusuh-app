@@ -10,6 +10,7 @@ ktlint-plugin = "12.1.2"
 detekt = "1.23.7"
 kover = "0.8.3"
 kotlinTest = "2.0.21"
+navigation = "2.8.0-alpha10"
 
 android-minSdk = "24"
 android-targetSdk = "34"
@@ -32,6 +33,7 @@ ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "kto
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 
 [plugins]
