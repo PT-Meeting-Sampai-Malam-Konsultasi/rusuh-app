@@ -40,6 +40,9 @@ object RusuhColors {
     val OnStatusSoldOut = Color(0xFFFFFFFF)
     val StatusUpcoming = Color(0xFF1E88E5) // blue: coming soon / "Segera dijual"
     val OnStatusUpcoming = Color(0xFFFFFFFF)
+
+    // Scrim applied over a poster image so overlaid chrome stays legible.
+    val PosterScrim = Color(0x99000000)
 }
 
 /**

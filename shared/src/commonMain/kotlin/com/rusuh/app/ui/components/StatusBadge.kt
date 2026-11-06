@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.unit.dp
+import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhStatusColors
 import com.rusuh.app.ui.theme.StatusColorPair
 
@@ -41,7 +41,12 @@ sealed interface EventStatus {
      * @param soldOutInMinutes minutes from sale-open to sell-out (e.g. 41).
      * @param capacity total tickets sold / venue capacity (e.g. 12_000).
      */
-    data class SoldOut(val soldOutInMinutes: Int, val capacity: Int) : EventStatus
+    data class SoldOut(val soldOutInMinutes: Int, val capacity: Int) : EventStatus {
+        init {
+            require(soldOutInMinutes >= 0) { "soldOutInMinutes must be >= 0, was $soldOutInMinutes" }
+            require(capacity > 0) { "capacity must be > 0, was $capacity" }
+        }
+    }
 
     /**
      * Not on sale yet. Shows a countdown to when sales open.
@@ -49,7 +54,11 @@ sealed interface EventStatus {
      * @param countdown pre-formatted remaining time (e.g. "7 hari 14 jam lagi").
      *   Pre-formatted by the caller so this stays locale/clock agnostic.
      */
-    data class ComingSoon(val countdown: String) : EventStatus
+    data class ComingSoon(val countdown: String) : EventStatus {
+        init {
+            require(countdown.isNotBlank()) { "countdown must not be blank" }
+        }
+    }
 }
 
 /**
@@ -94,13 +103,13 @@ fun StatusBadge(
         shape = MaterialTheme.shapes.small,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
             if (status is EventStatus.Available) {
                 StatusDot(color = colors.content)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(RusuhSpacing.sm))
             }
             Text(
                 text = label.uppercase(),
@@ -118,7 +127,7 @@ private fun StatusDot(
     Spacer(
         modifier =
             modifier
-                .size(8.dp)
+                .size(RusuhSpacing.statusDot)
                 .background(color = color, shape = CircleShape),
     )
 }

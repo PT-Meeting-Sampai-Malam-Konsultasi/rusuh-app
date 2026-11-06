@@ -27,7 +27,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import com.rusuh.app.ui.theme.RusuhColors
+import com.rusuh.app.ui.theme.RusuhSpacing
 
 /** Event format shown as a secondary badge on the poster (Tour / Live / Festival). */
 enum class EventFormat(val label: String) {
@@ -93,7 +94,7 @@ fun EventCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .alpha(if (disabled) DISABLED_ALPHA else 1f)
+                .alpha(if (disabled) RusuhSpacing.DISABLED_ALPHA else 1f)
                 .semantics(mergeDescendants = true) { contentDescription = cardDescription },
         shape = MaterialTheme.shapes.large,
         colors =
@@ -102,16 +103,15 @@ fun EventCard(
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
         enabled = clickable,
-        onClick = { onClick?.invoke() },
+        onClick = { if (clickable) onClick?.invoke() },
     ) {
         PosterSlot(
             image = image,
             format = data.format,
-            contentDescription = "Poster ${data.title}",
         )
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RusuhSpacing.xl)) {
             StatusBadge(status = data.status)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(RusuhSpacing.md))
             Text(
                 text = data.title,
                 style = MaterialTheme.typography.headlineMedium,
@@ -126,7 +126,7 @@ fun EventCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(RusuhSpacing.md))
             Text(
                 text = "${data.dateTime} ${data.timeZone.name}",
                 style = MaterialTheme.typography.bodyMedium,
@@ -138,7 +138,7 @@ fun EventCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             data.priceFrom?.let { price ->
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(RusuhSpacing.md))
                 Text(
                     text = price,
                     style = MaterialTheme.typography.bodyLarge,
@@ -151,12 +151,18 @@ fun EventCard(
     }
 }
 
-/** Poster image / placeholder with a top-down darkening gradient and format badge. */
+/**
+ * Poster image / placeholder with a top-down darkening scrim and format badge.
+ *
+ * Purely visual: the parent card already announces the event identity, format
+ * and status as one merged description, so the poster and format badge carry no
+ * contentDescription (null image = decorative) to avoid a redundant,
+ * double-read announcement.
+ */
 @Composable
 private fun PosterSlot(
     image: Painter?,
     format: EventFormat,
-    contentDescription: String,
 ) {
     Box(
         modifier =
@@ -168,7 +174,8 @@ private fun PosterSlot(
         if (image != null) {
             Image(
                 painter = image,
-                contentDescription = contentDescription,
+                // decorative; the merged card description already covers it
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -182,14 +189,14 @@ private fun PosterSlot(
                         .background(MaterialTheme.colorScheme.primaryContainer),
             )
         }
-        // Overlay gradient so overlaid chrome stays legible on any poster.
+        // Scrim so overlaid chrome stays legible on any poster.
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, OVERLAY_GRADIENT_END),
+                            colors = listOf(Color.Transparent, RusuhColors.PosterScrim),
                         ),
                     ),
         )
@@ -198,7 +205,7 @@ private fun PosterSlot(
             modifier =
                 Modifier
                     .align(Alignment.TopStart)
-                    .padding(12.dp),
+                    .padding(RusuhSpacing.lg),
         )
     }
 }
@@ -216,8 +223,7 @@ private fun FormatBadge(
             modifier
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.primary)
-                .padding(horizontal = 8.dp, vertical = 2.dp)
-                .semantics { contentDescription = "Format ${format.label}" },
+                .padding(horizontal = RusuhSpacing.md, vertical = RusuhSpacing.xxs),
     )
 }
 
@@ -225,7 +231,7 @@ private fun FormatBadge(
 @Composable
 private fun StatusFooter(status: EventStatus) {
     val text = status.footerText() ?: return
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(RusuhSpacing.md))
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
@@ -269,6 +275,4 @@ internal fun Int.formatThousands(): String {
     return sb.toString()
 }
 
-private const val DISABLED_ALPHA = 0.5f
 private const val POSTER_ASPECT_RATIO = 16f / 9f
-private val OVERLAY_GRADIENT_END = Color(0x99000000)
