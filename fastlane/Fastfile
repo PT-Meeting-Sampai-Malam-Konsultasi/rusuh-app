@@ -1,0 +1,34 @@
+default_platform(:ios)
+
+# Paths are resolved relative to the repo root (one level above fastlane/).
+REPO_ROOT       = File.expand_path("..", __dir__)
+XCODE_PROJECT   = File.join(REPO_ROOT, "iosApp", "Rusuh.xcodeproj")
+ARCHIVE_DIR     = ENV["KIROCREW_SCRATCH"] || File.join(REPO_ROOT, "build", "ios")
+ARCHIVE_PATH    = File.join(ARCHIVE_DIR, "Rusuh.xcarchive")
+
+platform :ios do
+  desc "Build the KMP shared framework, then produce an UNSIGNED Rusuh.xcarchive"
+  lane :build_unsigned do
+    # Phase 1: build the Kotlin Multiplatform shared framework for the iOS device slice.
+    gradle(
+      task: ":shared:linkReleaseFrameworkIosArm64",
+      gradle_path: File.join(REPO_ROOT, "gradlew"),
+      project_dir: REPO_ROOT
+    )
+
+    # Phase 2: archive the Xcode app target without any code signing.
+    build_app(
+      project: XCODE_PROJECT,
+      scheme: "Rusuh",
+      configuration: "Release",
+      skip_codesigning: true,
+      skip_package_ipa: true,
+      skip_archive: false,
+      archive_path: ARCHIVE_PATH,
+      destination: "generic/platform=iOS",
+      xcargs: 'CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM=""'
+    )
+
+    UI.success("Unsigned archive written to #{ARCHIVE_PATH}")
+  end
+end

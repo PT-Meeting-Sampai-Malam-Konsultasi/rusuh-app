@@ -8,14 +8,19 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
-# NOTE: This workflow requires iosApp/iosApp.xcodeproj to exist.
-# The Xcode project should be configured with a Run Script Build Phase
-# that builds the KMP shared framework before compiling Swift sources.
+# This workflow builds an UNSIGNED iOS .xcarchive for the Rusuh KMP app.
+# The archive is driven by Fastlane (fastlane/Fastfile, lane `build_unsigned`),
+# which first builds the KMP `shared` framework via Gradle, then archives the
+# `Rusuh` scheme from iosApp/Rusuh.xcodeproj with code signing disabled.
 
 jobs:
   build:
-    runs-on: macos-14
+    # macos-15 is a supported GitHub-hosted label. macos-14 was resolving to an
+    # unsupported runner configuration on this org, so the job died in ~1s.
+    runs-on: macos-15
     timeout-minutes: 60
+    env:
+      ARCHIVE_PATH: ${{ runner.temp }}/Rusuh.xcarchive
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +31,18 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Pin Xcode deterministically. macos-15 ships 16.4 as the default; the old
+      # hardcoded /Applications/Xcode_15.4.app no longer exists on this image.
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.4'
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
       - name: Cache Konan
         uses: actions/cache@v4
         with:
@@ -33,40 +50,18 @@ jobs:
           key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: konan-${{ runner.os }}-
 
-      # Phase 1: Build KMP Shared Framework (Release for iOS device)
-      - name: Build KMP Shared Framework
-        run: ./gradlew :shared:linkReleaseFrameworkIosArm64 --stacktrace
-
-      # Phase 2: Select Xcode version
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-
-      # Phase 3: Build unsigned iOS archive
-      # The Xcode project should have a Build Phase script that copies
-      # the framework from shared/build/bin/iosArm64/releaseFramework/
-      - name: Build iOS Archive (Unsigned)
-        run: |
-          if [ -d "iosApp/iosApp.xcodeproj" ]; then
-            xcodebuild archive \
-              -project iosApp/iosApp.xcodeproj \
-              -scheme iosApp \
-              -configuration Release \
-              -destination 'generic/platform=iOS' \
-              -archivePath ${{ runner.temp }}/iosApp.xcarchive \
-              CODE_SIGN_IDENTITY="" \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGNING_ALLOWED=NO \
-              DEVELOPMENT_TEAM="" \
-              | xcpretty
-          else
-            echo "::warning::iosApp.xcodeproj not found. Skipping archive step."
-            echo "KMP framework built successfully. Create the Xcode project to enable full iOS builds."
-          fi
+      # Build the KMP shared framework + unsigned archive via Fastlane.
+      # The lane writes the archive to $KIROCREW_SCRATCH/Rusuh.xcarchive when set,
+      # otherwise to <repo>/build/ios/Rusuh.xcarchive — we point it at runner.temp.
+      - name: Build unsigned iOS archive (Fastlane)
+        env:
+          KIROCREW_SCRATCH: ${{ runner.temp }}
+        run: bundle exec fastlane build_unsigned
 
       - name: Upload Archive
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ios-archive-unsigned
-          path: ${{ runner.temp }}/iosApp.xcarchive
-          if-no-files-found: warn
+          path: ${{ env.ARCHIVE_PATH }}
+          if-no-files-found: error
