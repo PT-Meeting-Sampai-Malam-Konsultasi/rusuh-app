@@ -29,6 +29,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.event_footer_sold_out
+import rusuh_app.shared.generated.resources.event_footer_temporarily_full
+import rusuh_app.shared.generated.resources.status_passthrough
+import rusuh_app.shared.generated.resources.status_prefix
 
 /** Event format shown as a secondary badge on the poster (Tour / Live / Festival). */
 enum class EventFormat(val label: String) {
@@ -247,42 +254,78 @@ private fun StatusFooter(status: EventStatus) {
 }
 
 /**
- * Supporting footer text for a status, or null when the status needs none.
- * Pure function — unit-tested directly.
+ * Localized supporting footer text for a status, or null when the status needs
+ * none. `@Composable` so it resolves the string resource at the call site; the
+ * key/arg mapping itself is covered by the pure [footerSpec] below.
  */
-fun EventStatus.footerText(): String? =
+@Composable
+fun EventStatus.footerText(): String? {
+    val spec = footerSpec() ?: return null
+    // Resolve by arg count rather than a spread (avoids the array copy detekt
+    // flags). Footer resources take 0, 1 or 2 args — enumerate them.
+    return when (spec.args.size) {
+        0 -> stringResource(spec.resource)
+        1 -> stringResource(spec.resource, spec.args[0])
+        else -> stringResource(spec.resource, spec.args[0], spec.args[1])
+    }
+}
+
+/**
+ * A status footer's string resource plus its format args (or null when the
+ * status needs no footer). Pure function — unit-tested directly; the composable
+ * [footerText] resolves it. ComingSoon carries its pre-formatted countdown
+ * verbatim via a passthrough resource, so no localization is lost.
+ */
+internal fun EventStatus.footerSpec(): FooterSpec? =
     when (this) {
         EventStatus.Available -> null
-        EventStatus.TemporarilyFull ->
-            "Sisa tiket sedang dibayar pembeli lain. " +
-                "Yang tidak jadi dibayar kembali dalam 10 menit."
+        EventStatus.TemporarilyFull -> FooterSpec(Res.string.event_footer_temporarily_full)
         is EventStatus.SoldOut ->
-            "Semua ${capacity.formatThousands()} tiket terjual dalam $soldOutInMinutes menit."
-        is EventStatus.ComingSoon -> countdown
+            FooterSpec(Res.string.event_footer_sold_out, listOf(capacity.formatThousands(), soldOutInMinutes))
+        is EventStatus.ComingSoon -> FooterSpec(Res.string.status_passthrough, listOf(countdown))
     }
+
+/** Resource + format args for a status footer line. */
+internal data class FooterSpec(
+    val resource: StringResource,
+    val args: List<Any> = emptyList(),
+)
 
 /**
  * Full accessibility description combining the event's known identity fields and
  * status. Blank fields (e.g. before the API resolves venue/date) are skipped so
  * the reader never hears empty segments or stray separators.
+ *
+ * `@Composable` so status label + footer resolve from string resources; the
+ * identity assembly is pure and stays covered by [buildCardIdentity].
  */
+@Composable
 internal fun buildCardDescription(data: EventCardData): String {
-    val identity =
-        listOf(
-            data.title,
-            data.subtitle,
-            data.format.label,
-            listOf(data.venue, data.city).filter { it.isNotBlank() }.joinToString(" "),
-            // Timezone only reads alongside a date; a lone "WIB" would be noise.
-            if (data.dateTime.isNotBlank()) "${data.dateTime} ${data.timeZone.name}" else "",
-        ).filter { it.isNotBlank() }
+    val statusLabel = stringResource(data.status.badgeLabel())
+    val footer = data.status.footerText()
     return buildString {
-        append(identity.joinToString(", "))
+        append(buildCardIdentity(data))
         data.priceFrom?.let { append(". $it") }
-        append(". Status: ${data.status.badgeLabel()}")
-        data.status.footerText()?.let { append(". $it") }
+        append(". ")
+        append(stringResource(Res.string.status_prefix, statusLabel))
+        footer?.let { append(". $it") }
     }
 }
+
+/**
+ * Pure (non-composable) identity segment of the card description: the locale-
+ * agnostic, caller-formatted fields joined with blanks skipped. Unit-tested
+ * directly.
+ */
+internal fun buildCardIdentity(data: EventCardData): String =
+    listOf(
+        data.title,
+        data.subtitle,
+        data.format.label,
+        listOf(data.venue, data.city).filter { it.isNotBlank() }.joinToString(" "),
+        // Timezone only reads alongside a date; a lone "WIB" would be noise.
+        if (data.dateTime.isNotBlank()) "${data.dateTime} ${data.timeZone.name}" else "",
+    ).filter { it.isNotBlank() }.joinToString(", ")
 
 /** Groups digits with dots (Indonesian thousands separator): 12000 -> "12.000". */
 internal fun Int.formatThousands(): String {

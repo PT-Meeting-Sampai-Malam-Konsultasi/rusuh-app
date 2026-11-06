@@ -2,6 +2,12 @@ package com.rusuh.app.ui.components
 
 import com.rusuh.app.ui.theme.RusuhStatusColors
 import com.rusuh.app.ui.theme.StatusColorPair
+import org.jetbrains.compose.resources.StringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.status_available
+import rusuh_app.shared.generated.resources.status_coming_soon
+import rusuh_app.shared.generated.resources.status_sold_out
+import rusuh_app.shared.generated.resources.status_temporarily_full
 
 /**
  * Availability status of an event, as shown on the home page event cards.
@@ -44,15 +50,17 @@ sealed interface EventStatus {
 }
 
 /**
- * Resolves an [EventStatus] to its short pill label and semantic colors.
- * Pure function — unit-tested directly.
+ * Resolves an [EventStatus] to the string resource for its short pill label.
+ * Pure function — returns the [StringResource] key (a plain value, not a
+ * composable), so it stays unit-testable and the composable call site resolves
+ * it with `stringResource(...)`.
  */
-fun EventStatus.badgeLabel(): String =
+fun EventStatus.badgeLabel(): StringResource =
     when (this) {
-        EventStatus.Available -> "Antrian dibuka"
-        EventStatus.TemporarilyFull -> "Penuh sementara"
-        is EventStatus.SoldOut -> "Habis terjual"
-        is EventStatus.ComingSoon -> "Segera dijual"
+        EventStatus.Available -> Res.string.status_available
+        EventStatus.TemporarilyFull -> Res.string.status_temporarily_full
+        is EventStatus.SoldOut -> Res.string.status_sold_out
+        is EventStatus.ComingSoon -> Res.string.status_coming_soon
     }
 
 /** Semantic color pair for the status. Pure function — unit-tested directly. */

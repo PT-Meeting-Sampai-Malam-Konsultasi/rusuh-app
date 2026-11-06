@@ -49,6 +49,34 @@ import com.rusuh.app.ui.components.SeatCategoryCard
 import com.rusuh.app.ui.components.SeatCategoryUi
 import com.rusuh.app.ui.components.formatRupiah
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.action_back
+import rusuh_app.shared.generated.resources.detail_cap_reached
+import rusuh_app.shared.generated.resources.detail_cap_selected
+import rusuh_app.shared.generated.resources.detail_categories_hint
+import rusuh_app.shared.generated.resources.detail_empty_body
+import rusuh_app.shared.generated.resources.detail_empty_title
+import rusuh_app.shared.generated.resources.detail_error_title
+import rusuh_app.shared.generated.resources.detail_expired_action
+import rusuh_app.shared.generated.resources.detail_expired_badge
+import rusuh_app.shared.generated.resources.detail_expired_body
+import rusuh_app.shared.generated.resources.detail_expired_description
+import rusuh_app.shared.generated.resources.detail_expired_headline
+import rusuh_app.shared.generated.resources.detail_loading
+import rusuh_app.shared.generated.resources.detail_loading_description
+import rusuh_app.shared.generated.resources.detail_nik_example
+import rusuh_app.shared.generated.resources.detail_nik_field_label
+import rusuh_app.shared.generated.resources.detail_nik_field_placeholder
+import rusuh_app.shared.generated.resources.detail_nik_hint
+import rusuh_app.shared.generated.resources.detail_nik_invalid
+import rusuh_app.shared.generated.resources.detail_nik_valid
+import rusuh_app.shared.generated.resources.detail_niks_incomplete
+import rusuh_app.shared.generated.resources.detail_proceed
+import rusuh_app.shared.generated.resources.detail_section_categories
+import rusuh_app.shared.generated.resources.detail_section_nik
+import rusuh_app.shared.generated.resources.detail_title
+import rusuh_app.shared.generated.resources.detail_total
 
 /** Maximum tickets a single order may hold across all categories (FR-13). */
 const val MAX_TICKETS_PER_ORDER = 3
@@ -144,7 +172,7 @@ fun DetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Pilih tiket",
+                        text = stringResource(Res.string.detail_title),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -153,7 +181,7 @@ fun DetailScreen(
                     if (onBack != null) {
                         // Text chevron rather than a material-icons dependency (matches WaitingRoomScreen).
                         TextButton(onClick = onBack) {
-                            Text(text = "\u2039 Kembali")
+                            Text(text = stringResource(Res.string.action_back))
                         }
                     }
                 },
@@ -216,11 +244,9 @@ private fun ContentState(
         EventHeader(detail)
         Spacer(Modifier.height(RusuhSpacing.xl))
 
-        SectionTitle("Kategori")
+        SectionTitle(stringResource(Res.string.detail_section_categories))
         Text(
-            text =
-                "Maks. $MAX_TICKETS_PER_ORDER tiket per transaksi. " +
-                    "Tanpa nomor kursi \u2014 masuk sesuai kategori.",
+            text = stringResource(Res.string.detail_categories_hint, MAX_TICKETS_PER_ORDER),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -244,11 +270,9 @@ private fun ContentState(
         Spacer(Modifier.height(RusuhSpacing.xl))
 
         if (nikInputs.isNotEmpty()) {
-            SectionTitle("NIK pemegang tiket")
+            SectionTitle(stringResource(Res.string.detail_section_nik))
             Text(
-                text =
-                    "1 NIK = 1 tiket per event. " +
-                        "Di pintu masuk, tunjukkan e-tiket + KTP asli dengan NIK yang sama.",
+                text = stringResource(Res.string.detail_nik_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -276,12 +300,12 @@ private fun ContentState(
             enabled = canProceed,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(text = "Lanjut ke pembayaran")
+            Text(text = stringResource(Res.string.detail_proceed))
         }
         if (selectedTotal > 0 && !allNiksValid) {
             Spacer(Modifier.height(RusuhSpacing.md))
             Text(
-                text = "Lengkapi NIK 16 digit untuk setiap tiket agar dapat melanjutkan.",
+                text = stringResource(Res.string.detail_niks_incomplete),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -373,10 +397,9 @@ private fun CapIndicator(selected: Int) {
     Text(
         text =
             if (atCap) {
-                "$selected/$MAX_TICKETS_PER_ORDER \u2014 batas tiket tercapai. " +
-                    "Kurangi satu untuk ganti kategori."
+                stringResource(Res.string.detail_cap_reached, selected, MAX_TICKETS_PER_ORDER)
             } else {
-                "$selected/$MAX_TICKETS_PER_ORDER tiket dipilih."
+                stringResource(Res.string.detail_cap_selected, selected, MAX_TICKETS_PER_ORDER)
             },
         style = MaterialTheme.typography.bodySmall,
         fontWeight = if (atCap) FontWeight.SemiBold else FontWeight.Normal,
@@ -397,17 +420,19 @@ private fun NikField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Tiket $ticketNumber") },
-            placeholder = { Text("16 digit sesuai KTP") },
+            label = { Text(stringResource(Res.string.detail_nik_field_label, ticketNumber)) },
+            placeholder = { Text(stringResource(Res.string.detail_nik_field_placeholder)) },
             singleLine = true,
             isError = showError,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
         val (msg, color) =
             when {
-                valid -> "\u2713 Format NIK valid" to MaterialTheme.colorScheme.primary
-                showError -> "NIK harus $NIK_LENGTH digit angka" to MaterialTheme.colorScheme.error
-                else -> "Contoh: 3201 1234 5678 0001" to MaterialTheme.colorScheme.onSurfaceVariant
+                valid -> stringResource(Res.string.detail_nik_valid) to MaterialTheme.colorScheme.primary
+                showError ->
+                    stringResource(Res.string.detail_nik_invalid, NIK_LENGTH) to
+                        MaterialTheme.colorScheme.error
+                else -> stringResource(Res.string.detail_nik_example) to MaterialTheme.colorScheme.onSurfaceVariant
             }
         Spacer(Modifier.height(RusuhSpacing.xs))
         Text(text = msg, style = MaterialTheme.typography.bodySmall, color = color)
@@ -422,7 +447,7 @@ private fun TotalRow(subtotal: Int) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "Total",
+            text = stringResource(Res.string.detail_total),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -437,15 +462,16 @@ private fun TotalRow(subtotal: Int) {
 
 @Composable
 private fun LoadingState() {
+    val loadingDescription = stringResource(Res.string.detail_loading_description)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.semantics { contentDescription = "Memuat detail tiket" },
+        modifier = Modifier.semantics { contentDescription = loadingDescription },
     ) {
         CircularProgressIndicator()
         Spacer(Modifier.height(RusuhSpacing.xl))
         Text(
-            text = "Memuat detail tiket\u2026",
+            text = stringResource(Res.string.detail_loading),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -456,15 +482,15 @@ private fun LoadingState() {
 @Composable
 private fun EmptyState() {
     CenteredMessage(
-        title = "Belum ada kategori",
-        body = "Tiket untuk acara ini belum tersedia.",
+        title = stringResource(Res.string.detail_empty_title),
+        body = stringResource(Res.string.detail_empty_body),
     )
 }
 
 @Composable
 private fun ErrorState(message: String) {
     CenteredMessage(
-        title = "Gagal memuat detail",
+        title = stringResource(Res.string.detail_error_title),
         body = message,
         titleColor = MaterialTheme.colorScheme.error,
     )
@@ -473,6 +499,7 @@ private fun ErrorState(message: String) {
 /** Expired / "Waktu habis" variant — mirrors the hi-fi expired sheet. */
 @Composable
 private fun ExpiredState(onBack: (() -> Unit)?) {
+    val expiredDescription = stringResource(Res.string.detail_expired_description)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -480,31 +507,26 @@ private fun ExpiredState(onBack: (() -> Unit)?) {
             Modifier
                 .fillMaxWidth()
                 .padding(RusuhSpacing.xl)
-                .semantics {
-                    contentDescription =
-                        "Waktu habis. 5 menit sudah lewat. Pilihan Anda belum disimpan."
-                },
+                .semantics { contentDescription = expiredDescription },
     ) {
         StatusDot(color = MaterialTheme.colorScheme.error)
         Spacer(Modifier.height(RusuhSpacing.xl))
         Text(
-            text = "Waktu habis",
+            text = stringResource(Res.string.detail_expired_badge),
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.error,
         )
         Spacer(Modifier.height(RusuhSpacing.md))
         Text(
-            text = "5 menit sudah lewat.",
+            text = stringResource(Res.string.detail_expired_headline),
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(RusuhSpacing.md))
         Text(
-            text =
-                "Pilihan Anda belum disimpan dan tempat Anda kami berikan ke nomor berikutnya. " +
-                    "Antre lagi untuk mencoba lagi.",
+            text = stringResource(Res.string.detail_expired_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -512,7 +534,7 @@ private fun ExpiredState(onBack: (() -> Unit)?) {
         if (onBack != null) {
             Spacer(Modifier.height(RusuhSpacing.xl))
             Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                Text(text = "Antre lagi")
+                Text(text = stringResource(Res.string.detail_expired_action))
             }
         }
     }

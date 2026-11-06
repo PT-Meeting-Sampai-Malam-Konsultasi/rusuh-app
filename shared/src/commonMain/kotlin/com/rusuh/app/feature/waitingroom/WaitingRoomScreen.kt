@@ -31,6 +31,19 @@ import com.rusuh.app.ui.components.QueuePositionCard
 import com.rusuh.app.ui.components.QueuePositionUi
 import com.rusuh.app.ui.components.accentColors
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.action_back
+import rusuh_app.shared.generated.resources.waiting_empty_body
+import rusuh_app.shared.generated.resources.waiting_empty_title
+import rusuh_app.shared.generated.resources.waiting_error_title
+import rusuh_app.shared.generated.resources.waiting_loading
+import rusuh_app.shared.generated.resources.waiting_loading_description
+import rusuh_app.shared.generated.resources.waiting_status_closed
+import rusuh_app.shared.generated.resources.waiting_status_waiting
+import rusuh_app.shared.generated.resources.waiting_status_your_turn
+import rusuh_app.shared.generated.resources.waiting_title
 
 /**
  * Waiting Room screen — assembles the [QueuePositionCard] with screen chrome and
@@ -61,7 +74,7 @@ fun WaitingRoomScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = eventTitle ?: "Ruang Tunggu",
+                        text = eventTitle ?: stringResource(Res.string.waiting_title),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -70,7 +83,7 @@ fun WaitingRoomScreen(
                     if (onBack != null) {
                         // Text chevron rather than a material-icons dependency for one glyph.
                         TextButton(onClick = onBack) {
-                            Text(text = "‹ Kembali")
+                            Text(text = stringResource(Res.string.action_back))
                         }
                     }
                 },
@@ -131,7 +144,7 @@ private fun ContentState(position: QueuePositionUi) {
         QueuePositionCard(data = position)
         Spacer(Modifier.height(RusuhSpacing.xl))
         Text(
-            text = position.phase.statusMessage(),
+            text = stringResource(position.phase.statusMessage()),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
             color = position.phase.accentColors().container,
@@ -142,15 +155,16 @@ private fun ContentState(position: QueuePositionUi) {
 
 @Composable
 private fun LoadingState() {
+    val loadingDescription = stringResource(Res.string.waiting_loading_description)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.semantics { contentDescription = "Memuat posisi antrian" },
+        modifier = Modifier.semantics { contentDescription = loadingDescription },
     ) {
         CircularProgressIndicator()
         Spacer(Modifier.height(RusuhSpacing.xl))
         Text(
-            text = "Memuat posisi antrian…",
+            text = stringResource(Res.string.waiting_loading),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -161,15 +175,15 @@ private fun LoadingState() {
 @Composable
 private fun EmptyState() {
     CenteredMessage(
-        title = "Tidak ada antrian",
-        body = "Anda tidak sedang berada dalam antrian untuk acara ini.",
+        title = stringResource(Res.string.waiting_empty_title),
+        body = stringResource(Res.string.waiting_empty_body),
     )
 }
 
 @Composable
 private fun ErrorState(message: String) {
     CenteredMessage(
-        title = "Gagal memuat antrian",
+        title = stringResource(Res.string.waiting_error_title),
         body = message,
         titleColor = MaterialTheme.colorScheme.error,
     )
@@ -209,9 +223,9 @@ private fun CenteredMessage(
  * Mirrors the FR-04 copy: waiting (FR-06/07), turn arrived (FR-08), queue
  * closed on sold-out (FR-08/T-03).
  */
-fun QueuePhase.statusMessage(): String =
+fun QueuePhase.statusMessage(): StringResource =
     when (this) {
-        QueuePhase.Waiting -> "Menunggu giliran…"
-        QueuePhase.YourTurn -> "Giliran Anda tiba"
-        QueuePhase.QueueClosed -> "Antrian ditutup — tiket telah habis terjual"
+        QueuePhase.Waiting -> Res.string.waiting_status_waiting
+        QueuePhase.YourTurn -> Res.string.waiting_status_your_turn
+        QueuePhase.QueueClosed -> Res.string.waiting_status_closed
     }

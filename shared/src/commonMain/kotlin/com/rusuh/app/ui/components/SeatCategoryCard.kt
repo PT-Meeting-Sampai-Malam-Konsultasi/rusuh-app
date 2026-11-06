@@ -29,6 +29,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.rusuh.app.ui.theme.RusuhShapes
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.seat_decrement
+import rusuh_app.shared.generated.resources.seat_increment
+import rusuh_app.shared.generated.resources.seat_remaining
+import rusuh_app.shared.generated.resources.seat_sold_out
 
 /**
  * Display data for one seat category on the Detail Ticket page (FR-11/FR-12).
@@ -142,7 +149,7 @@ fun SeatCategoryCard(
                 )
                 Spacer(Modifier.height(RusuhSpacing.xxs))
                 Text(
-                    text = availabilityLabel(data),
+                    text = resolveAvailabilityLabel(data),
                     style = MaterialTheme.typography.bodySmall,
                     color =
                         if (soldOut) {
@@ -163,7 +170,7 @@ fun SeatCategoryCard(
                     // \u2212 is the minus sign (visually balanced against "+").
                     symbol = "\u2212",
                     enabled = !soldOut && quantity > 0,
-                    label = "Kurangi ${data.name}",
+                    label = stringResource(Res.string.seat_decrement, data.name),
                     onClick = { onQuantityChange((quantity - 1).coerceAtLeast(0)) },
                 )
                 Text(
@@ -177,7 +184,7 @@ fun SeatCategoryCard(
                 StepperButton(
                     symbol = "+",
                     enabled = !soldOut && canIncrement,
-                    label = "Tambah ${data.name}",
+                    label = stringResource(Res.string.seat_increment, data.name),
                     onClick = { onQuantityChange(quantity + 1) },
                 )
             }
@@ -219,12 +226,34 @@ private fun StepperButton(
 }
 
 /**
- * Availability line for a category. Pure function — unit-tested directly.
+ * Availability line resource (and optional formatted-count arg) for a category.
+ * Pure function — unit-tested directly; [resolveAvailabilityLabel] resolves it.
  * Capacity-only (FR-11): a remaining count or the sold-out label, never a seat
  * number.
  */
-internal fun availabilityLabel(data: SeatCategoryUi): String =
-    if (data.isSoldOut) "Habis" else "Sisa ${data.available.formatThousands()} tiket"
+internal fun availabilityLabel(data: SeatCategoryUi): AvailabilityLabel =
+    if (data.isSoldOut) {
+        AvailabilityLabel(Res.string.seat_sold_out)
+    } else {
+        AvailabilityLabel(Res.string.seat_remaining, data.available.formatThousands())
+    }
+
+/** Resource (and optional pre-formatted remaining count) for the availability line. */
+internal data class AvailabilityLabel(
+    val resource: StringResource,
+    val remaining: String? = null,
+)
+
+/** Resolves [availabilityLabel] to its localized string in a composition. */
+@Composable
+internal fun resolveAvailabilityLabel(data: SeatCategoryUi): String {
+    val label = availabilityLabel(data)
+    return if (label.remaining != null) {
+        stringResource(label.resource, label.remaining)
+    } else {
+        stringResource(label.resource)
+    }
+}
 
 /**
  * Formats whole rupiah as "Rp 850.000" with Indonesian thousands dots.
@@ -233,15 +262,25 @@ internal fun availabilityLabel(data: SeatCategoryUi): String =
  */
 internal fun formatRupiah(amount: Int): String = "Rp ${amount.formatThousands()}"
 
-/** Full accessibility description combining name, price, availability and current quantity. */
+/**
+ * Full accessibility description combining name, price, availability and current
+ * quantity. `@Composable` so the availability segment resolves from resources.
+ *
+ * shortcut: the "N dipilih" / "N selected" quantity suffix is not yet a resource
+ * (it is only spoken by screen readers, never shown on screen); migrate it to a
+ * plural-aware key when the detail screen's a11y copy is localized end to end.
+ */
+@Composable
 internal fun buildSeatCategoryDescription(
     data: SeatCategoryUi,
     quantity: Int,
-): String =
-    buildString {
+): String {
+    val availability = resolveAvailabilityLabel(data)
+    return buildString {
         append("${data.name}. ")
         data.description?.let { append("$it. ") }
         append("${formatRupiah(data.priceRupiah)}. ")
-        append("${availabilityLabel(data)}.")
+        append("$availability.")
         if (!data.isSoldOut) append(" $quantity dipilih.")
     }
+}
