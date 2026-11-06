@@ -16,9 +16,16 @@ object RusuhSpacing {
     val md = 8.dp
     val lg = 12.dp
     val xl = 16.dp
+    val xxl = 24.dp
 
     /** Diameter of the status indicator dot on a StatusBadge. */
     val statusDot = 8.dp
+
+    /** Outer bounds of the Waiting Room queue indicator (pulsing halo). */
+    val queueIndicator = 48.dp
+
+    /** Diameter of the solid core dot inside the queue indicator. */
+    val queueDotCore = 16.dp
 
     /** Alpha applied to a disabled (sold-out) card. */
     const val DISABLED_ALPHA = 0.5f
