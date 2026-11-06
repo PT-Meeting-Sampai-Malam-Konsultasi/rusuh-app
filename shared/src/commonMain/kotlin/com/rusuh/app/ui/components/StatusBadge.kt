@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.status_prefix
 
 /**
  * A small pill badge showing event availability.
@@ -32,9 +35,10 @@ fun StatusBadge(
     modifier: Modifier = Modifier,
 ) {
     val colors = status.badgeColors()
-    val label = status.badgeLabel()
+    val label = stringResource(status.badgeLabel())
+    val statusDescription = stringResource(Res.string.status_prefix, label)
     Surface(
-        modifier = modifier.clearAndSetSemantics { contentDescription = "Status: $label" },
+        modifier = modifier.clearAndSetSemantics { contentDescription = statusDescription },
         color = colors.container,
         contentColor = colors.content,
         shape = MaterialTheme.shapes.small,

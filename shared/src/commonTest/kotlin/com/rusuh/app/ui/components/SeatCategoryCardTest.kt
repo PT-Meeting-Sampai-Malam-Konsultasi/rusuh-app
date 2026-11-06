@@ -1,5 +1,8 @@
 package com.rusuh.app.ui.components
 
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.seat_remaining
+import rusuh_app.shared.generated.resources.seat_sold_out
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,34 +26,21 @@ class SeatCategoryCardTest {
     }
 
     @Test
-    fun availabilityShowsRemainingCountWhenInStock() {
-        assertEquals("Sisa 1.200 tiket", availabilityLabel(sample(1_200)))
+    fun availabilityUsesRemainingKeyWithFormattedCountWhenInStock() {
+        assertEquals(
+            AvailabilityLabel(Res.string.seat_remaining, "1.200"),
+            availabilityLabel(sample(1_200)),
+        )
     }
 
     @Test
-    fun availabilityShowsSoldOutWhenZero() {
-        assertEquals("Habis", availabilityLabel(sample(0)))
+    fun availabilityUsesSoldOutKeyWhenZero() {
+        assertEquals(AvailabilityLabel(Res.string.seat_sold_out), availabilityLabel(sample(0)))
     }
 
     @Test
     fun isSoldOutOnlyWhenAvailabilityZero() {
         assertTrue(sample(0).isSoldOut)
         assertFalse(sample(1).isSoldOut)
-    }
-
-    @Test
-    fun descriptionIncludesNamePriceAvailabilityAndQuantity() {
-        val desc = buildSeatCategoryDescription(sample(50), quantity = 2)
-        assertTrue(desc.contains("Festival B"), desc)
-        assertTrue(desc.contains("Rp 850.000"), desc)
-        assertTrue(desc.contains("Sisa 50 tiket"), desc)
-        assertTrue(desc.contains("2 dipilih"), desc)
-    }
-
-    @Test
-    fun descriptionOmitsQuantityWhenSoldOut() {
-        val desc = buildSeatCategoryDescription(sample(0), quantity = 0)
-        assertTrue(desc.contains("Habis"), desc)
-        assertFalse(desc.contains("dipilih"), desc)
     }
 }

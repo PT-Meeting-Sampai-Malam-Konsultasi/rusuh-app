@@ -1,15 +1,18 @@
 package com.rusuh.app.feature.waitingroom
 
 import com.rusuh.app.ui.components.QueuePhase
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.waiting_status_closed
+import rusuh_app.shared.generated.resources.waiting_status_waiting
+import rusuh_app.shared.generated.resources.waiting_status_your_turn
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class WaitingRoomScreenTest {
     @Test
     fun statusMessagePerPhase() {
-        assertEquals("Menunggu giliran…", QueuePhase.Waiting.statusMessage())
-        assertEquals("Giliran Anda tiba", QueuePhase.YourTurn.statusMessage())
-        assertTrue(QueuePhase.QueueClosed.statusMessage().contains("habis terjual"))
+        assertEquals(Res.string.waiting_status_waiting, QueuePhase.Waiting.statusMessage())
+        assertEquals(Res.string.waiting_status_your_turn, QueuePhase.YourTurn.statusMessage())
+        assertEquals(Res.string.waiting_status_closed, QueuePhase.QueueClosed.statusMessage())
     }
 }

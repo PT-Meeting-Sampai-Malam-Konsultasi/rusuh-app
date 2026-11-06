@@ -14,6 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.action_retry
 
 /**
  * Full-screen error state with a retry affordance.
@@ -47,7 +50,7 @@ fun ErrorState(
         )
         Spacer(Modifier.height(RusuhSpacing.xl))
         Button(onClick = onRetry) {
-            Text(text = "Coba lagi")
+            Text(text = stringResource(Res.string.action_retry))
         }
     }
 }

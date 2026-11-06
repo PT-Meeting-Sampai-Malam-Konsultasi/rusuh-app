@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Indonesian (id) translation of the UI strings. Values are the original
+  hardcoded literals from the migrated screens (issue #51). EN base is in
+  values/strings.xml. Keep keys in sync with the EN base.
+-->
+<resources>
+    <!-- App / brand -->
+    <string name="app_name">Rusuh</string>
+
+    <!-- Shared navigation / actions -->
+    <string name="action_back">‹ Kembali</string>
+    <string name="action_retry">Coba lagi</string>
+
+    <!-- Home screen -->
+    <string name="home_empty_title">Belum ada event</string>
+    <string name="home_pull_to_refresh">Tarik ke bawah untuk memuat ulang.</string>
+    <string name="home_loading_description">Memuat daftar event</string>
+
+    <!-- Event status badge labels (home cards) -->
+    <string name="status_available">Antrian dibuka</string>
+    <string name="status_temporarily_full">Penuh sementara</string>
+    <string name="status_sold_out">Habis terjual</string>
+    <string name="status_coming_soon">Segera dijual</string>
+    <string name="status_prefix">Status: %1$s</string>
+    <!-- Passthrough untuk teks yang sudah diformat & tidak bergantung locale (mis. hitung mundur dari pemanggil). -->
+    <string name="status_passthrough">%1$s</string>
+
+    <!-- Event card status footers -->
+    <string name="event_footer_temporarily_full">Sisa tiket sedang dibayar pembeli lain. Yang tidak jadi dibayar kembali dalam 10 menit.</string>
+    <string name="event_footer_sold_out">Semua %1$s tiket terjual dalam %2$d menit.</string>
+
+    <!-- Waiting Room screen -->
+    <string name="waiting_title">Ruang Tunggu</string>
+    <string name="waiting_loading_description">Memuat posisi antrian</string>
+    <string name="waiting_loading">Memuat posisi antrian…</string>
+    <string name="waiting_empty_title">Tidak ada antrian</string>
+    <string name="waiting_empty_body">Anda tidak sedang berada dalam antrian untuk acara ini.</string>
+    <string name="waiting_error_title">Gagal memuat antrian</string>
+    <string name="waiting_status_waiting">Menunggu giliran…</string>
+    <string name="waiting_status_your_turn">Giliran Anda tiba</string>
+    <string name="waiting_status_closed">Antrian ditutup — tiket telah habis terjual</string>
+
+    <!-- Queue position card -->
+    <string name="queue_position_waiting">Anda antrian ke-</string>
+    <string name="queue_position_your_turn">Giliran Anda — antrian ke-</string>
+    <string name="queue_position_closed">Antrian ditutup — antrian ke-</string>
+    <string name="queue_people_ahead_none">Tidak ada antrian di depan Anda</string>
+    <string name="queue_people_ahead_sold_out">Tiket telah habis terjual</string>
+    <string name="queue_people_ahead_count">%1$d orang di depan Anda</string>
+    <string name="queue_eta">Estimasi tunggu %1$s</string>
+
+    <!-- Detail (Pilih tiket) screen -->
+    <string name="detail_title">Pilih tiket</string>
+    <string name="detail_section_categories">Kategori</string>
+    <string name="detail_categories_hint">Maks. %1$d tiket per transaksi. Tanpa nomor kursi — masuk sesuai kategori.</string>
+    <string name="detail_cap_reached">%1$d/%2$d — batas tiket tercapai. Kurangi satu untuk ganti kategori.</string>
+    <string name="detail_cap_selected">%1$d/%2$d tiket dipilih.</string>
+    <string name="detail_section_nik">NIK pemegang tiket</string>
+    <string name="detail_nik_hint">1 NIK = 1 tiket per event. Di pintu masuk, tunjukkan e-tiket + KTP asli dengan NIK yang sama.</string>
+    <string name="detail_nik_field_label">Tiket %1$d</string>
+    <string name="detail_nik_field_placeholder">16 digit sesuai KTP</string>
+    <string name="detail_nik_valid">✓ Format NIK valid</string>
+    <string name="detail_nik_invalid">NIK harus %1$d digit angka</string>
+    <string name="detail_nik_example">Contoh: 3201 1234 5678 0001</string>
+    <string name="detail_total">Total</string>
+    <string name="detail_proceed">Lanjut ke pembayaran</string>
+    <string name="detail_niks_incomplete">Lengkapi NIK 16 digit untuk setiap tiket agar dapat melanjutkan.</string>
+    <string name="detail_loading_description">Memuat detail tiket</string>
+    <string name="detail_loading">Memuat detail tiket…</string>
+    <string name="detail_empty_title">Belum ada kategori</string>
+    <string name="detail_empty_body">Tiket untuk acara ini belum tersedia.</string>
+    <string name="detail_error_title">Gagal memuat detail</string>
+    <string name="detail_expired_description">Waktu habis. 5 menit sudah lewat. Pilihan Anda belum disimpan.</string>
+    <string name="detail_expired_badge">Waktu habis</string>
+    <string name="detail_expired_headline">5 menit sudah lewat.</string>
+    <string name="detail_expired_body">Pilihan Anda belum disimpan dan tempat Anda kami berikan ke nomor berikutnya. Antre lagi untuk mencoba lagi.</string>
+    <string name="detail_expired_action">Antre lagi</string>
+
+    <!-- Seat category card -->
+    <string name="seat_sold_out">Habis</string>
+    <string name="seat_remaining">Sisa %1$s tiket</string>
+    <string name="seat_decrement">Kurangi %1$s</string>
+    <string name="seat_increment">Tambah %1$s</string>
+</resources>

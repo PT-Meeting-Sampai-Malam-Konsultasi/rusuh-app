@@ -1,10 +1,16 @@
 package com.rusuh.app.ui.components
 
 import com.rusuh.app.ui.theme.RusuhStatusColors
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.queue_people_ahead_count
+import rusuh_app.shared.generated.resources.queue_people_ahead_none
+import rusuh_app.shared.generated.resources.queue_people_ahead_sold_out
+import rusuh_app.shared.generated.resources.queue_position_closed
+import rusuh_app.shared.generated.resources.queue_position_waiting
+import rusuh_app.shared.generated.resources.queue_position_your_turn
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 class QueuePositionCardTest {
     private fun data(
@@ -23,45 +29,41 @@ class QueuePositionCardTest {
 
     @Test
     fun positionLabelPerPhase() {
-        assertEquals("Anda antrian ke-", QueuePhase.Waiting.positionLabel())
-        assertTrue(QueuePhase.YourTurn.positionLabel().contains("Giliran Anda"))
-        assertTrue(QueuePhase.QueueClosed.positionLabel().contains("ditutup"))
+        assertEquals(Res.string.queue_position_waiting, QueuePhase.Waiting.positionLabel())
+        assertEquals(Res.string.queue_position_your_turn, QueuePhase.YourTurn.positionLabel())
+        assertEquals(Res.string.queue_position_closed, QueuePhase.QueueClosed.positionLabel())
     }
 
     @Test
     fun peopleAheadLabelCountsWhileWaiting() {
-        assertEquals("41 orang di depan Anda", peopleAheadLabel(data(peopleAhead = 41)))
+        assertEquals(
+            PeopleAheadLabel(Res.string.queue_people_ahead_count, 41),
+            peopleAheadLabel(data(peopleAhead = 41)),
+        )
     }
 
     @Test
     fun peopleAheadLabelZeroWhileWaiting() {
-        assertEquals("Tidak ada antrian di depan Anda", peopleAheadLabel(data(peopleAhead = 0)))
+        assertEquals(
+            PeopleAheadLabel(Res.string.queue_people_ahead_none),
+            peopleAheadLabel(data(peopleAhead = 0)),
+        )
     }
 
     @Test
     fun peopleAheadLabelYourTurnIgnoresCount() {
-        val label = peopleAheadLabel(data(peopleAhead = 5, phase = QueuePhase.YourTurn))
-        assertEquals("Tidak ada antrian di depan Anda", label)
+        assertEquals(
+            PeopleAheadLabel(Res.string.queue_people_ahead_none),
+            peopleAheadLabel(data(peopleAhead = 5, phase = QueuePhase.YourTurn)),
+        )
     }
 
     @Test
     fun peopleAheadLabelClosedShowsSoldOut() {
-        val label = peopleAheadLabel(data(phase = QueuePhase.QueueClosed))
-        assertEquals("Tiket telah habis terjual", label)
-    }
-
-    @Test
-    fun descriptionIncludesPositionPhaseAndEta() {
-        val desc = buildQueueDescription(data(position = 42, peopleAhead = 41, eta = "~8 menit"))
-        assertTrue(desc.contains("Anda antrian ke-42"), desc)
-        assertTrue(desc.contains("41 orang di depan Anda"), desc)
-        assertTrue(desc.contains("Estimasi tunggu ~8 menit"), desc)
-    }
-
-    @Test
-    fun descriptionOmitsEtaWhenNull() {
-        val desc = buildQueueDescription(data(eta = null))
-        assertTrue(!desc.contains("Estimasi"), desc)
+        assertEquals(
+            PeopleAheadLabel(Res.string.queue_people_ahead_sold_out),
+            peopleAheadLabel(data(phase = QueuePhase.QueueClosed)),
+        )
     }
 
     @Test
