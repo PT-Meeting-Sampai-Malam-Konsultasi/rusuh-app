@@ -10,3 +10,10 @@
 *.xcuserstate
 **/build/
 xcuserdata/
+
+# Fastlane / Bundler (installed per-build, not committed)
+/vendor/bundle
+/.bundle
+fastlane/report.xml
+fastlane/README.md
+*.xcarchive
