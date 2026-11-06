@@ -27,6 +27,15 @@ object RusuhSpacing {
     /** Diameter of the solid core dot inside the queue indicator. */
     val queueDotCore = 16.dp
 
+    /** Side length of a square +/- stepper button on the Detail Ticket page. */
+    val stepperButton = 36.dp
+
+    /** Border width of a stepper button. */
+    val stepperBorder = 1.dp
+
+    /** Fixed width of the quantity readout between the stepper buttons. */
+    val stepperValue = 28.dp
+
     /** Alpha applied to a disabled (sold-out) card. */
     const val DISABLED_ALPHA = 0.5f
 }
