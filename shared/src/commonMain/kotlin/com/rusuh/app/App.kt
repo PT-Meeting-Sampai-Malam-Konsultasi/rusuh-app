@@ -1,25 +1,20 @@
 package com.rusuh.app
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.navigation.compose.rememberNavController
+import com.rusuh.app.navigation.RusuhNavGraph
 import com.rusuh.app.ui.theme.RusuhTheme
 
+/**
+ * App entry composable: applies the theme and hosts the navigation graph.
+ *
+ * The nav graph starts on the Home (Event) tab and drives the four top-level
+ * tab destinations through the shared bottom bar (see [RusuhNavGraph]).
+ */
 @Composable
 fun App() {
     RusuhTheme {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Rusuh Booking Tiket",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-        }
+        val navController = rememberNavController()
+        RusuhNavGraph(navController = navController)
     }
 }
