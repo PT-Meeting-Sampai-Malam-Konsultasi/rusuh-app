@@ -19,8 +19,6 @@ jobs:
     # unsupported runner configuration on this org, so the job died in ~1s.
     runs-on: macos-15
     timeout-minutes: 60
-    env:
-      ARCHIVE_PATH: ${{ runner.temp }}/Rusuh.xcarchive
     steps:
       - uses: actions/checkout@v4
 
@@ -51,11 +49,10 @@ jobs:
           restore-keys: konan-${{ runner.os }}-
 
       # Build the KMP shared framework + unsigned archive via Fastlane.
-      # The lane writes the archive to $KIROCREW_SCRATCH/Rusuh.xcarchive when set,
-      # otherwise to <repo>/build/ios/Rusuh.xcarchive — we point it at runner.temp.
+      # The lane writes the archive to $ARCHIVE_PATH.
       - name: Build unsigned iOS archive (Fastlane)
         env:
-          KIROCREW_SCRATCH: ${{ runner.temp }}
+          ARCHIVE_PATH: ${{ runner.temp }}/Rusuh.xcarchive
         run: bundle exec fastlane build_unsigned
 
       - name: Upload Archive
@@ -63,5 +60,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-archive-unsigned
-          path: ${{ env.ARCHIVE_PATH }}
+          path: ${{ runner.temp }}/Rusuh.xcarchive
           if-no-files-found: error

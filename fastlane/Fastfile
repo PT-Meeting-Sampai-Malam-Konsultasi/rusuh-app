@@ -3,8 +3,11 @@ default_platform(:ios)
 # Paths are resolved relative to the repo root (one level above fastlane/).
 REPO_ROOT       = File.expand_path("..", __dir__)
 XCODE_PROJECT   = File.join(REPO_ROOT, "iosApp", "Rusuh.xcodeproj")
-ARCHIVE_DIR     = ENV["KIROCREW_SCRATCH"] || File.join(REPO_ROOT, "build", "ios")
-ARCHIVE_PATH    = File.join(ARCHIVE_DIR, "Rusuh.xcarchive")
+# Archive location: ARCHIVE_PATH wins (CI sets it), then KIROCREW_SCRATCH, then a
+# repo-local build dir for a plain local run.
+ARCHIVE_PATH    = ENV["ARCHIVE_PATH"] ||
+                  File.join(ENV["KIROCREW_SCRATCH"] || File.join(REPO_ROOT, "build", "ios"),
+                            "Rusuh.xcarchive")
 
 platform :ios do
   desc "Build the KMP shared framework, then produce an UNSIGNED Rusuh.xcarchive"
