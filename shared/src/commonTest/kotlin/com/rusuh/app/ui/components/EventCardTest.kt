@@ -77,4 +77,29 @@ class EventCardTest {
         val desc = buildCardDescription(data)
         assertTrue(!desc.contains("Rp"), desc)
     }
+
+    @Test
+    fun unknownFormatOmitsFormatFromDescriptionWithoutDoubleSeparator() {
+        // Use a subtitle that does not itself contain a format word, so the
+        // assertions isolate the format segment.
+        val data =
+            sampleData(EventStatus.Available)
+                .copy(subtitle = "Senja Panjang", format = EventFormat.UNKNOWN)
+        val desc = buildCardDescription(data)
+        // No stray ", ," where the format label would have been.
+        assertTrue(!desc.contains(", ,"), desc)
+        // Identity still present; format segment gone.
+        assertEquals(
+            "Langit Sore, Senja Panjang, Stadion Kridosono Yogyakarta, " +
+                "Sab, 9 Jan 2027 · 18.30 WIB. Mulai Rp 325.000. Status: Antrian dibuka",
+            desc,
+        )
+    }
+
+    @Test
+    fun knownFormatStillAppearsInDescription() {
+        val data = sampleData(EventStatus.Available).copy(subtitle = "Senja Panjang")
+        val desc = buildCardDescription(data)
+        assertTrue(desc.contains("Live"), desc)
+    }
 }

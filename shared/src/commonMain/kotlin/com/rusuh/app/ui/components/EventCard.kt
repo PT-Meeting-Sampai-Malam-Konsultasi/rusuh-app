@@ -35,6 +35,9 @@ enum class EventFormat(val label: String) {
     TOUR("Tour"),
     LIVE("Live"),
     FESTIVAL("Festival"),
+
+    /** Format not yet known (e.g. before the API resolves it); renders no badge. */
+    UNKNOWN(""),
 }
 
 /**
@@ -200,13 +203,17 @@ private fun PosterSlot(
                         ),
                     ),
         )
-        FormatBadge(
-            format = format,
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(RusuhSpacing.lg),
-        )
+        // No badge for an unknown format (blank label), so a card never shows an
+        // empty pill before the real format is resolved.
+        if (format.label.isNotEmpty()) {
+            FormatBadge(
+                format = format,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(RusuhSpacing.lg),
+            )
+        }
     }
 }
 
@@ -254,15 +261,28 @@ fun EventStatus.footerText(): String? =
         is EventStatus.ComingSoon -> countdown
     }
 
-/** Full accessibility description combining event identity and status. */
-internal fun buildCardDescription(data: EventCardData): String =
-    buildString {
-        append("${data.title}, ${data.subtitle}, ${data.format.label}, ")
-        append("${data.venue} ${data.city}, ${data.dateTime} ${data.timeZone.name}.")
-        data.priceFrom?.let { append(" $it.") }
-        append(" Status: ${data.status.badgeLabel()}")
+/**
+ * Full accessibility description combining the event's known identity fields and
+ * status. Blank fields (e.g. before the API resolves venue/date) are skipped so
+ * the reader never hears empty segments or stray separators.
+ */
+internal fun buildCardDescription(data: EventCardData): String {
+    val identity =
+        listOf(
+            data.title,
+            data.subtitle,
+            data.format.label,
+            listOf(data.venue, data.city).filter { it.isNotBlank() }.joinToString(" "),
+            // Timezone only reads alongside a date; a lone "WIB" would be noise.
+            if (data.dateTime.isNotBlank()) "${data.dateTime} ${data.timeZone.name}" else "",
+        ).filter { it.isNotBlank() }
+    return buildString {
+        append(identity.joinToString(", "))
+        data.priceFrom?.let { append(". $it") }
+        append(". Status: ${data.status.badgeLabel()}")
         data.status.footerText()?.let { append(". $it") }
     }
+}
 
 /** Groups digits with dots (Indonesian thousands separator): 12000 -> "12.000". */
 internal fun Int.formatThousands(): String {
