@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +53,8 @@ private val EMPTY_STATE_MIN_HEIGHT = 400.dp
  *
  * @param viewModel the [HomeViewModel] providing state, effects and intent sink.
  * @param onEventClick invoked with an event id when the user opens an event.
+ *   Defaults to a no-op so previews and non-navigating hosts can render the screen;
+ *   a host that wants navigation must pass a real callback (the nav graph wires it).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,15 +66,21 @@ fun HomeScreen(
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(Unit) {
+    // Re-run the initial load if the view model instance itself changes, not only
+    // on first composition, so a swapped-in view model still loads its events.
+    LaunchedEffect(viewModel) {
         viewModel.dispatch(HomeIntent.LoadEvents)
     }
+
+    // Keep the latest onEventClick without restarting the effect collector, so a
+    // recomposition that supplies a new callback never fires the stale one.
+    val currentOnEventClick by rememberUpdatedState(onEventClick)
 
     // One-time effects: navigate on tap, surface transient errors as a snackbar.
     LaunchedEffect(viewModel) {
         viewModel.effect.collect { effect ->
             when (effect) {
-                is HomeEffect.NavigateToEvent -> onEventClick(effect.id)
+                is HomeEffect.NavigateToEvent -> currentOnEventClick(effect.id)
                 is HomeEffect.ShowError -> snackbarHostState.showSnackbar(effect.message)
             }
         }

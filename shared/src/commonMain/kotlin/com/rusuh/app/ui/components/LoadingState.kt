@@ -7,12 +7,16 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -21,7 +25,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.theme.RusuhSpacing
@@ -49,12 +55,14 @@ private const val SHIMMER_SWEEP = 900f
 private const val SHIMMER_GRADIENT_WIDTH = 300f
 
 /**
- * Loading placeholder for the home list: a column of shimmering skeleton cards
- * that mirror [EventCard]'s shape (poster + two text lines) so the layout does
- * not jump when real data arrives.
+ * Loading placeholder for the home list: a scrollable column of shimmering
+ * skeleton cards that mirror [EventCard]'s shape (poster + two text lines) so the
+ * layout does not jump when real data arrives.
  *
- * The whole column carries a single content description so screen readers
- * announce "loading" once rather than reading each decorative skeleton block.
+ * Uses a [LazyColumn] so several full-height skeleton cards never clip on short
+ * viewports. The container carries a single content description plus a polite
+ * live region so assistive tech announces loading once when it appears after a
+ * user action, rather than reading each decorative skeleton block.
  *
  * @param count how many skeleton cards to draw.
  */
@@ -64,12 +72,19 @@ fun LoadingState(
     count: Int = DEFAULT_SKELETON_COUNT,
 ) {
     val brush = rememberShimmerBrush()
-    Column(
-        modifier = modifier.semantics { contentDescription = "Memuat daftar event" },
+    LazyColumn(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .semantics {
+                    contentDescription = "Memuat daftar event"
+                    liveRegion = LiveRegionMode.Polite
+                },
+        contentPadding = PaddingValues(RusuhSpacing.xl),
+        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
     ) {
-        repeat(count) {
+        items(count) {
             SkeletonCard(brush = brush)
-            Spacer(Modifier.height(RusuhSpacing.xl))
         }
     }
 }
