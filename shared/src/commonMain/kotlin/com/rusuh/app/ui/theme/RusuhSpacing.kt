@@ -27,6 +27,15 @@ object RusuhSpacing {
     /** Diameter of the solid core dot inside the queue indicator. */
     val queueDotCore = 16.dp
 
+    /** Tonal elevation of the shared bottom navigation bar. */
+    val bottomBarElevation = 3.dp
+
+    /** Side length of the square poster thumbnail on a My Queues row. */
+    val queueThumb = 64.dp
+
+    /** Height of a placeholder skeleton row on the My Queues loading state. */
+    val queueSkeletonRow = 96.dp
+
     /** Side length of a square +/- stepper button on the Detail Ticket page. */
     val stepperButton = 36.dp
 
