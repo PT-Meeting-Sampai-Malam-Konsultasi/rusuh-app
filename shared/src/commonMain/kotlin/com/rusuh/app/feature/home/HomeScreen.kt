@@ -1,53 +1,213 @@
 package com.rusuh.app.feature.home
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.rusuh.app.ui.components.ErrorState
+import com.rusuh.app.ui.components.EventCard
+import com.rusuh.app.ui.components.LoadingState
+import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhTheme
 
+/** Minimum width a single event-card column occupies; drives the responsive grid. */
+private val EVENT_CARD_MIN_WIDTH = 320.dp
+
+/** Minimum height so the empty-state column fills the viewport and stays pullable. */
+private val EMPTY_STATE_MIN_HEIGHT = 400.dp
+
 /**
- * Minimal placeholder Home screen.
+ * The Home screen: an app bar plus a responsive, pull-to-refresh event list that
+ * renders M1's [EventCard] for each event in [HomeViewModel]'s state.
  *
- * This renders only the MVI [HomeState] (loading / error / event count). It is a
- * deliberate scaffold so M2 can wire M3's state together with M1's `EventCard`
- * without reworking the state layer.
+ * This is the UI half of FR-01: it collects [HomeState] from the [HomeViewModel]
+ * and dispatches [HomeIntent]s; the data still comes from M3's stub repository
+ * until M4 wires the real API. Navigation is pushed out to [onEventClick] so the
+ * shared screen stays free of any navigator dependency.
  *
- * @param viewModel the [HomeViewModel] providing state and consuming intents.
+ * @param viewModel the [HomeViewModel] providing state, effects and intent sink.
+ * @param onEventClick invoked with an event id when the user opens an event.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: HomeViewModel) {
+fun HomeScreen(
+    viewModel: HomeViewModel,
+    modifier: Modifier = Modifier,
+    onEventClick: (String) -> Unit = {},
+) {
     val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.dispatch(HomeIntent.LoadEvents)
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        when {
-            state.isLoading -> CircularProgressIndicator()
-            state.error != null ->
-                Text(
-                    text = state.error ?: "",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            else ->
-                // TODO(M2): render event list with EventCard
-                Text(
-                    text = "Events: ${state.events.size}",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+    // One-time effects: navigate on tap, surface transient errors as a snackbar.
+    LaunchedEffect(viewModel) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is HomeEffect.NavigateToEvent -> onEventClick(effect.id)
+                is HomeEffect.ShowError -> snackbarHostState.showSnackbar(effect.message)
+            }
         }
+    }
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = { HomeAppBar() },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { innerPadding ->
+        HomeContent(
+            state = state,
+            contentPadding = innerPadding,
+            actions =
+                HomeActions(
+                    onRefresh = { viewModel.dispatch(HomeIntent.RefreshEvents) },
+                    onRetry = { viewModel.dispatch(HomeIntent.RefreshEvents) },
+                    onEventClick = { id -> viewModel.dispatch(HomeIntent.EventClicked(id)) },
+                ),
+        )
+    }
+}
+
+/**
+ * The user actions the home content can raise, bundled so the content composable
+ * takes one handler object instead of three loose lambdas.
+ */
+private data class HomeActions(
+    val onRefresh: () -> Unit,
+    val onRetry: () -> Unit,
+    val onEventClick: (String) -> Unit,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeAppBar() {
+    TopAppBar(
+        title = {
+            Text(
+                text = "Rusuh",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeContent(
+    state: HomeState,
+    contentPadding: PaddingValues,
+    actions: HomeActions,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.fillMaxSize().padding(contentPadding)) {
+        when {
+            // First load (no data yet): show skeletons, not the pull indicator.
+            state.isLoading && state.events.isEmpty() ->
+                LoadingState(modifier = Modifier.padding(RusuhSpacing.xl))
+
+            state.error != null && state.events.isEmpty() ->
+                ErrorState(message = state.error, onRetry = actions.onRetry)
+
+            else ->
+                PullToRefreshBox(
+                    isRefreshing = state.isLoading,
+                    onRefresh = actions.onRefresh,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    if (state.events.isEmpty()) {
+                        EmptyState()
+                    } else {
+                        EventGrid(events = state.events, onEventClick = actions.onEventClick)
+                    }
+                }
+        }
+    }
+}
+
+/**
+ * Responsive event grid: an adaptive column count ([GridCells.Adaptive]) gives a
+ * single column on phones and multiple columns on wide screens from one layout.
+ */
+@Composable
+private fun EventGrid(
+    events: List<HomeEventItem>,
+    onEventClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = EVENT_CARD_MIN_WIDTH),
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(RusuhSpacing.xl),
+        horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
+        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
+    ) {
+        items(items = events, key = { it.id }) { event ->
+            EventCard(
+                data = event.toEventCardData(),
+                onClick = { onEventClick(event.id) },
+            )
+        }
+    }
+}
+
+/**
+ * Shown inside the pull-to-refresh box when the loaded list is empty.
+ *
+ * Uses a vertically-scrollable column so [PullToRefreshBox] has a scroll
+ * connection and the pull-to-refresh gesture still works with no items.
+ */
+@Composable
+private fun EmptyState(modifier: Modifier = Modifier) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = EMPTY_STATE_MIN_HEIGHT)
+                .padding(RusuhSpacing.xl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Belum ada event",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = "Tarik ke bawah untuk memuat ulang.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -55,11 +215,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
  * Preview helper wrapping [HomeScreen] in [RusuhTheme].
  *
  * The `@Preview` annotation is intentionally omitted: it lives in
- * `compose.components.uiToolingPreview`, which this module does not depend on, and
- * M3 should not add a dependency just for a preview. M2 can annotate when it adds
- * the real UI and the tooling dependency.
+ * `compose.components.uiToolingPreview`, which this module does not depend on.
  */
-@Suppress("UnusedPrivateMember") // Preview seam for M2; becomes @Preview-annotated there.
+@Suppress("UnusedPrivateMember")
 @Composable
 private fun HomeScreenPreview() {
     RusuhTheme {
