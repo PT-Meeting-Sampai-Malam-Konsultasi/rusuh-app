@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 fun RusuhTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = RusuhLightColorScheme,
-        typography = RusuhTypography,
+        typography = rusuhTypography(),
         shapes = RusuhMaterialShapes,
         content = content,
     )
