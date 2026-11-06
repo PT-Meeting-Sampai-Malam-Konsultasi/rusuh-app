@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Default (English) UI strings. EN is the base locale per ADR-0014; the
+  Indonesian translation lives in values-id/strings.xml. Add a key ONLY when a
+  string is actually rendered (issue #51) — do not pre-populate unused keys.
+  Accessed from composables via stringResource(Res.string.<key>).
+-->
+<resources>
+    <!-- App / brand -->
+    <string name="app_name">Rusuh</string>
+
+    <!-- Shared navigation / actions -->
+    <string name="action_back">‹ Back</string>
+    <string name="action_retry">Try again</string>
+
+    <!-- Home screen -->
+    <string name="home_empty_title">No events yet</string>
+    <string name="home_pull_to_refresh">Pull down to reload.</string>
+    <string name="home_loading_description">Loading event list</string>
+
+    <!-- Event status badge labels (home cards) -->
+    <string name="status_available">Queue open</string>
+    <string name="status_temporarily_full">Temporarily full</string>
+    <string name="status_sold_out">Sold out</string>
+    <string name="status_coming_soon">On sale soon</string>
+    <string name="status_prefix">Status: %1$s</string>
+    <!-- Passthrough for already-formatted, locale-agnostic copy (e.g. a caller-built countdown). -->
+    <string name="status_passthrough">%1$s</string>
+
+    <!-- Event card status footers -->
+    <string name="event_footer_temporarily_full">Remaining tickets are being paid for by other buyers. Any that go unpaid are released within 10 minutes.</string>
+    <string name="event_footer_sold_out">All %1$s tickets sold in %2$d minutes.</string>
+
+    <!-- Waiting Room screen -->
+    <string name="waiting_title">Waiting Room</string>
+    <string name="waiting_loading_description">Loading queue position</string>
+    <string name="waiting_loading">Loading queue position…</string>
+    <string name="waiting_empty_title">Not in any queue</string>
+    <string name="waiting_empty_body">You are not currently in a queue for this event.</string>
+    <string name="waiting_error_title">Could not load the queue</string>
+    <string name="waiting_status_waiting">Waiting for your turn…</string>
+    <string name="waiting_status_your_turn">Your turn has arrived</string>
+    <string name="waiting_status_closed">Queue closed — tickets are sold out</string>
+
+    <!-- Queue position card -->
+    <string name="queue_position_waiting">You are number</string>
+    <string name="queue_position_your_turn">Your turn — number</string>
+    <string name="queue_position_closed">Queue closed — number</string>
+    <string name="queue_people_ahead_none">No one ahead of you</string>
+    <string name="queue_people_ahead_sold_out">Tickets are sold out</string>
+    <string name="queue_people_ahead_count">%1$d people ahead of you</string>
+    <string name="queue_eta">Estimated wait %1$s</string>
+
+    <!-- Detail (Pick ticket) screen -->
+    <string name="detail_title">Pick ticket</string>
+    <string name="detail_section_categories">Categories</string>
+    <string name="detail_categories_hint">Max. %1$d tickets per transaction. No seat numbers — entry is by category.</string>
+    <string name="detail_cap_reached">%1$d/%2$d — ticket limit reached. Remove one to switch category.</string>
+    <string name="detail_cap_selected">%1$d/%2$d tickets selected.</string>
+    <string name="detail_section_nik">Ticket holder NIK</string>
+    <string name="detail_nik_hint">1 NIK = 1 ticket per event. At the entrance, show your e-ticket and the original KTP with the matching NIK.</string>
+    <string name="detail_nik_field_label">Ticket %1$d</string>
+    <string name="detail_nik_field_placeholder">16 digits as on the KTP</string>
+    <string name="detail_nik_valid">✓ Valid NIK format</string>
+    <string name="detail_nik_invalid">NIK must be %1$d digits.</string>
+    <string name="detail_nik_example">Example: 3201 1234 5678 0001</string>
+    <string name="detail_total">Total</string>
+    <string name="detail_proceed">Proceed to payment</string>
+    <string name="detail_niks_incomplete">Enter a 16-digit NIK for every ticket to proceed.</string>
+    <string name="detail_loading_description">Loading ticket detail</string>
+    <string name="detail_loading">Loading ticket detail…</string>
+    <string name="detail_empty_title">No categories yet</string>
+    <string name="detail_empty_body">Tickets for this event are not available yet.</string>
+    <string name="detail_error_title">Could not load the detail</string>
+    <string name="detail_expired_description">Time is up. 5 minutes have passed. Your selection was not saved.</string>
+    <string name="detail_expired_badge">Time is up</string>
+    <string name="detail_expired_headline">5 minutes have passed.</string>
+    <string name="detail_expired_body">Your selection was not saved and your place has been given to the next in line. Queue again to try once more.</string>
+    <string name="detail_expired_action">Queue again</string>
+
+    <!-- Seat category card -->
+    <string name="seat_sold_out">Sold out</string>
+    <string name="seat_remaining">%1$s tickets left</string>
+    <string name="seat_decrement">Decrease %1$s</string>
+    <string name="seat_increment">Increase %1$s</string>
+</resources>

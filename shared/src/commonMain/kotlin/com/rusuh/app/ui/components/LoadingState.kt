@@ -31,6 +31,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.home_loading_description
 
 /** Height of a single skeleton text line. */
 private val SKELETON_LINE_HEIGHT = 16.dp
@@ -72,12 +75,13 @@ fun LoadingState(
     count: Int = DEFAULT_SKELETON_COUNT,
 ) {
     val brush = rememberShimmerBrush()
+    val loadingDescription = stringResource(Res.string.home_loading_description)
     LazyColumn(
         modifier =
             modifier
                 .fillMaxSize()
                 .semantics {
-                    contentDescription = "Memuat daftar event"
+                    contentDescription = loadingDescription
                     liveRegion = LiveRegionMode.Polite
                 },
         contentPadding = PaddingValues(RusuhSpacing.xl),

@@ -31,6 +31,16 @@ import androidx.compose.ui.text.style.TextAlign
 import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhStatusColors
 import com.rusuh.app.ui.theme.StatusColorPair
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.queue_eta
+import rusuh_app.shared.generated.resources.queue_people_ahead_count
+import rusuh_app.shared.generated.resources.queue_people_ahead_none
+import rusuh_app.shared.generated.resources.queue_people_ahead_sold_out
+import rusuh_app.shared.generated.resources.queue_position_closed
+import rusuh_app.shared.generated.resources.queue_position_waiting
+import rusuh_app.shared.generated.resources.queue_position_your_turn
 
 /**
  * Phase of a customer's wait in the queue. Drives the card's accent color and
@@ -103,6 +113,8 @@ fun QueuePositionCard(
 ) {
     val colors = data.phase.accentColors()
     val description = buildQueueDescription(data)
+    val positionLabel = stringResource(data.phase.positionLabel())
+    val peopleAhead = resolvePeopleAheadLabel(data)
 
     Card(
         modifier =
@@ -123,7 +135,7 @@ fun QueuePositionCard(
             QueueIndicator(phase = data.phase, color = colors.container)
             Spacer(Modifier.height(RusuhSpacing.xl))
             Text(
-                text = data.phase.positionLabel(),
+                text = positionLabel,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -138,7 +150,7 @@ fun QueuePositionCard(
             )
             Spacer(Modifier.height(RusuhSpacing.md))
             Text(
-                text = peopleAheadLabel(data),
+                text = peopleAhead,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
@@ -146,7 +158,7 @@ fun QueuePositionCard(
             data.estimatedWait?.let { eta ->
                 Spacer(Modifier.height(RusuhSpacing.xs))
                 Text(
-                    text = "Estimasi tunggu $eta",
+                    text = stringResource(Res.string.queue_eta, eta),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -213,33 +225,63 @@ fun QueuePhase.accentColors(): StatusColorPair =
         QueuePhase.QueueClosed -> RusuhStatusColors.soldOut
     }
 
-/** Headline above the position number for a phase. Pure function — unit-tested directly. */
-fun QueuePhase.positionLabel(): String =
+/**
+ * Headline-above-the-position resource for a phase. Pure function — returns the
+ * [StringResource] key, so it stays unit-testable; the composable resolves it.
+ */
+fun QueuePhase.positionLabel(): StringResource =
     when (this) {
-        QueuePhase.Waiting -> "Anda antrian ke-"
-        QueuePhase.YourTurn -> "Giliran Anda — antrian ke-"
-        QueuePhase.QueueClosed -> "Antrian ditutup — antrian ke-"
+        QueuePhase.Waiting -> Res.string.queue_position_waiting
+        QueuePhase.YourTurn -> Res.string.queue_position_your_turn
+        QueuePhase.QueueClosed -> Res.string.queue_position_closed
     }
 
-/** People-ahead line for the card. Pure function — unit-tested directly. */
-internal fun peopleAheadLabel(data: QueuePositionUi): String =
+/**
+ * People-ahead line resource + optional arg for the card. Pure function —
+ * unit-tested directly; [resolvePeopleAheadLabel] resolves it in a composition.
+ * A null [PeopleAheadLabel.count] means a plain resource; a non-null count fills
+ * the `%1$d` placeholder.
+ */
+internal fun peopleAheadLabel(data: QueuePositionUi): PeopleAheadLabel =
     when (data.phase) {
-        QueuePhase.YourTurn -> "Tidak ada antrian di depan Anda"
-        QueuePhase.QueueClosed -> "Tiket telah habis terjual"
+        QueuePhase.YourTurn -> PeopleAheadLabel(Res.string.queue_people_ahead_none)
+        QueuePhase.QueueClosed -> PeopleAheadLabel(Res.string.queue_people_ahead_sold_out)
         QueuePhase.Waiting ->
             when (data.peopleAhead) {
-                0 -> "Tidak ada antrian di depan Anda"
-                else -> "${data.peopleAhead} orang di depan Anda"
+                0 -> PeopleAheadLabel(Res.string.queue_people_ahead_none)
+                else -> PeopleAheadLabel(Res.string.queue_people_ahead_count, data.peopleAhead)
             }
     }
 
-/** Full accessibility description combining position, phase and wait. Pure function. */
+/** Resource (and optional count arg) for the people-ahead line. */
+internal data class PeopleAheadLabel(
+    val resource: StringResource,
+    val count: Int? = null,
+)
+
+/** Resolves [peopleAheadLabel] to its localized string in a composition. */
+@Composable
+internal fun resolvePeopleAheadLabel(data: QueuePositionUi): String {
+    val label = peopleAheadLabel(data)
+    return if (label.count != null) {
+        stringResource(label.resource, label.count)
+    } else {
+        stringResource(label.resource)
+    }
+}
+
+/**
+ * Full accessibility description combining position, phase and wait.
+ * `@Composable` so the phase label, people-ahead line and ETA resolve from
+ * string resources.
+ */
+@Composable
 internal fun buildQueueDescription(data: QueuePositionUi): String =
     buildString {
-        append("${data.phase.positionLabel()}${data.position}. ")
-        append(peopleAheadLabel(data))
+        append("${stringResource(data.phase.positionLabel())}${data.position}. ")
+        append(resolvePeopleAheadLabel(data))
         append(".")
-        data.estimatedWait?.let { append(" Estimasi tunggu $it.") }
+        data.estimatedWait?.let { append(" ${stringResource(Res.string.queue_eta, it)}.") }
     }
 
 private const val PULSE_MIN_SCALE = 0.6f

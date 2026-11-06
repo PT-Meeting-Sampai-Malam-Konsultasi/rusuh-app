@@ -35,6 +35,11 @@ import com.rusuh.app.ui.components.EventCard
 import com.rusuh.app.ui.components.LoadingState
 import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhTheme
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.app_name
+import rusuh_app.shared.generated.resources.home_empty_title
+import rusuh_app.shared.generated.resources.home_pull_to_refresh
 
 /** Minimum width a single event-card column occupies; drives the responsive grid. */
 private val EVENT_CARD_MIN_WIDTH = 320.dp
@@ -120,7 +125,7 @@ private fun HomeAppBar() {
     TopAppBar(
         title = {
             Text(
-                text = "Rusuh",
+                text = stringResource(Res.string.app_name),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -206,13 +211,13 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Belum ada event",
+            text = stringResource(Res.string.home_empty_title),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "Tarik ke bawah untuk memuat ulang.",
+            text = stringResource(Res.string.home_pull_to_refresh),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

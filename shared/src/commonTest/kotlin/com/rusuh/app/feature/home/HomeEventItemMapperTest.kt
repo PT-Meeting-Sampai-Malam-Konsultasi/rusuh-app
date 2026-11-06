@@ -2,7 +2,7 @@ package com.rusuh.app.feature.home
 
 import com.rusuh.app.ui.components.EventFormat
 import com.rusuh.app.ui.components.EventStatus
-import com.rusuh.app.ui.components.buildCardDescription
+import com.rusuh.app.ui.components.buildCardIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -29,11 +29,11 @@ class HomeEventItemMapperTest {
     }
 
     @Test
-    fun mappedCardDescriptionIsTitlePlusAvailableWithoutEmptySegments() {
+    fun mappedCardIdentityIsTitleAloneWithoutEmptySegments() {
         // Blank venue/date/format must not leak empty segments or a lone timezone
-        // into the screen-reader description.
+        // into the screen-reader description. (The localized status suffix is
+        // appended by the @Composable buildCardDescription at render time.)
         val card = HomeEventItem(id = "4", title = "Konser Senja").toEventCardData()
-        val desc = buildCardDescription(card)
-        assertEquals("Konser Senja. Status: Antrian dibuka", desc)
+        assertEquals("Konser Senja", buildCardIdentity(card))
     }
 }

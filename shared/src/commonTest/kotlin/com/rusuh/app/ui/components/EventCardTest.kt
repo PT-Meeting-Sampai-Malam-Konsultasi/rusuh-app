@@ -1,5 +1,9 @@
 package com.rusuh.app.ui.components
 
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.event_footer_sold_out
+import rusuh_app.shared.generated.resources.event_footer_temporarily_full
+import rusuh_app.shared.generated.resources.status_passthrough
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -21,25 +25,31 @@ class EventCardTest {
 
     @Test
     fun availableHasNoFooter() {
-        assertNull(EventStatus.Available.footerText())
+        assertNull(EventStatus.Available.footerSpec())
     }
 
     @Test
-    fun temporarilyFullFooterMentionsTenMinutes() {
-        val footer = EventStatus.TemporarilyFull.footerText()
-        assertTrue(footer != null && footer.contains("10 menit"), "got: $footer")
+    fun temporarilyFullFooterUsesTheTenMinuteKey() {
+        // The "10 minutes" copy now lives in the resource value; the spec maps to that key.
+        assertEquals(
+            FooterSpec(Res.string.event_footer_temporarily_full),
+            EventStatus.TemporarilyFull.footerSpec(),
+        )
     }
 
     @Test
-    fun soldOutFooterIncludesCapacityAndMinutes() {
-        val footer = EventStatus.SoldOut(soldOutInMinutes = 41, capacity = 12_000).footerText()
-        assertEquals("Semua 12.000 tiket terjual dalam 41 menit.", footer)
+    fun soldOutFooterCarriesCapacityAndMinutesArgs() {
+        val spec = EventStatus.SoldOut(soldOutInMinutes = 41, capacity = 12_000).footerSpec()
+        assertEquals(FooterSpec(Res.string.event_footer_sold_out, listOf("12.000", 41)), spec)
     }
 
     @Test
-    fun comingSoonFooterIsTheCountdown() {
+    fun comingSoonFooterPassesTheCountdownThrough() {
         val countdown = "7 hari 14 jam lagi"
-        assertEquals(countdown, EventStatus.ComingSoon(countdown).footerText())
+        assertEquals(
+            FooterSpec(Res.string.status_passthrough, listOf(countdown)),
+            EventStatus.ComingSoon(countdown).footerSpec(),
+        )
     }
 
     @Test
@@ -51,55 +61,34 @@ class EventCardTest {
     }
 
     @Test
-    fun cardDescriptionIncludesIdentityStatusAndFooter() {
-        val desc = buildCardDescription(sampleData(EventStatus.SoldOut(41, 12_000)))
-        assertTrue(desc.contains("Langit Sore"), desc)
-        assertTrue(desc.contains("WIB"), desc)
-        assertTrue(desc.contains("Habis terjual"), desc)
-        assertTrue(desc.contains("12.000 tiket terjual"), desc)
+    fun cardIdentityIncludesTitleTimezoneAndFields() {
+        val identity = buildCardIdentity(sampleData(EventStatus.SoldOut(41, 12_000)))
+        assertTrue(identity.contains("Langit Sore"), identity)
+        assertTrue(identity.contains("WIB"), identity)
     }
 
     @Test
-    fun cardDescriptionOmitsFooterWhenAvailable() {
-        val desc = buildCardDescription(sampleData(EventStatus.Available))
-        assertTrue(desc.endsWith("Status: Antrian dibuka"), desc)
-    }
-
-    @Test
-    fun cardDescriptionIncludesPriceWhenPresent() {
-        val desc = buildCardDescription(sampleData(EventStatus.Available))
-        assertTrue(desc.contains("Mulai Rp 325.000"), desc)
-    }
-
-    @Test
-    fun cardDescriptionOmitsPriceWhenNull() {
-        val data = sampleData(EventStatus.Available).copy(priceFrom = null)
-        val desc = buildCardDescription(data)
-        assertTrue(!desc.contains("Rp"), desc)
-    }
-
-    @Test
-    fun unknownFormatOmitsFormatFromDescriptionWithoutDoubleSeparator() {
+    fun unknownFormatOmitsFormatFromIdentityWithoutDoubleSeparator() {
         // Use a subtitle that does not itself contain a format word, so the
         // assertions isolate the format segment.
         val data =
             sampleData(EventStatus.Available)
                 .copy(subtitle = "Senja Panjang", format = EventFormat.UNKNOWN)
-        val desc = buildCardDescription(data)
+        val identity = buildCardIdentity(data)
         // No stray ", ," where the format label would have been.
-        assertTrue(!desc.contains(", ,"), desc)
+        assertTrue(!identity.contains(", ,"), identity)
         // Identity still present; format segment gone.
         assertEquals(
             "Langit Sore, Senja Panjang, Stadion Kridosono Yogyakarta, " +
-                "Sab, 9 Jan 2027 · 18.30 WIB. Mulai Rp 325.000. Status: Antrian dibuka",
-            desc,
+                "Sab, 9 Jan 2027 · 18.30 WIB",
+            identity,
         )
     }
 
     @Test
-    fun knownFormatStillAppearsInDescription() {
+    fun knownFormatStillAppearsInIdentity() {
         val data = sampleData(EventStatus.Available).copy(subtitle = "Senja Panjang")
-        val desc = buildCardDescription(data)
-        assertTrue(desc.contains("Live"), desc)
+        val identity = buildCardIdentity(data)
+        assertTrue(identity.contains("Live"), identity)
     }
 }
