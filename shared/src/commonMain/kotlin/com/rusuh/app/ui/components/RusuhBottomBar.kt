@@ -3,11 +3,13 @@ package com.rusuh.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,12 +18,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.rusuh.app.ui.theme.RusuhBrandColors
+import com.rusuh.app.ui.theme.RusuhBrandMetrics
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Shared bottom navigation bar used by every top-level tab screen (Event /
@@ -47,25 +53,29 @@ fun RusuhBottomBar(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = RusuhSpacing.bottomBarElevation,
+        // Figma/hi-fi bar: paper background with a 2.5dp ink rule on top.
+        color = RusuhBrandColors.Paper,
+        contentColor = RusuhBrandColors.Ink,
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = RusuhSpacing.sm),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RusuhTab.entries.forEach { tab ->
-                BottomBarItem(
-                    tab = tab,
-                    selected = tab == selectedTab,
-                    onClick = { if (tab != selectedTab) onTabSelected(tab) },
-                    modifier = Modifier.weight(1f),
-                )
+        // Keep the tabs clear of the system navigation bar (3-button / gesture area).
+        Column(Modifier.navigationBarsPadding()) {
+            Box(Modifier.fillMaxWidth().height(RusuhBrandMetrics.borderWidth).background(RusuhBrandColors.Ink))
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = RusuhSpacing.sm),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RusuhTab.entries.forEach { tab ->
+                    BottomBarItem(
+                        tab = tab,
+                        selected = tab == selectedTab,
+                        onClick = { if (tab != selectedTab) onTabSelected(tab) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
@@ -81,16 +91,14 @@ private fun BottomBarItem(
     // Active tab takes the full on-surface ink; inactive tabs are muted. Mirrors
     // the hi-fi `.tabbar a` (muted) vs `a[aria-current]` (ink) contrast.
     val iconColor =
-        if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        if (selected) RusuhBrandColors.Ink else RusuhBrandColors.Ink2
 
     Column(
         modifier =
             modifier
-                .clickable(onClick = onClick)
-                .clearAndSetSemantics {
-                    contentDescription = "${tab.label}${if (selected) ", terpilih" else ""}"
-                    this.selected = selected
-                }
+                .clickable(role = Role.Tab, onClick = onClick)
+                // Announce "<label>, selected" from the tab semantics; the decorative glyph is hidden below.
+                .semantics(mergeDescendants = true) { this.selected = selected }
                 .padding(vertical = RusuhSpacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -100,6 +108,7 @@ private fun BottomBarItem(
             style = MaterialTheme.typography.titleMedium,
             color = iconColor,
             textAlign = TextAlign.Center,
+            modifier = Modifier.clearAndSetSemantics {},
         )
         Spacer(Modifier.height(RusuhSpacing.xxs))
         TabLabel(tab = tab, selected = selected)
@@ -118,21 +127,21 @@ private fun TabLabel(
 ) {
     if (selected) {
         Text(
-            text = tab.label,
+            text = stringResource(tab.label),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.surface,
+            color = RusuhBrandColors.Paper,
             modifier =
                 Modifier
                     .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.onSurface)
+                    .background(RusuhBrandColors.Ink)
                     .padding(horizontal = RusuhSpacing.sm, vertical = RusuhSpacing.xxs),
         )
     } else {
         Text(
-            text = tab.label,
+            text = stringResource(tab.label),
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = RusuhBrandColors.Ink2,
         )
     }
 }

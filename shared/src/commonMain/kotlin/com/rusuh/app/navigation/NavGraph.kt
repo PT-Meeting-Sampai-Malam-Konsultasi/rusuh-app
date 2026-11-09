@@ -32,7 +32,10 @@ import com.rusuh.app.ui.components.QueuePositionUi
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.tab_coming_soon
 
 /**
  * Main navigation graph for the Rusuh app.
@@ -114,11 +117,11 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
     }
 
     composable(Screen.Tickets.route) {
-        StubTabScreen(tab = RusuhTab.Tiket, title = "Tiket — segera hadir", onTabSelected = onTabSelected)
+        StubTabScreen(tab = RusuhTab.Tiket, onTabSelected = onTabSelected)
     }
 
     composable(Screen.Account.route) {
-        StubTabScreen(tab = RusuhTab.Akun, title = "Akun — segera hadir", onTabSelected = onTabSelected)
+        StubTabScreen(tab = RusuhTab.Akun, onTabSelected = onTabSelected)
     }
 }
 
@@ -163,7 +166,6 @@ private fun TabScaffold(
 @Composable
 private fun StubTabScreen(
     tab: RusuhTab,
-    title: String,
     onTabSelected: (RusuhTab) -> Unit,
 ) {
     Scaffold(
@@ -172,7 +174,7 @@ private fun StubTabScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = tab.label,
+                        text = stringResource(tab.label),
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -186,7 +188,7 @@ private fun StubTabScreen(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = title,
+                text = stringResource(Res.string.tab_coming_soon, stringResource(tab.label)),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
