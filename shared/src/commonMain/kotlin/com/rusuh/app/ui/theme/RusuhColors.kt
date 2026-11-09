@@ -43,6 +43,15 @@ object RusuhColors {
 
     // Scrim applied over a poster image so overlaid chrome stays legible.
     val PosterScrim = Color(0x99000000)
+
+    // Ink / paper tokens for the bordered, hard-shadow card style (Home + EventCard).
+    // TODO(figma-verify): provisional values -- Figma file V1VQxA5Ckf82rMppnuMdSw was
+    // unreachable (MCP rate limit) when these were added; confirm against the
+    // variable defs of "Home - Mobile" (4:1544) / "Aside - Event" (5:10).
+    val Ink = Color(0xFF111111) // card/badge outlines and hard shadow
+    val Paper = Color(0xFFFFF8EE) // Home page background
+    val FormatBadge = Color(0xFFFFD23F) // rotated Tour/Live/Festival tag on the poster
+    val OnFormatBadge = Ink
 }
 
 /**

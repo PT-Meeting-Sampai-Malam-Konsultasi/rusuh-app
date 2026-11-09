@@ -1,10 +1,14 @@
 package com.rusuh.app.feature.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -19,6 +23,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,11 +33,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.components.ErrorState
 import com.rusuh.app.ui.components.EventCard
 import com.rusuh.app.ui.components.LoadingState
+import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhTheme
 import org.jetbrains.compose.resources.stringResource
@@ -93,6 +100,7 @@ fun HomeScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = RusuhColors.Paper,
         topBar = { HomeAppBar() },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
@@ -122,15 +130,26 @@ private data class HomeActions(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeAppBar() {
-    TopAppBar(
-        title = {
-            Text(
-                text = stringResource(Res.string.app_name),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        },
-    )
+    Column {
+        TopAppBar(
+            title = {
+                Text(
+                    text = stringResource(Res.string.app_name),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = RusuhColors.Ink,
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = RusuhColors.Paper),
+        )
+        // Ink rule under the header, matching the card outline weight.
+        Spacer(
+            Modifier
+                .fillMaxWidth()
+                .height(RusuhSpacing.inkBorder)
+                .background(RusuhColors.Ink),
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -179,9 +198,9 @@ private fun EventGrid(
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = EVENT_CARD_MIN_WIDTH),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(RusuhSpacing.xl),
-        horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
-        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
+        contentPadding = PaddingValues(RusuhSpacing.homeGridPadding),
+        horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.homeGridGap),
+        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.homeGridGap),
     ) {
         items(items = events, key = { it.id }) { event ->
             EventCard(

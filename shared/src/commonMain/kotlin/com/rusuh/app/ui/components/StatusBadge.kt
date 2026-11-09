@@ -1,5 +1,6 @@
 package com.rusuh.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
+import com.rusuh.app.ui.theme.RusuhColors
+import com.rusuh.app.ui.theme.RusuhShapes
 import com.rusuh.app.ui.theme.RusuhSpacing
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
@@ -41,7 +45,8 @@ fun StatusBadge(
         modifier = modifier.clearAndSetSemantics { contentDescription = statusDescription },
         color = colors.container,
         contentColor = colors.content,
-        shape = MaterialTheme.shapes.small,
+        shape = RusuhShapes.pill,
+        border = BorderStroke(RusuhSpacing.inkBorder, RusuhColors.Ink),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.xs),
@@ -55,6 +60,7 @@ fun StatusBadge(
             Text(
                 text = label.uppercase(),
                 style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
             )
         }
     }

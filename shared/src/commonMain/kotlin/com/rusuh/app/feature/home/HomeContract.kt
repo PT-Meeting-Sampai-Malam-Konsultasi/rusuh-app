@@ -3,6 +3,9 @@ package com.rusuh.app.feature.home
 import com.rusuh.app.mvi.MviEffect
 import com.rusuh.app.mvi.MviIntent
 import com.rusuh.app.mvi.MviState
+import com.rusuh.app.ui.components.EventFormat
+import com.rusuh.app.ui.components.EventStatus
+import com.rusuh.app.ui.components.TimeZoneLabel
 
 /**
  * Minimal placeholder event model for the Home screen's MVI state.
@@ -16,6 +19,16 @@ import com.rusuh.app.mvi.MviState
 data class HomeEventItem(
     val id: String,
     val title: String,
+    // Optional display fields (all defaulted, so existing call sites are unchanged).
+    // TODO(M4): populate from the real API domain model.
+    val subtitle: String = "",
+    val format: EventFormat = EventFormat.UNKNOWN,
+    val venue: String = "",
+    val city: String = "",
+    val dateTime: String = "",
+    val timeZone: TimeZoneLabel = TimeZoneLabel.WIB,
+    val status: EventStatus = EventStatus.Available,
+    val priceFrom: String? = null,
 )
 
 /**
