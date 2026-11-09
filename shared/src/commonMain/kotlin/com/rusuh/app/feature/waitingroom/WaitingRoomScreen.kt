@@ -2,230 +2,260 @@
 
 package com.rusuh.app.feature.waitingroom
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import com.rusuh.app.ui.components.QueuePhase
+import androidx.compose.ui.unit.dp
+import com.rusuh.app.ui.components.QueueBigNumber
 import com.rusuh.app.ui.components.QueuePositionCard
-import com.rusuh.app.ui.components.QueuePositionUi
-import com.rusuh.app.ui.components.accentColors
+import com.rusuh.app.ui.components.formatCountdown
+import com.rusuh.app.ui.components.formatQueueNumber
+import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
-import org.jetbrains.compose.resources.StringResource
+import com.rusuh.app.ui.theme.rusuhDisplayFontFamily
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
-import rusuh_app.shared.generated.resources.action_back
+import rusuh_app.shared.generated.resources.waiting_back_description
 import rusuh_app.shared.generated.resources.waiting_empty_body
 import rusuh_app.shared.generated.resources.waiting_empty_title
 import rusuh_app.shared.generated.resources.waiting_error_title
-import rusuh_app.shared.generated.resources.waiting_loading
-import rusuh_app.shared.generated.resources.waiting_loading_description
-import rusuh_app.shared.generated.resources.waiting_status_closed
-import rusuh_app.shared.generated.resources.waiting_status_waiting
-import rusuh_app.shared.generated.resources.waiting_status_your_turn
+import rusuh_app.shared.generated.resources.waiting_missed_body
+import rusuh_app.shared.generated.resources.waiting_missed_cta
+import rusuh_app.shared.generated.resources.waiting_missed_estimate
+import rusuh_app.shared.generated.resources.waiting_missed_lead
+import rusuh_app.shared.generated.resources.waiting_missed_title
+import rusuh_app.shared.generated.resources.waiting_paused_hint
+import rusuh_app.shared.generated.resources.waiting_paused_lead
+import rusuh_app.shared.generated.resources.waiting_paused_title
+import rusuh_app.shared.generated.resources.waiting_prequeue_body
+import rusuh_app.shared.generated.resources.waiting_prequeue_hint
+import rusuh_app.shared.generated.resources.waiting_prequeue_lead
+import rusuh_app.shared.generated.resources.waiting_prequeue_title
+import rusuh_app.shared.generated.resources.waiting_sold_out_body
+import rusuh_app.shared.generated.resources.waiting_sold_out_cta
+import rusuh_app.shared.generated.resources.waiting_sold_out_lead
+import rusuh_app.shared.generated.resources.waiting_sold_out_notify
+import rusuh_app.shared.generated.resources.waiting_sold_out_title
 import rusuh_app.shared.generated.resources.waiting_title
+import rusuh_app.shared.generated.resources.waiting_turn_cta
+import rusuh_app.shared.generated.resources.waiting_turn_hint
+import rusuh_app.shared.generated.resources.waiting_turn_lead
+import rusuh_app.shared.generated.resources.waiting_turn_title
 
 /**
- * Waiting Room screen — assembles the [QueuePositionCard] with screen chrome and
- * phase status messaging.
+ * Waiting Room screen (FR-04-M2). Pure `state -> UI`; interactions go out through [dispatch].
  *
- * Stateless and UI-only: it renders the [state] it is handed and nothing more.
- * There is NO ViewModel, NO repository and NO API here.
- *
- * TODO(M3): wire WaitingRoomViewModel state — collect the MVI state/effects and
- *  map them onto [WaitingRoomUiState], replacing the caller-supplied [state].
- * TODO(M4): feed [QueuePositionUi] from the live queue-position API (FR-07/FR-10).
- *
- * @param state what to render (loading / content / empty / error).
- * @param eventTitle event name shown in the top bar; null shows a generic title.
- * @param onBack optional back-navigation handler; shows a back button when non-null.
+ * TODO(M3): wire WaitingRoomViewModel state/effects onto [WaitingRoomUiState] / [WaitingRoomAction].
+ * No ViewModel, repository or API here.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WaitingRoomScreen(
     state: WaitingRoomUiState,
+    dispatch: (WaitingRoomAction) -> Unit,
     modifier: Modifier = Modifier,
-    eventTitle: String? = null,
-    onBack: (() -> Unit)? = null,
 ) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = eventTitle ?: stringResource(Res.string.waiting_title),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    if (onBack != null) {
-                        // Text chevron rather than a material-icons dependency for one glyph.
-                        TextButton(onClick = onBack) {
-                            Text(text = stringResource(Res.string.action_back))
-                        }
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(RusuhSpacing.xl),
-            contentAlignment = Alignment.Center,
+    Column(modifier = modifier.fillMaxSize().background(RusuhColors.Paper).statusBarsPadding()) {
+        WaitingTopBar(onBack = { dispatch(WaitingRoomAction.Back) })
+        Box(Modifier.fillMaxWidth().height(RusuhSpacing.xxs).background(RusuhColors.Ink))
+        Column(
+            modifier = Modifier.fillMaxSize().navigationBarsPadding().verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when (state) {
-                WaitingRoomUiState.Loading -> LoadingState()
-                WaitingRoomUiState.Empty -> EmptyState()
-                is WaitingRoomUiState.Error -> ErrorState(message = state.message)
-                is WaitingRoomUiState.Content -> ContentState(position = state.position)
+                WaitingRoomUiState.Loading -> CenteredBox { LoadingContent() }
+                WaitingRoomUiState.Empty ->
+                    CenteredBox {
+                        CenteredMessage(
+                            title = stringResource(Res.string.waiting_empty_title),
+                            body = stringResource(Res.string.waiting_empty_body),
+                        )
+                    }
+                is WaitingRoomUiState.Error ->
+                    CenteredBox {
+                        CenteredMessage(
+                            title = stringResource(Res.string.waiting_error_title),
+                            body = state.message,
+                            titleColor = RusuhColors.Pink,
+                        )
+                    }
+                is WaitingRoomUiState.Active -> ActiveContent(state, dispatch)
             }
         }
     }
 }
 
-/**
- * UI-level render state for the Waiting Room screen.
- *
- * This is NOT the MVI state — it is a presentation-only discriminator so the
- * stateless screen can render each visual placeholder (loading / error / empty
- * / content) that the design calls for. FR-04-M3 introduces the real
- * WaitingRoomViewModel and maps its MVI state onto these cases.
- */
-sealed interface WaitingRoomUiState {
-    /** Fetching the initial queue position. */
-    data object Loading : WaitingRoomUiState
-
-    /** Loaded: an active queue position to display. */
-    data class Content(val position: QueuePositionUi) : WaitingRoomUiState
-
-    /** No queue for this event (customer was admitted directly / nothing to show). */
-    data object Empty : WaitingRoomUiState
-
-    /**
-     * Failed to load or lost the queue connection.
-     *
-     * @param message pre-formatted, user-facing error copy supplied by the caller.
-     */
-    data class Error(val message: String) : WaitingRoomUiState
-}
-
 @Composable
-private fun ContentState(position: QueuePositionUi) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        QueuePositionCard(data = position)
-        Spacer(Modifier.height(RusuhSpacing.xl))
+private fun WaitingTopBar(onBack: () -> Unit) {
+    val backDescription = stringResource(Res.string.waiting_back_description)
+    Box(modifier = Modifier.fillMaxWidth().heightIn(min = TOP_BAR_HEIGHT), contentAlignment = Alignment.Center) {
         Text(
-            text = stringResource(position.phase.statusMessage()),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = position.phase.accentColors().container,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun LoadingState() {
-    val loadingDescription = stringResource(Res.string.waiting_loading_description)
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = Modifier.semantics { contentDescription = loadingDescription },
-    ) {
-        CircularProgressIndicator()
-        Spacer(Modifier.height(RusuhSpacing.xl))
-        Text(
-            text = stringResource(Res.string.waiting_loading),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun EmptyState() {
-    CenteredMessage(
-        title = stringResource(Res.string.waiting_empty_title),
-        body = stringResource(Res.string.waiting_empty_body),
-    )
-}
-
-@Composable
-private fun ErrorState(message: String) {
-    CenteredMessage(
-        title = stringResource(Res.string.waiting_error_title),
-        body = message,
-        titleColor = MaterialTheme.colorScheme.error,
-    )
-}
-
-@Composable
-private fun CenteredMessage(
-    title: String,
-    body: String,
-    titleColor: Color = MaterialTheme.colorScheme.onSurface,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "$title. $body" },
-    ) {
-        Text(
-            text = title,
+            text = BACK_ARROW,
             style = MaterialTheme.typography.headlineMedium,
-            color = titleColor,
-            textAlign = TextAlign.Center,
+            color = RusuhColors.Ink,
+            modifier =
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .clickable(role = Role.Button, onClick = onBack)
+                    .semantics { contentDescription = backDescription }
+                    .padding(horizontal = RusuhSpacing.xl, vertical = RusuhSpacing.lg),
         )
-        Spacer(Modifier.height(RusuhSpacing.md))
         Text(
-            text = body,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            text = stringResource(Res.string.waiting_title),
+            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = rusuhDisplayFontFamily()),
+            fontWeight = FontWeight.Bold,
+            color = RusuhColors.Ink,
+            modifier = Modifier.semantics { heading() },
         )
     }
 }
 
-/**
- * Status line shown below the queue card for a phase. Pure function —
- * unit-tested directly.
- *
- * Mirrors the FR-04 copy: waiting (FR-06/07), turn arrived (FR-08), queue
- * closed on sold-out (FR-08/T-03).
- */
-fun QueuePhase.statusMessage(): StringResource =
-    when (this) {
-        QueuePhase.Waiting -> Res.string.waiting_status_waiting
-        QueuePhase.YourTurn -> Res.string.waiting_status_your_turn
-        QueuePhase.QueueClosed -> Res.string.waiting_status_closed
+@Composable
+private fun ActiveContent(
+    state: WaitingRoomUiState.Active,
+    dispatch: (WaitingRoomAction) -> Unit,
+) {
+    val phase = state.phase
+    Column(Modifier.fillMaxWidth().padding(horizontal = RusuhSpacing.xl)) {
+        if (state.isGuest && phase.showsGuestBanner()) {
+            Spacer(Modifier.height(RusuhSpacing.lg))
+            GuestBanner(onSignIn = { dispatch(WaitingRoomAction.SignIn) })
+        }
+        Spacer(Modifier.height(RusuhSpacing.xl))
+        EventPoster(event = state.event, phase = phase)
+        Spacer(Modifier.height(RusuhSpacing.xxl))
+        PhaseContent(event = state.event, phase = phase, dispatch = dispatch)
+        if (phase.showsNotes()) {
+            Spacer(Modifier.height(RusuhSpacing.xxl))
+            WaitingNotes(onLeave = { dispatch(WaitingRoomAction.LeaveQueue) })
+        }
+        Spacer(Modifier.height(RusuhSpacing.xxl))
     }
+}
+
+@Composable
+private fun PhaseContent(
+    event: WaitingRoomEventUi,
+    phase: WaitingRoomPhase,
+    dispatch: (WaitingRoomAction) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        when (phase) {
+            is WaitingRoomPhase.PreQueue -> PreQueueContent(phase)
+            is WaitingRoomPhase.Waiting -> QueuePositionCard(data = phase.queue)
+            is WaitingRoomPhase.Paused -> PausedContent(phase)
+            is WaitingRoomPhase.YourTurn -> YourTurnContent(phase, onEnter = { dispatch(WaitingRoomAction.EnterNow) })
+            is WaitingRoomPhase.MissedTurn ->
+                MissedContent(
+                    phase,
+                    onQueueAgain = { dispatch(WaitingRoomAction.QueueAgain) },
+                )
+            WaitingRoomPhase.SoldOut -> SoldOutContent(event, dispatch)
+        }
+    }
+}
+
+@Composable
+private fun PreQueueContent(phase: WaitingRoomPhase.PreQueue) {
+    Lead(stringResource(Res.string.waiting_prequeue_lead))
+    Spacer(Modifier.height(RusuhSpacing.md))
+    QueueBigNumber(text = formatCountdown(phase.secondsUntilOpen), ink = true)
+    Spacer(Modifier.height(RusuhSpacing.xl))
+    Headline(stringResource(Res.string.waiting_prequeue_title), size = HeadlineSize.Medium)
+    Spacer(Modifier.height(RusuhSpacing.xs))
+    Muted(stringResource(Res.string.waiting_prequeue_body, phase.opensAtLabel))
+    Spacer(Modifier.height(RusuhSpacing.xxl))
+    Body(stringResource(Res.string.waiting_prequeue_hint))
+}
+
+@Composable
+private fun PausedContent(phase: WaitingRoomPhase.Paused) {
+    Lead(stringResource(Res.string.waiting_paused_lead))
+    Spacer(Modifier.height(RusuhSpacing.md))
+    QueueBigNumber(text = formatQueueNumber(phase.position), paused = true)
+    Spacer(Modifier.height(RusuhSpacing.xl))
+    Headline(stringResource(Res.string.waiting_paused_title), size = HeadlineSize.Medium)
+    Spacer(Modifier.height(RusuhSpacing.xs))
+    Muted(stringResource(phase.reason.messageRes()))
+    Spacer(Modifier.height(RusuhSpacing.xxl))
+    Body(stringResource(Res.string.waiting_paused_hint))
+}
+
+@Composable
+private fun YourTurnContent(
+    phase: WaitingRoomPhase.YourTurn,
+    onEnter: () -> Unit,
+) {
+    Lead(stringResource(Res.string.waiting_turn_lead, formatQueueNumber(phase.myNumber)))
+    Spacer(Modifier.height(RusuhSpacing.lg))
+    Headline(stringResource(Res.string.waiting_turn_title), color = RusuhColors.Pink, shadow = RusuhColors.Blue)
+    Spacer(Modifier.height(RusuhSpacing.xxl))
+    PrimaryButton(text = stringResource(Res.string.waiting_turn_cta), onClick = onEnter)
+    Spacer(Modifier.height(RusuhSpacing.xl))
+    TurnTimer(seconds = phase.secondsLeft)
+    Spacer(Modifier.height(RusuhSpacing.xl))
+    Muted(stringResource(Res.string.waiting_turn_hint))
+}
+
+@Composable
+private fun MissedContent(
+    phase: WaitingRoomPhase.MissedTurn,
+    onQueueAgain: () -> Unit,
+) {
+    Lead(stringResource(Res.string.waiting_missed_lead))
+    Spacer(Modifier.height(RusuhSpacing.lg))
+    Headline(stringResource(Res.string.waiting_missed_title))
+    Spacer(Modifier.height(RusuhSpacing.xl))
+    Body(stringResource(Res.string.waiting_missed_body))
+    Spacer(Modifier.height(RusuhSpacing.xxl))
+    PrimaryButton(text = stringResource(Res.string.waiting_missed_cta), onClick = onQueueAgain)
+    phase.estimateMinutes?.let { minutes ->
+        Spacer(Modifier.height(RusuhSpacing.xl))
+        Muted(stringResource(Res.string.waiting_missed_estimate, minutes))
+    }
+}
+
+@Composable
+private fun SoldOutContent(
+    event: WaitingRoomEventUi,
+    dispatch: (WaitingRoomAction) -> Unit,
+) {
+    Lead(stringResource(Res.string.waiting_sold_out_lead, event.title))
+    Spacer(Modifier.height(RusuhSpacing.lg))
+    Headline(stringResource(Res.string.waiting_sold_out_title))
+    Spacer(Modifier.height(RusuhSpacing.xl))
+    Body(stringResource(Res.string.waiting_sold_out_body))
+    Spacer(Modifier.height(RusuhSpacing.xxl))
+    PrimaryButton(
+        text = stringResource(Res.string.waiting_sold_out_cta),
+        onClick = { dispatch(WaitingRoomAction.SeeOtherEvents) },
+    )
+    Spacer(Modifier.height(RusuhSpacing.xl))
+    TextLink(
+        text = stringResource(Res.string.waiting_sold_out_notify),
+        onClick = { dispatch(WaitingRoomAction.NotifyMe) },
+    )
+}
+
+private const val BACK_ARROW = "←"
+private val TOP_BAR_HEIGHT = 56.dp

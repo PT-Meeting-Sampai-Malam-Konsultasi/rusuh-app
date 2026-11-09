@@ -23,9 +23,11 @@ import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesActions
 import com.rusuh.app.feature.queues.MyQueuesScreen
+import com.rusuh.app.feature.waitingroom.WaitingRoomAction
+import com.rusuh.app.feature.waitingroom.WaitingRoomEventUi
+import com.rusuh.app.feature.waitingroom.WaitingRoomPhase
 import com.rusuh.app.feature.waitingroom.WaitingRoomScreen
 import com.rusuh.app.feature.waitingroom.WaitingRoomUiState
-import com.rusuh.app.ui.components.QueuePhase
 import com.rusuh.app.ui.components.QueuePositionUi
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
@@ -62,9 +64,10 @@ fun RusuhNavGraph(navController: NavHostController) {
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getString(Screen.WaitingRoom.ARG_EVENT_ID)
             WaitingRoomScreen(
-                state = placeholderWaitingRoomState(),
-                eventTitle = eventId,
-                onBack = { navController.popBackStack() },
+                state = placeholderWaitingRoomState(eventTitle = eventId.orEmpty()),
+                dispatch = { action ->
+                    if (action == WaitingRoomAction.Back) navController.popBackStack()
+                },
             )
         }
     }
@@ -205,12 +208,17 @@ private fun SplashPlaceholder() {
  * Placeholder Waiting Room content for a row tap, until M3 feeds the real queue
  * position. shortcut: fixed "waiting" position; swap for live state in M3/M4.
  */
-private fun placeholderWaitingRoomState(): WaitingRoomUiState =
-    WaitingRoomUiState.Content(
-        QueuePositionUi(
-            position = 128,
-            peopleAhead = 26,
-            phase = QueuePhase.Waiting,
-            estimatedWait = "~8 menit",
-        ),
+private fun placeholderWaitingRoomState(eventTitle: String): WaitingRoomUiState =
+    WaitingRoomUiState.Active(
+        event =
+            WaitingRoomEventUi(
+                title = eventTitle,
+                subtitle = "",
+                dateTimeLine = "",
+                venueLine = "",
+            ),
+        phase =
+            WaitingRoomPhase.Waiting(
+                QueuePositionUi(position = 128, estimatedWaitMinutes = 8, ratePerMinute = 310, updatedSecondsAgo = 2),
+            ),
     )
