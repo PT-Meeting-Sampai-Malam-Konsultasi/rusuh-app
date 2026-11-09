@@ -45,6 +45,30 @@ object RusuhSpacing {
     /** Fixed width of the quantity readout between the stepper buttons. */
     val stepperValue = 28.dp
 
+    /** Width of the poster thumbnail on an event card row (poster ratio is 4:5). */
+    val posterThumbWidth = 104.dp
+
+    /** Offset of the hard "print" shadow behind posters. */
+    val posterShadow = 3.dp
+
+    /** Offset of the hard shadow behind action buttons. */
+    val buttonShadow = 4.dp
+
+    /** Border width of status stamps. */
+    val stampBorder = 2.dp
+
+    /** Heavy rule / button border width (the hi-fi's 2.5px). */
+    val ruleThick = 2.5.dp
+
+    /** Hairline divider width. */
+    val hairline = 1.dp
+
+    /** Height of the Home app bar. */
+    val appBarHeight = 60.dp
+
+    /** Minimum touch height of an event card action button. */
+    val actionMinHeight = 44.dp
+
     /** Alpha applied to a disabled (sold-out) card. */
     const val DISABLED_ALPHA = 0.5f
 }

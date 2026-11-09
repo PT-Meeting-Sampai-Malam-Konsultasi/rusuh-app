@@ -14,6 +14,10 @@ object RusuhTextStyles {
     val body1 = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
     val body2 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal)
     val caption = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
+    val logo = TextStyle(fontSize = 28.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.28).sp)
+    val sectionTitle = TextStyle(fontSize = 28.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold)
+    val eventTitle = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold)
+    val stamp = TextStyle(fontSize = 11.sp, lineHeight = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.55.sp)
     val button = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
 }
 
@@ -25,6 +29,10 @@ internal val RusuhTypography =
         bodyMedium = RusuhTextStyles.body2,
         bodySmall = RusuhTextStyles.caption,
         labelLarge = RusuhTextStyles.button,
+        displaySmall = RusuhTextStyles.logo,
+        headlineSmall = RusuhTextStyles.sectionTitle,
+        titleSmall = RusuhTextStyles.eventTitle,
+        labelSmall = RusuhTextStyles.stamp,
     )
 
 /**
@@ -45,5 +53,9 @@ internal fun rusuhTypography(): Typography {
         bodyMedium = RusuhTypography.bodyMedium.copy(fontFamily = body),
         bodySmall = RusuhTypography.bodySmall.copy(fontFamily = body),
         labelLarge = RusuhTypography.labelLarge.copy(fontFamily = body),
+        displaySmall = RusuhTypography.displaySmall.copy(fontFamily = display),
+        headlineSmall = RusuhTypography.headlineSmall.copy(fontFamily = display),
+        titleSmall = RusuhTypography.titleSmall.copy(fontFamily = display),
+        labelSmall = RusuhTypography.labelSmall.copy(fontFamily = body),
     )
 }

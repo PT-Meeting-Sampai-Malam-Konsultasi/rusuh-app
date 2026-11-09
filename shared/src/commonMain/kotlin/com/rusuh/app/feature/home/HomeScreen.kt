@@ -5,9 +5,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -18,9 +21,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,18 +31,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.components.ErrorState
 import com.rusuh.app.ui.components.EventCard
 import com.rusuh.app.ui.components.LoadingState
+import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhTheme
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
-import rusuh_app.shared.generated.resources.app_name
 import rusuh_app.shared.generated.resources.home_empty_title
 import rusuh_app.shared.generated.resources.home_pull_to_refresh
+import rusuh_app.shared.generated.resources.home_section_all_events
+import rusuh_app.shared.generated.resources.home_section_all_events_count
 
 /** Minimum width a single event-card column occupies; drives the responsive grid. */
 private val EVENT_CARD_MIN_WIDTH = 320.dp
@@ -48,20 +55,19 @@ private val EVENT_CARD_MIN_WIDTH = 320.dp
 private val EMPTY_STATE_MIN_HEIGHT = 400.dp
 
 /**
- * The Home screen: an app bar plus a responsive, pull-to-refresh event list that
- * renders M1's [EventCard] for each event in [HomeViewModel]'s state.
+ * The Home screen (stateful host): collects [HomeState] from the [HomeViewModel],
+ * runs the initial load and one-time effects, and delegates rendering to the pure
+ * [HomeScreen] overload that takes `(state, dispatch)`.
  *
- * This is the UI half of FR-01: it collects [HomeState] from the [HomeViewModel]
- * and dispatches [HomeIntent]s; the data still comes from M3's stub repository
- * until M4 wires the real API. Navigation is pushed out to [onEventClick] so the
- * shared screen stays free of any navigator dependency.
+ * Data still comes from M3's stub repository until M4 wires the real API.
+ * Navigation is pushed out to [onEventClick] so the shared screen stays free of
+ * any navigator dependency.
  *
  * @param viewModel the [HomeViewModel] providing state, effects and intent sink.
  * @param onEventClick invoked with an event id when the user opens an event.
  *   Defaults to a no-op so previews and non-navigating hosts can render the screen;
  *   a host that wants navigation must pass a real callback (the nav graph wires it).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -91,9 +97,34 @@ fun HomeScreen(
         }
     }
 
+    HomeScreen(
+        state = state,
+        dispatch = viewModel::dispatch,
+        modifier = modifier,
+        snackbarHostState = snackbarHostState,
+    )
+}
+
+/**
+ * Pure Home screen: renders [state] and raises [HomeIntent]s through [dispatch].
+ * Holds no view model, so it previews and tests with plain data.
+ *
+ * Layout follows the Figma mobile frame (Home · Event list · Mobile 390): a paper
+ * app bar (RUSUH! logo + ID|EN toggle), an "All events" section header and the
+ * event list; the shared bottom bar is hosted by the navigation layer.
+ */
+@Composable
+fun HomeScreen(
+    state: HomeState,
+    dispatch: (HomeIntent) -> Unit,
+    modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        topBar = { HomeAppBar() },
+        containerColor = RusuhColors.Paper,
+        contentColor = RusuhColors.Ink,
+        topBar = { HomeAppBar(selectedLanguage = HomeLanguage.ID) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         HomeContent(
@@ -101,9 +132,9 @@ fun HomeScreen(
             contentPadding = innerPadding,
             actions =
                 HomeActions(
-                    onRefresh = { viewModel.dispatch(HomeIntent.RefreshEvents) },
-                    onRetry = { viewModel.dispatch(HomeIntent.RefreshEvents) },
-                    onEventClick = { id -> viewModel.dispatch(HomeIntent.EventClicked(id)) },
+                    onRefresh = { dispatch(HomeIntent.RefreshEvents) },
+                    onRetry = { dispatch(HomeIntent.RefreshEvents) },
+                    onEventClick = { id -> dispatch(HomeIntent.EventClicked(id)) },
                 ),
         )
     }
@@ -113,25 +144,12 @@ fun HomeScreen(
  * The user actions the home content can raise, bundled so the content composable
  * takes one handler object instead of three loose lambdas.
  */
+@Immutable
 private data class HomeActions(
     val onRefresh: () -> Unit,
     val onRetry: () -> Unit,
     val onEventClick: (String) -> Unit,
 )
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HomeAppBar() {
-    TopAppBar(
-        title = {
-            Text(
-                text = stringResource(Res.string.app_name),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        },
-    )
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,6 +187,7 @@ private fun HomeContent(
 /**
  * Responsive event grid: an adaptive column count ([GridCells.Adaptive]) gives a
  * single column on phones and multiple columns on wide screens from one layout.
+ * The "All events" section header spans the full width above the cards.
  */
 @Composable
 private fun EventGrid(
@@ -179,16 +198,52 @@ private fun EventGrid(
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = EVENT_CARD_MIN_WIDTH),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(RusuhSpacing.xl),
+        contentPadding = PaddingValues(horizontal = RusuhSpacing.xl, vertical = RusuhSpacing.xxl),
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
-        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
     ) {
+        item(key = SECTION_HEADER_KEY, span = { GridItemSpan(maxLineSpan) }) {
+            SectionHeader(eventCount = events.size)
+        }
         items(items = events, key = { it.id }) { event ->
             EventCard(
                 data = event.toEventCardData(),
                 onClick = { onEventClick(event.id) },
             )
         }
+    }
+}
+
+private const val SECTION_HEADER_KEY = "home_section_header"
+
+/** "Semua event" title with the event count underneath and a heavy ink rule. */
+@Composable
+private fun SectionHeader(
+    eventCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    drawLine(
+                        color = RusuhColors.Ink,
+                        start = Offset(0f, size.height - RusuhSpacing.ruleThick.toPx() / 2),
+                        end = Offset(size.width, size.height - RusuhSpacing.ruleThick.toPx() / 2),
+                        strokeWidth = RusuhSpacing.ruleThick.toPx(),
+                    )
+                }.padding(bottom = RusuhSpacing.lg),
+    ) {
+        Text(
+            text = stringResource(Res.string.home_section_all_events),
+            style = MaterialTheme.typography.headlineSmall,
+            color = RusuhColors.Ink,
+        )
+        Text(
+            text = stringResource(Res.string.home_section_all_events_count, eventCount),
+            style = MaterialTheme.typography.bodyMedium,
+            color = RusuhColors.Ink2,
+        )
     }
 }
 
@@ -213,20 +268,20 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         Text(
             text = stringResource(Res.string.home_empty_title),
             style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = RusuhColors.Ink,
             textAlign = TextAlign.Center,
         )
         Text(
             text = stringResource(Res.string.home_pull_to_refresh),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = RusuhColors.Ink2,
             textAlign = TextAlign.Center,
         )
     }
 }
 
 /**
- * Preview helper wrapping [HomeScreen] in [RusuhTheme].
+ * Preview helpers wrapping the pure [HomeScreen] in [RusuhTheme], one per state.
  *
  * The `@Preview` annotation is intentionally omitted: it lives in
  * `compose.components.uiToolingPreview`, which this module does not depend on.
@@ -235,6 +290,24 @@ private fun EmptyState(modifier: Modifier = Modifier) {
 @Composable
 private fun HomeScreenPreview() {
     RusuhTheme {
-        HomeScreen(viewModel = HomeViewModel(StubHomeRepository()))
+        HomeScreen(state = HomeState(events = homePreviewEvents()), dispatch = {})
     }
+}
+
+@Suppress("UnusedPrivateMember")
+@Composable
+private fun HomeScreenLoadingPreview() {
+    RusuhTheme { HomeScreen(state = HomeState(isLoading = true), dispatch = {}) }
+}
+
+@Suppress("UnusedPrivateMember")
+@Composable
+private fun HomeScreenEmptyPreview() {
+    RusuhTheme { HomeScreen(state = HomeState(), dispatch = {}) }
+}
+
+@Suppress("UnusedPrivateMember")
+@Composable
+private fun HomeScreenErrorPreview() {
+    RusuhTheme { HomeScreen(state = HomeState(error = "Failed to load events"), dispatch = {}) }
 }
