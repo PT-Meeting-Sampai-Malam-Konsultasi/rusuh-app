@@ -4,24 +4,26 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -30,8 +32,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
 import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhShapes
 import com.rusuh.app.ui.theme.RusuhSpacing
@@ -42,6 +48,7 @@ import rusuh_app.shared.generated.resources.event_footer_sold_out
 import rusuh_app.shared.generated.resources.event_footer_temporarily_full
 import rusuh_app.shared.generated.resources.status_passthrough
 import rusuh_app.shared.generated.resources.status_prefix
+import rusuh_app.shared.generated.resources.status_sold_out
 
 /** Event format shown as a secondary badge on the poster (Tour / Live / Festival). */
 enum class EventFormat(val label: String) {
@@ -84,16 +91,20 @@ data class EventCardData(
 enum class TimeZoneLabel { WIB, WITA, WIT }
 
 /**
- * Event card for the home-page list.
+ * Event row for the home-page list (hi-fi mobile layout): a tilted poster
+ * thumbnail with a hard ink shadow on the left; stamp, title, schedule, price and
+ * status footer on the right; a hairline underneath.
  *
- * A sold-out event is non-clickable and dimmed; every other status is clickable
- * when [onClick] is non-null. The whole card is a single semantic unit so screen
- * readers announce event + status + schedule in one pass.
+ * A sold-out event is non-clickable and its poster is greyed; every other status is
+ * clickable when [onClick] is non-null. The whole row is a single semantic unit so
+ * screen readers announce event + status + schedule in one pass.
  *
- * @param image optional poster painter; when null a branded placeholder box is
- *   drawn. Kept as a [Painter] slot so no image-loading library is pulled into
- *   commonMain for this component — callers supply whatever loader they use.
- * @param onClick tap handler; ignored (and card marked disabled) for sold-out.
+ * @param image optional poster painter; when null a generated flat-colour poster
+ *   is drawn. Kept as a [Painter] slot so no image-loading library is pulled into
+ *   commonMain for this component.
+ * @param posterTilt rotation in degrees of the poster thumbnail; the list alternates
+ *   [RusuhSpacing.POSTER_TILT_ODD] / [RusuhSpacing.POSTER_TILT_EVEN].
+ * @param onClick tap handler; ignored (and row marked disabled) for sold-out.
  */
 @Composable
 fun EventCard(
@@ -101,6 +112,7 @@ fun EventCard(
     modifier: Modifier = Modifier,
     image: Painter? = null,
     onClick: (() -> Unit)? = null,
+    posterTilt: Float = RusuhSpacing.POSTER_TILT_ODD,
 ) {
     val disabled = data.status is EventStatus.SoldOut
     val clickable = onClick != null && !disabled
@@ -110,173 +122,203 @@ fun EventCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .alpha(if (disabled) RusuhSpacing.DISABLED_ALPHA else 1f)
-                // Hard (zero-blur) offset shadow drawn behind the bordered card.
-                .padding(end = RusuhSpacing.hardShadowOffset, bottom = RusuhSpacing.hardShadowOffset)
-                .drawBehind {
-                    val offset = RusuhSpacing.hardShadowOffset.toPx()
-                    val radius = RusuhShapes.cardRadius.toPx()
-                    drawRoundRect(
+                .semantics(mergeDescendants = true) { contentDescription = cardDescription }
+                .clickable(enabled = clickable, role = Role.Button) { onClick?.invoke() },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = RusuhSpacing.eventRowPadding),
+            horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
+        ) {
+            PosterThumb(data = data, image = image, tilt = posterTilt)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(RusuhSpacing.sm),
+            ) {
+                StatusBadge(status = data.status)
+                Text(
+                    text = if (data.subtitle.isBlank()) data.title else "${data.title} \u2014 ${data.subtitle}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontSize = TITLE_SIZE,
+                    lineHeight = TITLE_LINE_HEIGHT,
+                    color = RusuhColors.Ink,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${data.dateTime} ${data.timeZone.name}".trim(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = DETAIL_SIZE,
+                    color = RusuhColors.Ink2,
+                )
+                Text(
+                    text = listOf(data.venue, data.city).filter { it.isNotBlank() }.joinToString(", "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = DETAIL_SIZE,
+                    color = RusuhColors.Ink2,
+                )
+                data.priceFrom?.let { price ->
+                    Text(
+                        text = boldAmount(price),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = RusuhColors.Ink,
-                        topLeft = Offset(offset, offset),
-                        size = size,
-                        cornerRadius = CornerRadius(radius, radius),
                     )
                 }
-                .clip(RusuhShapes.card)
-                .background(MaterialTheme.colorScheme.surface)
-                .border(RusuhSpacing.inkBorder, RusuhColors.Ink, RusuhShapes.card)
-                .clickable(enabled = clickable, role = Role.Button) { onClick?.invoke() }
-                // clickable(enabled = false) already marks the node disabled.
-                .semantics(mergeDescendants = true) { contentDescription = cardDescription },
-    ) {
-        PosterSlot(
-            image = image,
-            format = data.format,
-        )
-        // Ink rule separating poster and body.
-        Spacer(
-            Modifier
-                .fillMaxWidth()
-                .height(RusuhSpacing.inkBorder)
-                .background(RusuhColors.Ink),
-        )
-        Column(modifier = Modifier.padding(RusuhSpacing.xl)) {
-            StatusBadge(status = data.status)
-            Spacer(Modifier.height(RusuhSpacing.md))
-            Text(
-                text = data.title,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = data.subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(RusuhSpacing.md))
-            Text(
-                text = "${data.dateTime} ${data.timeZone.name}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "${data.venue}, ${data.city}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            data.priceFrom?.let { price ->
-                Spacer(Modifier.height(RusuhSpacing.md))
-                Text(
-                    text = price,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                StatusFooter(status = data.status)
             }
-            StatusFooter(status = data.status)
         }
+        HorizontalDivider(thickness = RusuhSpacing.hairline, color = RusuhColors.Hair)
     }
 }
 
+/** Bolds the amount after the currency marker: "Mulai Rp 325.000" -> "Mulai **Rp 325.000**". */
+private fun boldAmount(price: String) =
+    buildAnnotatedString {
+        val at = price.indexOf("Rp")
+        if (at < 0) {
+            append(price)
+        } else {
+            append(price.substring(0, at))
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(price.substring(at)) }
+        }
+    }
+
+/** Flat poster fill and the colours of the title / subtitle chip drawn on it. */
+private data class PosterPalette(val background: Color, val title: Color, val chip: Color, val chipText: Color)
+
+private fun EventCardData.posterPalette(): PosterPalette =
+    when {
+        status is EventStatus.SoldOut ->
+            PosterPalette(RusuhColors.Ink3, RusuhColors.Paper, RusuhColors.Paper, RusuhColors.Ink3)
+        format == EventFormat.TOUR ->
+            PosterPalette(RusuhColors.Blue, RusuhColors.Paper, RusuhColors.Paper, RusuhColors.PinkInk)
+        format == EventFormat.LIVE ->
+            PosterPalette(RusuhColors.Pink, Color.White, RusuhColors.Paper, RusuhColors.Blue)
+        format == EventFormat.FESTIVAL ->
+            PosterPalette(RusuhColors.Card, RusuhColors.Blue, RusuhColors.Blue, RusuhColors.Paper)
+        else -> PosterPalette(RusuhColors.Ink, RusuhColors.Paper, RusuhColors.Paper, RusuhColors.Pink)
+    }
+
 /**
- * Poster image / placeholder with a top-down darkening scrim and format badge.
+ * Poster thumbnail: flat colour (or [image]) with the event title set in the
+ * condensed display face, a rotated subtitle chip, a hard ink shadow and a slight
+ * tilt. Sold-out events get a rotated "sold out" stamp across the poster.
  *
- * Purely visual: the parent card already announces the event identity, format
- * and status as one merged description, so the poster and format badge carry no
- * contentDescription (null image = decorative) to avoid a redundant,
- * double-read announcement.
+ * Purely visual: the parent row already announces identity, format and status as
+ * one merged description, so nothing here carries its own contentDescription.
  */
 @Composable
-private fun PosterSlot(
+private fun PosterThumb(
+    data: EventCardData,
     image: Painter?,
-    format: EventFormat,
+    tilt: Float,
 ) {
+    val palette = data.posterPalette()
+    val shadow = RusuhSpacing.hardShadowOffset
     Box(
         modifier =
             Modifier
-                .fillMaxWidth()
-                .aspectRatio(POSTER_ASPECT_RATIO),
+                .width(RusuhSpacing.posterThumbWidth)
+                .aspectRatio(RusuhSpacing.POSTER_ASPECT)
+                .rotate(tilt)
+                .drawBehind {
+                    val offset = shadow.toPx()
+                    drawRect(RusuhColors.Ink, topLeft = Offset(offset, offset))
+                }.background(palette.background)
+                .clipToBounds(),
     ) {
         if (image != null) {
             Image(
                 painter = image,
-                // decorative; the merged card description already covers it
+                // decorative; the merged row description already covers it
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-        } else {
-            // No image library in the project yet: a branded placeholder box
-            // rather than pulling in Coil/Kamel for a single slot.
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, RusuhColors.PosterScrim))),
             )
         }
-        // Scrim so overlaid chrome stays legible on any poster.
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, RusuhColors.PosterScrim),
-                        ),
-                    ),
-        )
-        // No badge for an unknown format (blank label), so a card never shows an
-        // empty pill before the real format is resolved.
-        if (format.label.isNotEmpty()) {
-            FormatBadge(
-                format = format,
+        Column(
+            modifier = Modifier.fillMaxSize().padding(RusuhSpacing.md),
+            verticalArrangement = Arrangement.Bottom,
+        ) {
+            Text(
+                text = data.title.uppercase(),
+                style = MaterialTheme.typography.headlineLarge,
+                fontSize = POSTER_TITLE_SIZE,
+                lineHeight = POSTER_TITLE_LINE_HEIGHT,
+                fontWeight = FontWeight.Bold,
+                color = palette.title,
+                maxLines = POSTER_TITLE_MAX_LINES,
+                overflow = TextOverflow.Clip,
+            )
+            if (data.subtitle.isNotBlank()) {
+                Text(
+                    text = data.subtitle,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontSize = POSTER_CHIP_SIZE,
+                    lineHeight = POSTER_CHIP_SIZE,
+                    color = palette.chipText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        Modifier
+                            .padding(top = RusuhSpacing.sm)
+                            .rotate(RusuhSpacing.STAMP_ROTATION)
+                            .background(palette.chip)
+                            .padding(horizontal = RusuhSpacing.xs, vertical = RusuhSpacing.xxs),
+                )
+            }
+        }
+        if (data.status is EventStatus.SoldOut) {
+            Text(
+                text = stringResource(Res.string.status_sold_out).uppercase(),
+                style = MaterialTheme.typography.headlineLarge,
+                fontSize = SOLD_STAMP_SIZE,
+                lineHeight = SOLD_STAMP_SIZE,
+                fontWeight = FontWeight.Bold,
+                color = RusuhColors.Ink,
+                maxLines = 1,
                 modifier =
                     Modifier
-                        .align(Alignment.TopStart)
-                        .padding(RusuhSpacing.lg),
+                        .align(Alignment.Center)
+                        .rotate(SOLD_STAMP_ROTATION)
+                        .background(RusuhColors.Paper)
+                        .border(RusuhSpacing.stampBorder, RusuhColors.Ink, RusuhShapes.square)
+                        .padding(horizontal = RusuhSpacing.sm, vertical = RusuhSpacing.xxs),
             )
         }
     }
 }
 
-@Composable
-private fun FormatBadge(
-    format: EventFormat,
-    modifier: Modifier = Modifier,
-) {
-    // Diagonal tag: rotated, ink-outlined pill.
-    Text(
-        text = format.label.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-        color = RusuhColors.OnFormatBadge,
-        modifier =
-            modifier
-                .rotate(RusuhSpacing.FORMAT_BADGE_ROTATION)
-                .clip(RusuhShapes.small)
-                .background(RusuhColors.FormatBadge)
-                .border(RusuhSpacing.inkBorder, RusuhColors.Ink, RusuhShapes.small)
-                .padding(horizontal = RusuhSpacing.md, vertical = RusuhSpacing.xs),
-    )
-}
-
-/** Status-specific supporting line below the main info (sold-out stats, countdown). */
+/** Status-specific supporting line below the main info (sold-out stats, countdown), after a hairline. */
 @Composable
 private fun StatusFooter(status: EventStatus) {
     val text = status.footerText() ?: return
-    Spacer(Modifier.height(RusuhSpacing.md))
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(RusuhSpacing.md)) {
+        Spacer(Modifier.height(RusuhSpacing.xxs))
+        HorizontalDivider(thickness = RusuhSpacing.hairline, color = RusuhColors.Hair)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = DETAIL_SIZE,
+            color = RusuhColors.Ink2,
+        )
+    }
 }
+
+private val TITLE_SIZE = 18.sp
+private val TITLE_LINE_HEIGHT = 20.sp
+private val DETAIL_SIZE = 13.sp
+private val POSTER_TITLE_SIZE = 26.sp
+private val POSTER_TITLE_LINE_HEIGHT = 22.sp
+private val POSTER_CHIP_SIZE = 11.sp
+private val SOLD_STAMP_SIZE = 22.sp
+private const val POSTER_TITLE_MAX_LINES = 3
+private const val SOLD_STAMP_ROTATION = -12f
 
 /**
  * Localized supporting footer text for a status, or null when the status needs
@@ -362,5 +404,3 @@ internal fun Int.formatThousands(): String {
     }
     return sb.toString()
 }
-
-private const val POSTER_ASPECT_RATIO = 16f / 9f

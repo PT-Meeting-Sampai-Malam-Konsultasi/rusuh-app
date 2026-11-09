@@ -45,22 +45,35 @@ object RusuhSpacing {
     /** Fixed width of the quantity readout between the stepper buttons. */
     val stepperValue = 28.dp
 
-    // TODO(figma-verify): provisional card-style tokens, see RusuhColors.Ink.
+    // Hi-fi mobile list values (analysis/hifi/assets/{rusuh,home}.css, max-width 720px).
 
-    /** Stroke width of the ink outline on cards and badges. */
-    val inkBorder = 2.dp
+    /** Stroke width of ink outlines (`--bw`). */
+    val inkBorder = 2.5.dp
 
-    /** X/Y offset of the solid (zero-blur) hard shadow under a card. */
-    val hardShadowOffset = 4.dp
+    /** Stroke width of a status stamp outline. */
+    val stampBorder = 2.dp
 
-    /** Outer padding of the Home event grid. */
-    val homeGridPadding = 16.dp
+    /** X/Y offset of the zero-blur hard shadow under a poster thumbnail. */
+    val hardShadowOffset = 3.dp
 
-    /** Gap between Home grid cells, both axes. */
-    val homeGridGap = 20.dp
+    /** Width of the poster thumbnail on an event row (4:5 aspect). */
+    val posterThumbWidth = 104.dp
 
-    /** Rotation (degrees) of the diagonal format badge on the poster. */
-    const val FORMAT_BADGE_ROTATION = -6f
+    /** Poster thumbnail aspect ratio, width / height. */
+    const val POSTER_ASPECT = 4f / 5f
+
+    /** Vertical padding of an event row. */
+    val eventRowPadding = 18.dp
+
+    /** Width of the hairline between event rows. */
+    val hairline = 1.dp
+
+    /** Rotation (degrees) of the status stamp and poster subtitle chip. */
+    const val STAMP_ROTATION = -2f
+
+    /** Alternating tilt (degrees) of poster thumbnails: odd rows, even rows. */
+    const val POSTER_TILT_ODD = -0.8f
+    const val POSTER_TILT_EVEN = 0.9f
 
     /** Alpha applied to a disabled (sold-out) card. */
     const val DISABLED_ALPHA = 0.5f

@@ -12,18 +12,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,9 +33,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rusuh.app.ui.components.ErrorState
 import com.rusuh.app.ui.components.EventCard
 import com.rusuh.app.ui.components.LoadingState
@@ -45,7 +49,9 @@ import com.rusuh.app.ui.theme.RusuhTheme
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.app_name
+import rusuh_app.shared.generated.resources.home_all_events
 import rusuh_app.shared.generated.resources.home_empty_title
+import rusuh_app.shared.generated.resources.home_event_count
 import rusuh_app.shared.generated.resources.home_pull_to_refresh
 
 /** Minimum width a single event-card column occupies; drives the responsive grid. */
@@ -53,6 +59,10 @@ private val EVENT_CARD_MIN_WIDTH = 320.dp
 
 /** Minimum height so the empty-state column fills the viewport and stays pullable. */
 private val EMPTY_STATE_MIN_HEIGHT = 400.dp
+
+private val APP_BAR_HEIGHT = 60.dp
+private val LOGO_SIZE = 28.sp
+private val HEADING_SIZE = 28.sp
 
 /**
  * The Home screen: an app bar plus a responsive, pull-to-refresh event list that
@@ -127,28 +137,27 @@ private data class HomeActions(
     val onEventClick: (String) -> Unit,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Paper app bar: wordmark with a pink "!" over a 2.5dp ink rule (hi-fi `.appbar`). */
 @Composable
 private fun HomeAppBar() {
-    Column {
-        TopAppBar(
-            title = {
-                Text(
-                    text = stringResource(Res.string.app_name),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = RusuhColors.Ink,
-                )
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = RusuhColors.Paper),
-        )
-        // Ink rule under the header, matching the card outline weight.
-        Spacer(
-            Modifier
-                .fillMaxWidth()
-                .height(RusuhSpacing.inkBorder)
-                .background(RusuhColors.Ink),
-        )
+    Column(modifier = Modifier.fillMaxWidth().background(RusuhColors.Paper)) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(APP_BAR_HEIGHT).padding(horizontal = RusuhSpacing.xl),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                text =
+                    buildAnnotatedString {
+                        append(stringResource(Res.string.app_name).uppercase())
+                        withStyle(SpanStyle(color = RusuhColors.Pink)) { append("!") }
+                    },
+                style = MaterialTheme.typography.headlineLarge,
+                fontSize = LOGO_SIZE,
+                fontWeight = FontWeight.Bold,
+                color = RusuhColors.Ink,
+            )
+        }
+        HorizontalDivider(thickness = RusuhSpacing.inkBorder, color = RusuhColors.Ink)
     }
 }
 
@@ -198,16 +207,38 @@ private fun EventGrid(
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = EVENT_CARD_MIN_WIDTH),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(RusuhSpacing.homeGridPadding),
-        horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.homeGridGap),
-        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.homeGridGap),
+        contentPadding = PaddingValues(RusuhSpacing.xl),
+        horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
     ) {
-        items(items = events, key = { it.id }) { event ->
+        item(span = { GridItemSpan(maxLineSpan) }) { ListHeading(count = events.size) }
+        itemsIndexed(items = events, key = { _, event -> event.id }) { index, event ->
             EventCard(
                 data = event.toEventCardData(),
                 onClick = { onEventClick(event.id) },
+                posterTilt = if (index % 2 == 0) RusuhSpacing.POSTER_TILT_ODD else RusuhSpacing.POSTER_TILT_EVEN,
             )
         }
+    }
+}
+
+/** "All events" heading, count line and ink rule above the list (hi-fi `.list-h`). */
+@Composable
+private fun ListHeading(count: Int) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(Res.string.home_all_events),
+            style = MaterialTheme.typography.headlineLarge,
+            fontSize = HEADING_SIZE,
+            fontWeight = FontWeight.Bold,
+            color = RusuhColors.Ink,
+        )
+        Text(
+            text = stringResource(Res.string.home_event_count, count),
+            style = MaterialTheme.typography.bodyMedium,
+            color = RusuhColors.Ink2,
+        )
+        Spacer(Modifier.height(RusuhSpacing.lg))
+        HorizontalDivider(thickness = RusuhSpacing.inkBorder, color = RusuhColors.Ink)
     }
 }
 

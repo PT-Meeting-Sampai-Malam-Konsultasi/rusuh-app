@@ -13,6 +13,8 @@
     <string name="action_retry">Coba lagi</string>
 
     <!-- Home screen -->
+    <string name="home_all_events">Semua event</string>
+    <string name="home_event_count">%1$d event · urut tanggal penjualan</string>
     <string name="home_empty_title">Belum ada event</string>
     <string name="home_pull_to_refresh">Tarik ke bawah untuk memuat ulang.</string>
     <string name="home_loading_description">Memuat daftar event</string>
