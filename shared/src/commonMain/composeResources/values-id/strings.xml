@@ -30,6 +30,27 @@
     <string name="event_footer_temporarily_full">Sisa tiket sedang dibayar pembeli lain. Yang tidak jadi dibayar kembali dalam 10 menit.</string>
     <string name="event_footer_sold_out">Semua %1$s tiket terjual dalam %2$d menit.</string>
 
+    <!-- Home header + list (Figma: Home · Event list · Mobile 390) -->
+    <string name="home_logo_wordmark">RUSUH</string>
+    <string name="home_logo_accent">!</string>
+    <string name="home_logo_description">Rusuh, ke beranda</string>
+    <string name="home_language_toggle_description">Bahasa</string>
+    <string name="home_section_all_events">Semua event</string>
+    <string name="home_section_all_events_count">%1$d event · urut tanggal penjualan</string>
+
+    <!-- Event card (home) -->
+    <string name="event_card_status_on_sale">Dijual</string>
+    <string name="event_card_status_almost_gone">Hampir habis</string>
+    <string name="event_card_status_ended">Penjualan berakhir</string>
+    <string name="event_card_price_from">Mulai</string>
+    <string name="event_card_poster_sold_out">HABIS</string>
+    <string name="event_card_footer_opens">Dibuka %1$s</string>
+    <string name="event_card_footer_ended">Penjualan online ditutup %1$s.</string>
+    <string name="event_card_action_remind">Ingatkan saya</string>
+    <string name="event_card_action_join_queue">Masuk antrian</string>
+    <string name="event_card_action_queue_anyway">Tetap antre</string>
+    <string name="event_card_action_buy">Beli tiket</string>
+
     <!-- Waiting Room screen -->
     <string name="waiting_title">Ruang Tunggu</string>
     <string name="waiting_loading_description">Memuat posisi antrian</string>

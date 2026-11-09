@@ -31,6 +31,27 @@
     <string name="event_footer_temporarily_full">Remaining tickets are being paid for by other buyers. Any that go unpaid are released within 10 minutes.</string>
     <string name="event_footer_sold_out">All %1$s tickets sold in %2$d minutes.</string>
 
+    <!-- Home header + list (Figma: Home · Event list · Mobile 390) -->
+    <string name="home_logo_wordmark">RUSUH</string>
+    <string name="home_logo_accent">!</string>
+    <string name="home_logo_description">Rusuh, home</string>
+    <string name="home_language_toggle_description">Language</string>
+    <string name="home_section_all_events">All events</string>
+    <string name="home_section_all_events_count">%1$d events · by sale date</string>
+
+    <!-- Event card (home) -->
+    <string name="event_card_status_on_sale">On sale</string>
+    <string name="event_card_status_almost_gone">Almost gone</string>
+    <string name="event_card_status_ended">Sale ended</string>
+    <string name="event_card_price_from">From</string>
+    <string name="event_card_poster_sold_out">SOLD OUT</string>
+    <string name="event_card_footer_opens">Opens %1$s</string>
+    <string name="event_card_footer_ended">Online sales closed %1$s.</string>
+    <string name="event_card_action_remind">Remind me</string>
+    <string name="event_card_action_join_queue">Join the queue</string>
+    <string name="event_card_action_queue_anyway">Queue anyway</string>
+    <string name="event_card_action_buy">Buy tickets</string>
+
     <!-- Waiting Room screen -->
     <string name="waiting_title">Waiting Room</string>
     <string name="waiting_loading_description">Loading queue position</string>

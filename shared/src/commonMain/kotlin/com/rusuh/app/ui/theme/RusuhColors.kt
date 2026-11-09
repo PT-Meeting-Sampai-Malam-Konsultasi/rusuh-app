@@ -41,6 +41,22 @@ object RusuhColors {
     val StatusUpcoming = Color(0xFF1E88E5) // blue: coming soon / "Segera dijual"
     val OnStatusUpcoming = Color(0xFFFFFFFF)
 
+    // Hi-fi / Figma "paper & ink" palette used by the Home event list (additive:
+    // the Material scheme above is untouched so other screens keep their look).
+    val Paper = Color(0xFFF2EEE3)
+    val Paper2 = Color(0xFFE8E2D2)
+    val PaperCard = Color(0xFFFBF9F3)
+    val Ink = Color(0xFF141414)
+    val Ink2 = Color(0xFF4A4740)
+    val Ink3 = Color(0xFF6B665E)
+    val Hair = Color(0xFFCFC8B6)
+    val Pink = Color(0xFFD81F72)
+    val PinkInk = Color(0xFFB8125C)
+    val PinkTint = Color(0xFFF8D3E2)
+    val Blue = Color(0xFF2F5BEA)
+    val BlueInk = Color(0xFF1F3FB8)
+    val Green = Color(0xFF16784A)
+
     // Scrim applied over a poster image so overlaid chrome stays legible.
     val PosterScrim = Color(0x99000000)
 }
@@ -51,13 +67,43 @@ object RusuhColors {
  * These complement [RusuhLightColorScheme]; Material3's [androidx.compose.material3.ColorScheme]
  * has no dedicated slots for domain status colors, so components read them from here.
  */
-data class StatusColorPair(val container: Color, val content: Color)
+data class StatusColorPair(
+    val container: Color,
+    val content: Color,
+    val border: Color = container,
+    val dashedBorder: Boolean = false,
+)
 
 object RusuhStatusColors {
+    // Original status pairs, still used by queue rows and other screens.
     val available = StatusColorPair(RusuhColors.StatusAvailable, RusuhColors.OnStatusAvailable)
     val limited = StatusColorPair(RusuhColors.StatusLimited, RusuhColors.OnStatusLimited)
     val soldOut = StatusColorPair(RusuhColors.StatusSoldOut, RusuhColors.OnStatusSoldOut)
     val upcoming = StatusColorPair(RusuhColors.StatusUpcoming, RusuhColors.OnStatusUpcoming)
+
+    // Figma event-card stamps (paper & ink style).
+
+    /** Queue / waiting room open: pink stamp, white text. */
+    val waitingRoomOpen = StatusColorPair(RusuhColors.Pink, RusuhColors.OnPrimary)
+
+    /** On sale: green stamp. */
+    val onSale = StatusColorPair(RusuhColors.Green, RusuhColors.OnStatusAvailable)
+
+    /** Almost gone: orange stamp. */
+    val almostGone = StatusColorPair(RusuhColors.StatusLimited, RusuhColors.OnStatusLimited)
+
+    /** Temporarily full: paper card with a dashed ink outline. */
+    val temporarilyFull =
+        StatusColorPair(RusuhColors.PaperCard, RusuhColors.Ink, RusuhColors.Ink, dashedBorder = true)
+
+    /** Sold out: solid ink stamp, paper text. */
+    val soldOutStamp = StatusColorPair(RusuhColors.Ink, RusuhColors.Paper)
+
+    /** Coming soon: paper card, blue outline and text. */
+    val upcomingStamp = StatusColorPair(RusuhColors.PaperCard, RusuhColors.BlueInk, RusuhColors.BlueInk)
+
+    /** Sale ended: muted paper stamp. */
+    val ended = StatusColorPair(RusuhColors.Paper2, RusuhColors.Ink2, RusuhColors.Ink2)
 }
 
 internal val RusuhLightColorScheme =

@@ -3,20 +3,43 @@ package com.rusuh.app.feature.home
 import com.rusuh.app.mvi.MviEffect
 import com.rusuh.app.mvi.MviIntent
 import com.rusuh.app.mvi.MviState
+import com.rusuh.app.ui.components.EventFormat
+import com.rusuh.app.ui.components.EventPosterTone
+import com.rusuh.app.ui.components.EventStatus
+import com.rusuh.app.ui.components.TimeZoneLabel
 
 /**
- * Minimal placeholder event model for the Home screen's MVI state.
+ * Event model for the Home list.
  *
- * M1's richer `EventCardData` lives in a parallel PR and is NOT on `main`, so this
- * package defines its own lightweight model to avoid a cross-branch dependency.
+ * Carries the display fields the Figma event card needs. Every field except [id]
+ * and [title] has a neutral default so a minimal event (id + title) still maps to a
+ * valid card; a real data source (M4) fills the rest. Display strings are expected
+ * to be pre-formatted by the data layer, matching [com.rusuh.app.ui.components.EventCardData].
  *
- * shortcut: intentionally minimal (id + title); replace or map to the real domain
- * model once M4 (API integration) lands a shared event type.
+ * shortcut: reuses the UI card types for status/format/timezone until M4 lands a
+ * shared domain event type; replace those with domain types then.
+ *
+ * @property priceFrom starting amount without the "From" prefix (e.g. "Rp 325.000").
  */
 data class HomeEventItem(
     val id: String,
     val title: String,
+    val subtitle: String = "",
+    val format: EventFormat = EventFormat.UNKNOWN,
+    val venue: String = "",
+    val city: String = "",
+    val dateTime: String = "",
+    val timeZone: TimeZoneLabel = TimeZoneLabel.WIB,
+    val status: EventStatus = EventStatus.OnSale,
+    val priceFrom: String? = null,
+    val posterTone: EventPosterTone = EventPosterTone.Blue,
 )
+
+/** Interface languages offered by the header toggle. The codes are shown verbatim ("ID" | "EN"). */
+enum class HomeLanguage(val code: String) {
+    ID("ID"),
+    EN("EN"),
+}
 
 /**
  * UI state for the Home screen.
