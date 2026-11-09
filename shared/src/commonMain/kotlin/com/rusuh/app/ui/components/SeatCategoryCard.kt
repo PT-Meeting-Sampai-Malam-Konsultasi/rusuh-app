@@ -153,7 +153,8 @@ fun SeatCategoryCard(
                 Spacer(Modifier.height(RusuhSpacing.lg))
                 QuantityStepper(
                     quantity = quantity,
-                    canDecrement = !soldOut && quantity > 0,
+                    // Decrement stays available when the category turned sold out, so the user can back out.
+                    canDecrement = quantity > 0,
                     canIncrement = !soldOut && canIncrement,
                     decrementLabel = stringResource(Res.string.seat_decrement, data.name),
                     incrementLabel = stringResource(Res.string.seat_increment, data.name),

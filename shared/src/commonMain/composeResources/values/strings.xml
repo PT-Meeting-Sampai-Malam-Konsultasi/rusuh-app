@@ -128,6 +128,8 @@
     <string name="detail_name_placeholder">Full name</string>
     <string name="detail_name_hint">Printed on the e-ticket.</string>
     <string name="detail_nik_label">NIK</string>
+    <string name="detail_nik_field_description">NIK, ticket %1$d</string>
+    <string name="detail_name_field_description">Name as on the KTP, ticket %1$d</string>
     <string name="detail_nik_placeholder">16 digits as on the KTP</string>
     <string name="detail_nik_example">Example: 3201 1234 5678 0001</string>
     <string name="detail_nik_invalid">NIK must be %1$d digits.</string>

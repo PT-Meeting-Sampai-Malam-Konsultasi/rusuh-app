@@ -121,7 +121,10 @@ internal fun isCapReached(
 ): Boolean = selectedTotal >= maxTickets
 
 /** Visual-only NIK validity: exactly [NIK_LENGTH] digits. Real validation is `validateAttendee`. */
-internal fun isNikValid(nik: String): Boolean = nik.length == NIK_LENGTH && nik.all(Char::isDigit)
+internal fun isNikValid(nik: String): Boolean = nik.length == NIK_LENGTH && nik.all(::isAsciiDigit)
+
+/** ASCII 0-9 only: `Char.isDigit` also accepts Arabic-Indic and other Unicode digits. */
+internal fun isAsciiDigit(c: Char): Boolean = c in '0'..'9'
 
 /** Sets a category quantity, clamped to 0..(remaining cap), and resizes the attendee slots. */
 internal fun DetailFormState.withQuantity(
@@ -167,7 +170,7 @@ internal fun DetailFormState.withName(
 internal fun DetailFormState.withNik(
     index: Int,
     raw: String,
-): DetailFormState = updateAttendee(index) { it.copy(nik = raw.filter(Char::isDigit).take(NIK_LENGTH)) }
+): DetailFormState = updateAttendee(index) { it.copy(nik = raw.filter(::isAsciiDigit).take(NIK_LENGTH)) }
 
 private fun DetailFormState.updateAttendee(
     index: Int,
@@ -195,12 +198,17 @@ internal fun ticketCategories(
     quantities: Map<String, Int>,
 ): List<SeatCategoryUi> = categories.flatMap { c -> List(quantities[c.id] ?: 0) { c } }
 
-/** Whether "Lanjut bayar" is enabled: 1..cap tickets, every attendee named, NIK valid and unique. */
+/**
+ * Whether "Lanjut bayar" is enabled: 1..cap tickets, no selected category sold out, every attendee
+ * named, NIK valid and unique.
+ */
 internal fun canProceed(
     form: DetailFormState,
     maxTickets: Int,
+    categories: List<SeatCategoryUi> = emptyList(),
 ): Boolean =
     form.totalTickets in 1..maxTickets &&
+        categories.none { it.isSoldOut && (form.quantities[it.id] ?: 0) > 0 } &&
         form.attendees.size == form.totalTickets &&
         form.attendees.indices.all { i ->
             val a = form.attendees[i]
@@ -231,3 +239,36 @@ internal const val COUNTDOWN_WARN_SECONDS = 60
 
 /** Groups NIK digits in blocks of four ("3174 0552 0396 0004"). */
 internal fun groupNik(digits: String): String = digits.chunked(4).joinToString(" ")
+
+/** Mask glyph for hidden NIK digits. */
+internal const val NIK_MASK_CHAR = '\u2022'
+
+/** Digits left visible when the NIK is masked. */
+internal const val NIK_VISIBLE_TAIL = 4
+
+/**
+ * NIK as displayed: grouped 4-4-4-4; when [masked] every digit but the last [NIK_VISIBLE_TAIL]
+ * becomes a bullet ("•••• •••• •••• 1234"). Same length as [groupNik], so offsets map identically.
+ */
+internal fun nikDisplay(
+    digits: String,
+    masked: Boolean,
+): String {
+    val shown =
+        if (masked) {
+            val hidden = (digits.length - NIK_VISIBLE_TAIL).coerceAtLeast(0)
+            NIK_MASK_CHAR.toString().repeat(hidden) + digits.substring(hidden)
+        } else {
+            digits
+        }
+    return groupNik(shown)
+}
+
+/** Raw-digit offset to grouped-text offset (a space follows every full block of four). */
+internal fun nikOriginalToTransformed(offset: Int): Int = offset + (offset - 1).coerceAtLeast(0) / 4
+
+/** Grouped-text offset back to raw-digit offset, clamped to [length]. */
+internal fun nikTransformedToOriginal(
+    offset: Int,
+    length: Int,
+): Int = (offset - offset / 5).coerceAtMost(length)
