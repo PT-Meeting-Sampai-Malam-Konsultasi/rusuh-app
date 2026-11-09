@@ -14,11 +14,11 @@ class HomeEventItemMapperTest {
     }
 
     @Test
-    fun placeholderStatusIsAvailableSoCardsStayClickable() {
+    fun defaultStatusIsOnSaleSoCardsStayClickable() {
         // A sold-out status would disable the card; until M4 supplies a real
         // status the mapper must keep events openable.
         val card = HomeEventItem(id = "2", title = "Festival").toEventCardData()
-        assertEquals(EventStatus.Available, card.status)
+        assertEquals(EventStatus.OnSale, card.status)
     }
 
     @Test
@@ -35,5 +35,47 @@ class HomeEventItemMapperTest {
         // appended by the @Composable buildCardDescription at render time.)
         val card = HomeEventItem(id = "4", title = "Konser Senja").toEventCardData()
         assertEquals("Konser Senja", buildCardIdentity(card))
+    }
+
+    @Test
+    fun mapsEveryDisplayFieldOntoCard() {
+        val status = EventStatus.SoldOut(soldOutInMinutes = 41, capacity = 12_000)
+        val card =
+            HomeEventItem(
+                id = "5",
+                title = "Deru",
+                subtitle = "Malam Mesin",
+                format = EventFormat.LIVE,
+                venue = "Jatim Expo",
+                city = "Surabaya",
+                dateTime = "Jum, 4 Des 2026 · 20.00",
+                status = status,
+                priceFrom = "Rp 1",
+            ).toEventCardData()
+        assertEquals("Malam Mesin", card.subtitle)
+        assertEquals(EventFormat.LIVE, card.format)
+        assertEquals("Jatim Expo", card.venue)
+        assertEquals("Surabaya", card.city)
+        assertEquals("Jum, 4 Des 2026 · 20.00", card.dateTime)
+        assertEquals(status, card.status)
+        assertEquals("Rp 1", card.priceFrom)
+    }
+
+    @Test
+    fun previewEventsCoverEveryFigmaStatus() {
+        val statuses = homePreviewEvents().map { it.status }
+        assertEquals(7, statuses.size)
+        assertEquals(
+            setOf(
+                EventStatus.WaitingRoomOpen::class,
+                EventStatus.OnSale::class,
+                EventStatus.AlmostGone::class,
+                EventStatus.TemporarilyFull::class,
+                EventStatus.SoldOut::class,
+                EventStatus.ComingSoon::class,
+                EventStatus.Ended::class,
+            ),
+            statuses.map { it::class }.toSet(),
+        )
     }
 }
