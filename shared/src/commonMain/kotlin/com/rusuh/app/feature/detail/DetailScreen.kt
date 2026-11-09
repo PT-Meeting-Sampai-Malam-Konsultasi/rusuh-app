@@ -525,7 +525,8 @@ private fun BottomBar(
                 text = stringResource(Res.string.detail_proceed),
                 onClick = onProceed,
                 enabled = enabled,
-                modifier = Modifier.padding(end = RusuhSpacing.xs, bottom = RusuhSpacing.xs),
+                // weight(1f): takes the space beside the price, or the full width when it wraps below.
+                modifier = Modifier.weight(1f).padding(end = RusuhSpacing.xs, bottom = RusuhSpacing.xs),
             )
         }
     }
