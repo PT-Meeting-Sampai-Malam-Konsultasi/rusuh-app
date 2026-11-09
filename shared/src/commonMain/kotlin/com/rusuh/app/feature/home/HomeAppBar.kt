@@ -2,7 +2,6 @@ package com.rusuh.app.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,9 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -85,13 +83,13 @@ private fun HomeLogo(modifier: Modifier = Modifier) {
 
 /**
  * Pill-shaped ID | EN toggle (look only for now: language switching is wired with
- * the i18n runtime work, so [onSelect] defaults to a no-op).
+ * the i18n runtime work). It is not focusable or clickable, so assistive tech does
+ * does not announce a control that does nothing.
  */
 @Composable
 private fun LanguageToggle(
     selected: HomeLanguage,
     modifier: Modifier = Modifier,
-    onSelect: (HomeLanguage) -> Unit = {},
 ) {
     val description = stringResource(Res.string.home_language_toggle_description)
     Row(
@@ -99,7 +97,7 @@ private fun LanguageToggle(
             modifier
                 .border(RusuhSpacing.stampBorder, RusuhColors.Ink, CircleShape)
                 .padding(RusuhSpacing.xs)
-                .semantics { contentDescription = description },
+                .clearAndSetSemantics { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xxs),
     ) {
         HomeLanguage.entries.forEach { language ->
@@ -112,8 +110,6 @@ private fun LanguageToggle(
                 modifier =
                     Modifier
                         .background(if (isSelected) RusuhColors.Ink else Color.Transparent, CircleShape)
-                        .clickable(role = Role.RadioButton) { onSelect(language) }
-                        .semantics { this.selected = isSelected }
                         .padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.xs),
             )
         }
