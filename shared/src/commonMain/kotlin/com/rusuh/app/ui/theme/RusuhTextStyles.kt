@@ -30,6 +30,46 @@ object RusuhTextStyles {
     val queueSectionTitle = TextStyle(fontSize = 19.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
 }
 
+/**
+ * Brand text styles for the Figma-aligned Detail Ticket screen. Raw sizes/weights only;
+ * apply the brand family with [display] (Bricolage Grotesque) or [body] (Space Grotesk).
+ */
+object RusuhBrandTextStyles {
+    val hero =
+        TextStyle(fontSize = 30.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.3).sp)
+    val sectionTitle = TextStyle(fontSize = 26.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
+    val itemTitle = TextStyle(fontSize = 19.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold)
+    val subtitle = TextStyle(fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold)
+    val counter =
+        TextStyle(fontSize = 22.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.22.sp)
+    val stat = TextStyle(fontSize = 26.sp, lineHeight = 28.sp, fontWeight = FontWeight.ExtraBold)
+    val number = TextStyle(fontSize = 18.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold)
+    val stepperValue = TextStyle(fontSize = 22.sp, lineHeight = 24.sp, fontWeight = FontWeight.ExtraBold)
+    val sheetHeadline =
+        TextStyle(fontSize = 36.sp, lineHeight = 38.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp)
+    val cta = TextStyle(fontSize = 19.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold)
+
+    val chip = TextStyle(fontSize = 15.sp, lineHeight = 15.sp, fontWeight = FontWeight.ExtraBold)
+
+    val note = TextStyle(fontSize = 13.sp, lineHeight = 19.5.sp, fontWeight = FontWeight.Normal)
+    val bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
+    val bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
+    val label = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
+    val eyebrow =
+        TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.48.sp)
+    val price = TextStyle(fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold)
+    val input = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.17.sp)
+    val stepperSymbol = TextStyle(fontSize = 24.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+}
+
+/** Applies the Bricolage Grotesque display family to a brand style. */
+@Composable
+fun TextStyle.display(): TextStyle = copy(fontFamily = rusuhDisplayFontFamily())
+
+/** Applies the Space Grotesk body family to a brand style. */
+@Composable
+fun TextStyle.body(): TextStyle = copy(fontFamily = rusuhBodyFontFamily())
+
 internal val RusuhTypography =
     Typography(
         headlineLarge = RusuhTextStyles.h1,

@@ -84,6 +84,50 @@ object RusuhSpacing {
     /** Minimum touch height of a primary Waiting Room button. */
     val primaryButtonHeight = 56.dp
 
+    val xxxl = 32.dp
+
+    /** Hairline separator between list rows (Figma 1px). */
+    val borderThin = 1.dp
+
+    /** Standard ink border on boxes, inputs and buttons (Figma 2px). */
+    val borderMedium = 2.dp
+
+    /** Heavy rule under section headers, top/bottom bars and stepper dividers (Figma 2.5px). */
+    val borderHeavy = 2.5.dp
+
+    /** Hard (no blur) offset shadow on small chips and the poster. */
+    val shadowSm = 3.dp
+
+    /** Hard offset shadow on primary buttons and cards. */
+    val shadowMd = 4.dp
+
+    /** Height of the Detail Ticket top bar. */
+    val topBarHeight = 60.dp
+
+    /** Height of the sticky bottom bar content (excluding its top rule). */
+    val bottomBarHeight = 80.dp
+
+    /** Size of the quantity stepper (Figma 129x45) and its centre cell. */
+    val stepperWidth = 129.dp
+    val stepperHeight = 45.dp
+    val stepperCell = 40.dp
+
+    /** Minimum height of a self/other toggle cell. */
+    val toggleHeight = 48.dp
+
+    /** Height of a text input (Figma 52). */
+    val inputHeight = 52.dp
+
+    /** Event poster thumbnail in the Detail header (Figma 58x72). */
+    val posterWidth = 58.dp
+    val posterHeight = 72.dp
+
+    /** Numbered square on a section header (Figma 28). */
+    val sectionNumber = 28.dp
+
+    /** Height of the primary CTA button (Figma 54). */
+    val ctaHeight = 54.dp
+
     /** Alpha applied to a disabled (sold-out) card. */
     const val DISABLED_ALPHA = 0.5f
 }

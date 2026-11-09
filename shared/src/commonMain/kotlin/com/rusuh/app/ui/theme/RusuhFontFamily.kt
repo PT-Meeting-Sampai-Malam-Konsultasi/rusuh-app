@@ -23,7 +23,7 @@ import rusuh_app.shared.generated.resources.SpaceGrotesk
  * renders only the default instance or the design needs exact static cuts.
  */
 
-private val displayWeights = listOf(FontWeight.SemiBold, FontWeight.Bold)
+private val displayWeights = listOf(FontWeight.SemiBold, FontWeight.Bold, FontWeight.ExtraBold)
 private val bodyWeights = listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold)
 
 /** Display / heading font family: Bricolage Grotesque. */
