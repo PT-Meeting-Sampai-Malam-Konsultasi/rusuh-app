@@ -21,6 +21,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -175,7 +176,8 @@ fun QueueBigNumber(
             color = plate,
             maxLines = 1,
             softWrap = false,
-            modifier = Modifier.offset(x = RusuhSpacing.xs, y = RusuhSpacing.xxs),
+            // Decorative shadow copy: hidden from screen readers so the number is read once.
+            modifier = Modifier.offset(x = RusuhSpacing.xs, y = RusuhSpacing.xxs).clearAndSetSemantics {},
         )
         Text(text = text, style = style, color = face, maxLines = 1, softWrap = false)
     }
@@ -284,7 +286,10 @@ fun QueuePhase.faceColor(): Color =
 @Composable
 internal fun buildQueueDescription(data: QueuePositionUi): String =
     buildString {
-        append("${stringResource(Res.string.queue_position_waiting)}${formatQueueNumber(data.position)}.")
+        val lead = stringResource(Res.string.queue_position_waiting).trimEnd()
+        // "Anda antrian ke-" glues to the number; "You are number" needs a space.
+        val separator = if (lead.endsWith("-")) "" else " "
+        append("$lead$separator${formatQueueNumber(data.position)}.")
         if (data.phase == QueuePhase.Paused) {
             append(" ${stringResource(Res.string.queue_position_paused_description)}")
         } else {
