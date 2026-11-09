@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.VisualTransformation
@@ -143,7 +145,9 @@ fun CountdownChip(
 
 /**
  * Ink-bordered single-line text input (Figma "Input"). Stateless: value changes go through
- * [onValueChange]. [isError] switches to the danger border/surface. [onFocusLost] lets the
+ * [onValueChange]. [label] is the accessible name (the visible label is a separate Text);
+ * [isError] switches to the danger border/surface and, with [errorMessage], exposes error
+ * semantics. [onFocusChange] reports focus; [onFocusLost] lets the
  * caller defer validation messages until the user leaves the field.
  */
 @Composable
@@ -151,10 +155,14 @@ fun BrutalTextField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
+    label: String,
     modifier: Modifier = Modifier,
     isError: Boolean = false,
+    errorMessage: String? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    onFocusChange: (Boolean) -> Unit = {},
     onFocusLost: () -> Unit = {},
 ) {
     val borderColor = if (isError) RusuhColors.BrandDanger else RusuhColors.BrandInk
@@ -168,13 +176,19 @@ fun BrutalTextField(
         textStyle = textStyle,
         cursorBrush = SolidColor(RusuhColors.BrandInk),
         keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         visualTransformation = visualTransformation,
         modifier =
             modifier
                 .fillMaxWidth()
+                .semantics {
+                    contentDescription = label
+                    if (isError && errorMessage != null) error(errorMessage)
+                }
                 .onFocusChanged { focus ->
                     if (hadFocus && !focus.isFocused) onFocusLost()
                     hadFocus = focus.isFocused
+                    onFocusChange(focus.isFocused)
                 },
         decorationBox = { inner ->
             Box(

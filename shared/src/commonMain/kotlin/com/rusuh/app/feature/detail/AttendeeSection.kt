@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,12 +28,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
@@ -50,11 +59,13 @@ import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.detail_holder_other
 import rusuh_app.shared.generated.resources.detail_holder_self
 import rusuh_app.shared.generated.resources.detail_holder_toggle_description
+import rusuh_app.shared.generated.resources.detail_name_field_description
 import rusuh_app.shared.generated.resources.detail_name_hint
 import rusuh_app.shared.generated.resources.detail_name_label
 import rusuh_app.shared.generated.resources.detail_name_placeholder
 import rusuh_app.shared.generated.resources.detail_nik_duplicate
 import rusuh_app.shared.generated.resources.detail_nik_example
+import rusuh_app.shared.generated.resources.detail_nik_field_description
 import rusuh_app.shared.generated.resources.detail_nik_invalid
 import rusuh_app.shared.generated.resources.detail_nik_label
 import rusuh_app.shared.generated.resources.detail_nik_placeholder
@@ -77,9 +88,19 @@ internal fun AttendeeBlock(
     onNameChange: (String) -> Unit,
     onNikChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    isLast: Boolean = true,
 ) {
     var nikTouched by remember { mutableStateOf(false) }
+    var nikFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val formatError = nikTouched && attendee.nik.isNotEmpty() && !isNikValid(attendee.nik)
+    val nikError =
+        when {
+            duplicateOf != null -> stringResource(Res.string.detail_nik_duplicate, duplicateOf)
+            formatError -> stringResource(Res.string.detail_nik_invalid, NIK_LENGTH)
+            else -> null
+        }
     Column(
         modifier = modifier.fillMaxWidth().padding(vertical = RusuhSpacing.xl),
         verticalArrangement = Arrangement.spacedBy(RusuhSpacing.lg),
@@ -96,7 +117,14 @@ internal fun AttendeeBlock(
             value = attendee.name,
             onValueChange = onNameChange,
             placeholder = stringResource(Res.string.detail_name_placeholder),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            label = stringResource(Res.string.detail_name_field_description, ticketNumber),
+            keyboardOptions =
+                KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next,
+                ),
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Next) }),
         )
         FieldNote(stringResource(Res.string.detail_name_hint))
 
@@ -105,16 +133,28 @@ internal fun AttendeeBlock(
             value = attendee.nik,
             onValueChange = onNikChange,
             placeholder = stringResource(Res.string.detail_nik_placeholder),
-            isError = formatError || duplicateOf != null,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            visualTransformation = NikVisualTransformation,
+            label = stringResource(Res.string.detail_nik_field_description, ticketNumber),
+            isError = nikError != null,
+            errorMessage = nikError,
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = if (isLast) ImeAction.Done else ImeAction.Next,
+                ),
+            keyboardActions =
+                KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                    onDone = {
+                        focusManager.clearFocus()
+                        keyboard?.hide()
+                    },
+                ),
+            // NIK is PII: masked to the last 4 digits whenever the field is not being edited.
+            visualTransformation = NikVisualTransformation(masked = !nikFocused),
+            onFocusChange = { nikFocused = it },
             onFocusLost = { nikTouched = true },
         )
-        when {
-            duplicateOf != null -> FieldError(stringResource(Res.string.detail_nik_duplicate, duplicateOf))
-            formatError -> FieldError(stringResource(Res.string.detail_nik_invalid, NIK_LENGTH))
-            else -> FieldNote(stringResource(Res.string.detail_nik_example))
-        }
+        if (nikError != null) FieldError(nikError) else FieldNote(stringResource(Res.string.detail_nik_example))
         Box(Modifier.fillMaxWidth().height(RusuhSpacing.borderThin).background(RusuhColors.BrandHairline))
     }
 }
@@ -191,10 +231,15 @@ private fun FieldError(text: String) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
         verticalAlignment = Alignment.Top,
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(RusuhSpacing.xl).background(RusuhColors.BrandDanger, CircleShape),
+            modifier =
+                Modifier
+                    .size(RusuhSpacing.xl)
+                    .background(RusuhColors.BrandDanger, CircleShape)
+                    .clearAndSetSemantics { },
         ) {
             // "!" is a symbol glyph, not user-visible copy.
             Text(text = "!", style = RusuhBrandTextStyles.eyebrow.body(), color = Color.White)
@@ -207,16 +252,19 @@ private fun FieldError(text: String) {
     }
 }
 
-/** Displays NIK digits grouped by four ("3174 0552 0396 0004"); stored value stays digits-only. */
-internal object NikVisualTransformation : VisualTransformation {
+/**
+ * Displays NIK digits grouped by four; when [masked] all but the last four digits are bullets
+ * ("•••• •••• •••• 1234"). Stored value stays digits-only. Both modes have the same length, so
+ * one offset mapping serves both.
+ */
+internal class NikVisualTransformation(private val masked: Boolean) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
-        val grouped = groupNik(text.text)
         val mapping =
             object : OffsetMapping {
-                override fun originalToTransformed(offset: Int): Int = offset + (offset - 1).coerceAtLeast(0) / 4
+                override fun originalToTransformed(offset: Int): Int = nikOriginalToTransformed(offset)
 
-                override fun transformedToOriginal(offset: Int): Int = (offset - offset / 5).coerceAtMost(text.length)
+                override fun transformedToOriginal(offset: Int): Int = nikTransformedToOriginal(offset, text.length)
             }
-        return TransformedText(AnnotatedString(grouped), mapping)
+        return TransformedText(AnnotatedString(nikDisplay(text.text, masked)), mapping)
     }
 }

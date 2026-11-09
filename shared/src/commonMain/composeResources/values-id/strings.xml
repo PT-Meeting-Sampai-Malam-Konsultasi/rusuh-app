@@ -127,6 +127,8 @@
     <string name="detail_name_placeholder">Nama lengkap</string>
     <string name="detail_name_hint">Dicetak di e-tiket.</string>
     <string name="detail_nik_label">NIK</string>
+    <string name="detail_nik_field_description">NIK, tiket %1$d</string>
+    <string name="detail_name_field_description">Nama sesuai KTP, tiket %1$d</string>
     <string name="detail_nik_placeholder">16 digit sesuai KTP</string>
     <string name="detail_nik_example">Contoh: 3201 1234 5678 0001</string>
     <string name="detail_nik_invalid">NIK harus %1$d digit angka.</string>

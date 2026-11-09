@@ -9,20 +9,29 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -109,8 +120,19 @@ fun DetailScreen(
             else -> null
         }
 
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val expired = state is DetailUiState.Expired
+    LaunchedEffect(expired) {
+        if (expired) {
+            focusManager.clearFocus()
+            keyboard?.hide()
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize().background(RusuhColors.BrandPaper)) {
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+        // imePadding on the container: scroll area and sticky bar shrink above the keyboard.
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             DetailTopBar(remainingSeconds = remaining, onBack = { dispatch(DetailIntent.Back) })
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (state) {
@@ -131,9 +153,10 @@ fun DetailScreen(
                             )
                         }
                     is DetailUiState.Content ->
-                        DetailContentBody(state.detail, form, { form = it }, dispatch, interactive = true)
-                    is DetailUiState.Expired ->
-                        DetailContentBody(state.detail, form, { form = it }, dispatch, interactive = false)
+                        DetailContentBody(state.detail, form, { form = it }, dispatch)
+                    // Inert: only the (PII-free) header is composed, never attendee names/NIKs or
+                    // steppers/fields, so focus and TalkBack cannot reach them.
+                    is DetailUiState.Expired -> ExpiredBackdrop(state.detail)
                 }
             }
         }
@@ -196,8 +219,8 @@ private fun DetailContentBody(
     form: DetailFormState,
     onFormChange: (DetailFormState) -> Unit,
     dispatch: (DetailIntent) -> Unit,
-    interactive: Boolean,
 ) {
+    val focusManager = LocalFocusManager.current
     val maxTickets = detail.maxTickets
     val total = form.totalTickets
     val subtotal = subtotalRupiah(detail.categories, form.quantities)
@@ -205,7 +228,13 @@ private fun DetailContentBody(
     val capReached = isCapReached(total, maxTickets)
     val tickets = ticketCategories(detail.categories, form.quantities)
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                // Tap outside a field: drop focus (children that consume the tap are unaffected).
+                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
+    ) {
         Column(
             modifier =
                 Modifier
@@ -252,6 +281,7 @@ private fun DetailContentBody(
                     categoryName = category.name,
                     attendee = attendee,
                     duplicateOf = form.duplicateOf(index),
+                    isLast = index == tickets.lastIndex,
                     onKindChange = { onFormChange(form.withKind(index, it, detail.accountName)) },
                     onNameChange = { onFormChange(form.withName(index, it)) },
                     onNikChange = { onFormChange(form.withNik(index, it)) },
@@ -272,15 +302,19 @@ private fun DetailContentBody(
                 )
             }
         }
-        if (interactive) {
-            BottomBar(
-                tickets = total,
-                total = orderTotal,
-                enabled = canProceed(form, maxTickets),
-                onProceed = { dispatch(DetailIntent.Proceed) },
-            )
-        }
+        BottomBar(
+            tickets = total,
+            total = orderTotal,
+            enabled = canProceed(form, maxTickets, detail.categories),
+            onProceed = { dispatch(DetailIntent.Proceed) },
+        )
     }
+}
+
+/** What stays behind the "Waktu habis" sheet: the event header only, no attendee data. */
+@Composable
+private fun ExpiredBackdrop(detail: DetailContent) {
+    Column(modifier = Modifier.fillMaxSize().padding(RusuhSpacing.xl)) { EventHeader(detail) }
 }
 
 @Composable
@@ -451,6 +485,7 @@ private fun SummaryRow(
 }
 
 /** Sticky bottom bar: ticket count + total on the left, "Lanjut bayar →" on the right. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BottomBar(
     tickets: Int,
@@ -458,14 +493,23 @@ private fun BottomBar(
     enabled: Boolean,
     onProceed: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().background(RusuhColors.BrandPaper).navigationBarsPadding()) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(RusuhColors.BrandPaper)
+                // The IME inset already covers the nav bar; don't add it twice while typing.
+                .windowInsetsPadding(WindowInsets.navigationBars.exclude(WindowInsets.ime)),
+    ) {
         Box(Modifier.fillMaxWidth().height(RusuhSpacing.borderHeavy).background(RusuhColors.BrandInk))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // FlowRow: price and CTA share a line when they fit; at large font scale on narrow
+        // phones the CTA drops below instead of clipping the total.
+        FlowRow(
+            verticalArrangement = Arrangement.spacedBy(RusuhSpacing.lg),
             horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
             modifier = Modifier.fillMaxWidth().padding(RusuhSpacing.xl),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column {
                 Text(
                     text = stringResource(Res.string.detail_bar_tickets, tickets),
                     style = RusuhBrandTextStyles.note.body(),
@@ -475,14 +519,13 @@ private fun BottomBar(
                     text = formatRupiah(total),
                     style = RusuhBrandTextStyles.stat.display(),
                     color = RusuhColors.BrandInk,
-                    maxLines = 1,
                 )
             }
             BrutalButton(
                 text = stringResource(Res.string.detail_proceed),
                 onClick = onProceed,
                 enabled = enabled,
-                modifier = Modifier.weight(1f).padding(end = RusuhSpacing.xs, bottom = RusuhSpacing.xs),
+                modifier = Modifier.padding(end = RusuhSpacing.xs, bottom = RusuhSpacing.xs),
             )
         }
     }

@@ -177,4 +177,47 @@ class DetailScreenTest {
         assertEquals("3174 05", groupNik("317405"))
         assertEquals("", groupNik(""))
     }
+
+    @Test
+    fun nonAsciiDigitsAreNotAValidNik() {
+        val arabicIndic = nikA.map { it + ('\u0660' - '0') }.joinToString("") // U+0660.. digits
+        assertEquals(NIK_LENGTH, arabicIndic.length)
+        assertFalse(isNikValid(arabicIndic))
+        val form = DetailFormState().withQuantity("fest-b", 1, 3).withNik(0, arabicIndic + nikA)
+        assertEquals(nikA, form.attendees[0].nik)
+    }
+
+    @Test
+    fun nikMaskedShowsOnlyLastFourGrouped() {
+        assertEquals(
+            "\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 0004",
+            nikDisplay(nikA, masked = true),
+        )
+        assertEquals("3174 0552 0396 0004", nikDisplay(nikA, masked = false))
+        assertEquals("\u2022\u202217 40", nikDisplay("531740", masked = true))
+        assertEquals("", nikDisplay("", masked = true))
+    }
+
+    @Test
+    fun nikOffsetMappingMatchesGroupingAndRoundTrips() {
+        assertEquals(0, nikOriginalToTransformed(0))
+        assertEquals(4, nikOriginalToTransformed(4))
+        assertEquals(6, nikOriginalToTransformed(5))
+        assertEquals(19, nikOriginalToTransformed(16))
+        assertEquals(4, nikTransformedToOriginal(5, 16))
+        assertEquals(5, nikTransformedToOriginal(6, 16))
+        assertEquals(16, nikTransformedToOriginal(19, 16))
+        for (i in 0..16) assertEquals(i, nikTransformedToOriginal(nikOriginalToTransformed(i), 16))
+        assertEquals(nikDisplay(nikA, true).length, nikOriginalToTransformed(16))
+    }
+
+    @Test
+    fun cannotProceedWhileASelectedCategoryIsSoldOut() {
+        val soldOut = categories[0].copy(availability = SeatAvailability.SoldOut)
+        val form = filled(nikA)
+        assertTrue(canProceed(form, 3, categories))
+        assertFalse(canProceed(form, 3, listOf(soldOut, categories[1])))
+        // sold-out but not selected is fine
+        assertTrue(canProceed(form, 3, listOf(categories[0], soldOut.copy(id = "other"))))
+    }
 }
