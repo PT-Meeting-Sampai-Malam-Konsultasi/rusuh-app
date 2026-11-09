@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -23,10 +25,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -96,9 +94,9 @@ internal enum class AppLanguageOption(val code: String) {
  * error (retry) variants. Layout follows the Waiting Room and Home frames of the
  * Figma file (no dedicated My Queues frame exists).
  *
- * Stateless apart from the header toggle's local selection: it renders the
- * [state] it is handed and raises [actions]; there is NO ViewModel, NO
- * repository and NO API here.
+ * Stateless: it renders the [state] it is handed and raises [actions]; there is
+ * NO ViewModel, NO repository and NO API here. The header's ID|EN toggle is
+ * visual only until locale switching exists.
  *
  * TODO(M3): wire MyQueuesViewModel, collect the MVI state/effects and map them
  *  onto [MyQueuesUiState], replacing the caller-supplied [state].
@@ -106,7 +104,7 @@ internal enum class AppLanguageOption(val code: String) {
  *
  * @param state what to render.
  * @param actions the callbacks the screen raises (row tap, tab switch, browse,
- *   retry, language), bundled so the screen takes one handler object. All
+ *   retry), bundled so the screen takes one handler object. All
  *   default to no-ops so previews and non-navigating hosts can render it.
  */
 @Composable
@@ -115,20 +113,12 @@ fun MyQueuesScreen(
     state: MyQueuesUiState = MyQueuesUiState.Content(placeholderQueues()),
     actions: MyQueuesActions = MyQueuesActions(),
 ) {
-    var language by rememberSaveable { mutableStateOf(AppLanguageOption.Indonesian) }
-
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = RusuhBrandColors.Paper,
-        topBar = {
-            MyQueuesHeader(
-                language = language,
-                onLanguageSelected = {
-                    language = it
-                    actions.onLanguageSelected(it.code)
-                },
-            )
-        },
+        // The header pads the status bar itself and the bottom bar pads the
+        // navigation bar itself, so the Scaffold's own insets are never added on top.
+        topBar = { MyQueuesHeader(language = AppLanguageOption.Indonesian) },
         bottomBar = {
             RusuhBottomBar(
                 selectedTab = RusuhTab.Antrian,
@@ -160,15 +150,12 @@ fun MyQueuesScreen(
  *   returns the user to the Events tab.
  * @param onRetry invoked from the error state's retry action; reloads the queues
  *   once M3 wires the ViewModel.
- * @param onLanguageSelected invoked with "id" or "en" from the header toggle;
- *   applying the locale is the app shell's job.
  */
 data class MyQueuesActions(
     val onOpenWaitingRoom: (String) -> Unit = {},
     val onTabSelected: (RusuhTab) -> Unit = {},
     val onBrowseEvents: () -> Unit = {},
     val onRetry: () -> Unit = {},
-    val onLanguageSelected: (String) -> Unit = {},
 )
 
 @Composable
@@ -274,9 +261,15 @@ private fun CenteredMessage(
     actionLabel: String,
     onAction: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(RusuhSpacing.xl),
-        contentAlignment = Alignment.Center,
+    // Scrollable so the card stays reachable at large font scales.
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(RusuhSpacing.xl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
         Column(
             modifier =

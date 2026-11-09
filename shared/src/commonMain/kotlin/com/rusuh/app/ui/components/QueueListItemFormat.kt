@@ -61,6 +61,26 @@ internal fun updatedAgoLabel(seconds: Int): UpdatedAgoLabel =
         else -> UpdatedAgoLabel(Res.string.queue_list_item_updated_hours, seconds / SECONDS_PER_HOUR)
     }
 
+/** True for phases where the user's numeric position is meaningful and displayed. */
+internal fun QueueListPhase.showsPosition(): Boolean = this != QueueListPhase.YourTurn && this != QueueListPhase.Closed
+
+/** ETA minutes to show on the row: only for live queues with a known estimate. */
+internal fun visibleEtaMinutes(data: QueueListItemUi): Int? =
+    if (data.phase == QueueListPhase.Live) data.etaMinutes else null
+
+/**
+ * Joins a lead-in and a number: "Anda antrian ke-" glues to the number, while
+ * "You are number" needs a space. Mirrors QueuePositionCard's description.
+ */
+internal fun joinLeadAndNumber(
+    lead: String,
+    number: String,
+): String {
+    val trimmed = lead.trimEnd()
+    val separator = if (trimmed.endsWith("-")) "" else " "
+    return "$trimmed$separator$number"
+}
+
 /** Context sentence under the position: now-serving, or a phase hint. */
 internal fun contextLineResource(data: QueueListItemUi): StringResource? =
     when (data.phase) {

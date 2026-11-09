@@ -1,35 +1,32 @@
 package com.rusuh.app.ui.theme
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-
 /**
- * Brand-surface tokens from the Figma / hi-fi design language: warm paper
- * background, hard ink outlines and a pink accent. Additive to
- * [RusuhColors] (which keeps the Material baseline) so existing screens are
- * untouched; Figma-aligned screens read these directly.
+ * Brand-surface aliases kept for the Figma-aligned screens that read
+ * `RusuhBrandColors` / `RusuhBrandMetrics`. They hold no values of their own:
+ * every entry points at [RusuhColors] / [RusuhSpacing], the single source of
+ * truth, so the hex values and dp cannot drift apart.
  */
 object RusuhBrandColors {
-    val Paper = Color(0xFFF2EEE3)
-    val PaperDeep = Color(0xFFE8E2D2)
-    val Card = Color(0xFFFBF9F3)
-    val Ink = Color(0xFF141414)
-    val Ink2 = Color(0xFF4A4740)
-    val Ink3 = Color(0xFF6B665E)
-    val Hair = Color(0xFFCFC8B6)
-    val Pink = Color(0xFFD81F72)
-    val PinkInk = Color(0xFFB8125C)
-    val PinkTint = Color(0xFFF8D3E2)
+    val Paper = RusuhColors.Paper
+    val PaperDeep = RusuhColors.Paper2
+    val Card = RusuhColors.PaperCard
+    val Ink = RusuhColors.Ink
+    val Ink2 = RusuhColors.Ink2
+    val Ink3 = RusuhColors.Ink3
+    val Hair = RusuhColors.Hair
+    val Pink = RusuhColors.Pink
+    val PinkInk = RusuhColors.PinkInk
+    val PinkTint = RusuhColors.PinkTint
 }
 
-/** Neo-brutalist outline / hard-shadow metrics shared by Figma-aligned surfaces. */
+/** Neo-brutalist outline / hard-shadow metrics, aliased to [RusuhSpacing]. */
 object RusuhBrandMetrics {
     /** Ink outline width of cards, bars and badges. */
-    val borderWidth = 2.5.dp
+    val borderWidth = RusuhSpacing.ruleThick
 
     /** Offset of the hard (blur-less) ink shadow behind a card. */
-    val shadowOffset = 4.dp
+    val shadowOffset = RusuhSpacing.hardShadow
 
     /** Height of the top app bar (logo + language toggle). */
-    val appBarHeight = 60.dp
+    val appBarHeight = RusuhSpacing.appBarHeight
 }

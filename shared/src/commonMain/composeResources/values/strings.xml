@@ -193,4 +193,9 @@
     <string name="queue_list_item_updated_hours">Updated %1$d h ago</string>
     <string name="queue_list_item_open_action">Open queue</string>
     <string name="queue_list_item_description">%1$s. %2$s. %3$s. %4$s. %5$s.</string>
+    <string name="tab_event">Events</string>
+    <string name="tab_queues">Queues</string>
+    <string name="tab_tickets">Tickets</string>
+    <string name="tab_account">Account</string>
+    <string name="tab_coming_soon">%1$s — coming soon</string>
 </resources>
