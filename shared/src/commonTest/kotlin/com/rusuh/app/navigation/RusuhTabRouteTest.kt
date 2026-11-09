@@ -1,6 +1,11 @@
 package com.rusuh.app.navigation
 
 import com.rusuh.app.ui.components.RusuhTab
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.tab_account
+import rusuh_app.shared.generated.resources.tab_event
+import rusuh_app.shared.generated.resources.tab_queues
+import rusuh_app.shared.generated.resources.tab_tickets
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -22,7 +27,7 @@ class RusuhTabRouteTest {
     @Test
     fun tabOrderMatchesHiFiBottomBar() {
         assertEquals(
-            listOf("Event", "Antrian", "Tiket", "Akun"),
+            listOf(Res.string.tab_event, Res.string.tab_queues, Res.string.tab_tickets, Res.string.tab_account),
             RusuhTab.entries.map { it.label },
         )
     }

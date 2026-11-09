@@ -8,7 +8,7 @@ import com.rusuh.app.ui.components.QueueListPhase
  *
  * UI-only sample data so the stateless screen renders a realistic list before
  * M3 wires the ViewModel and M4 the API. Covers the phase variants the row can
- * show (live, your-turn, open, paused, closed) so the placeholder exercises the
+ * show (live with an ETA, your-turn at position 0, open, paused, closed) so the placeholder exercises the
  * whole [QueueListItem] surface.
  *
  * shortcut: hard-coded sample; swap for live data once M3/M4 land.
@@ -20,18 +20,19 @@ fun placeholderQueues(): List<QueueListItemUi> =
             title = "Samudra — Tur Gelombang 2026",
             dateVenue = "12 Des 2026 · Stadion Madya, Jakarta",
             position = 128,
-            nowServing = "Sedang melayani ke-102",
+            nowServing = 102,
             phase = QueueListPhase.Live,
-            updatedAgo = "diperbarui 3 detik lalu",
+            updatedAgoSeconds = 3,
+            etaMinutes = 12,
         ),
         QueueListItemUi(
             eventId = "evt-nyala",
             title = "Nyala Fest",
             dateVenue = "20 Des 2026 · GOR Saparua, Bandung",
-            position = 4,
-            nowServing = "Sedang melayani ke-1",
+            position = 0,
+            nowServing = 4,
             phase = QueueListPhase.YourTurn,
-            updatedAgo = "diperbarui 1 detik lalu",
+            updatedAgoSeconds = 1,
         ),
         QueueListItemUi(
             eventId = "evt-rimba",
@@ -40,16 +41,16 @@ fun placeholderQueues(): List<QueueListItemUi> =
             position = 532,
             nowServing = null,
             phase = QueueListPhase.QueueOpen,
-            updatedAgo = "diperbarui 8 detik lalu",
+            updatedAgoSeconds = 8,
         ),
         QueueListItemUi(
             eventId = "evt-gema",
             title = "Gema Akustik",
             dateVenue = "18 Jan 2027 · Taman Budaya, Yogyakarta",
             position = 76,
-            nowServing = "Antrian dijeda sementara",
+            nowServing = 90,
             phase = QueueListPhase.Paused,
-            updatedAgo = "diperbarui 25 detik lalu",
+            updatedAgoSeconds = 25,
         ),
         QueueListItemUi(
             eventId = "evt-pasar",
@@ -58,6 +59,6 @@ fun placeholderQueues(): List<QueueListItemUi> =
             position = 2041,
             nowServing = null,
             phase = QueueListPhase.Closed,
-            updatedAgo = "diperbarui 2 menit lalu",
+            updatedAgoSeconds = 120,
         ),
     )

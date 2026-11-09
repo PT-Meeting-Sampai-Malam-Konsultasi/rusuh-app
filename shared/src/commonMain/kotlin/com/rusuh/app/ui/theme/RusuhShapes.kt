@@ -9,6 +9,9 @@ object RusuhShapes {
     val small = RoundedCornerShape(4.dp)
     val medium = RoundedCornerShape(8.dp)
     val large = RoundedCornerShape(16.dp)
+
+    /** Fully rounded ends (language toggle). */
+    val pill = RoundedCornerShape(percent = 50)
 }
 
 internal val RusuhMaterialShapes =
