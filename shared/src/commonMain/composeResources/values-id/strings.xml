@@ -111,20 +111,37 @@
 
     <!-- Detail (Pilih tiket) screen -->
     <string name="detail_title">Pilih tiket</string>
+    <string name="detail_back_description">Kembali</string>
+    <string name="detail_timer_description">Sisa waktu %1$s</string>
     <string name="detail_section_categories">Kategori</string>
     <string name="detail_categories_hint">Maks. %1$d tiket per transaksi. Tanpa nomor kursi — masuk sesuai kategori.</string>
-    <string name="detail_cap_reached">%1$d/%2$d — batas tiket tercapai. Kurangi satu untuk ganti kategori.</string>
-    <string name="detail_cap_selected">%1$d/%2$d tiket dipilih.</string>
-    <string name="detail_section_nik">NIK pemegang tiket</string>
-    <string name="detail_nik_hint">1 NIK = 1 tiket per event. Di pintu masuk, tunjukkan e-tiket + KTP asli dengan NIK yang sama.</string>
-    <string name="detail_nik_field_label">Tiket %1$d</string>
-    <string name="detail_nik_field_placeholder">16 digit sesuai KTP</string>
-    <string name="detail_nik_valid">✓ Format NIK valid</string>
-    <string name="detail_nik_invalid">NIK harus %1$d digit angka</string>
+    <string name="detail_cap_chip">%1$d/%2$d</string>
+    <string name="detail_cap_message">Batas %1$d tiket tercapai. Kurangi satu untuk ganti kategori.</string>
+    <string name="detail_section_holders">Pemegang tiket</string>
+    <string name="detail_holders_hint">Nama dan NIK sesuai KTP. 1 NIK = 1 tiket per event — di pintu masuk, e-tiket dicocokkan dengan KTP asli.</string>
+    <string name="detail_ticket_label">Tiket %1$d · %2$s</string>
+    <string name="detail_holder_toggle_description">Untuk siapa tiket ini</string>
+    <string name="detail_holder_self">Saya sendiri</string>
+    <string name="detail_holder_other">Orang lain</string>
+    <string name="detail_name_label">Nama sesuai KTP</string>
+    <string name="detail_name_placeholder">Nama lengkap</string>
+    <string name="detail_name_hint">Dicetak di e-tiket.</string>
+    <string name="detail_nik_label">NIK</string>
+    <string name="detail_nik_field_description">NIK, tiket %1$d</string>
+    <string name="detail_name_field_description">Nama sesuai KTP, tiket %1$d</string>
+    <string name="detail_nik_placeholder">16 digit sesuai KTP</string>
     <string name="detail_nik_example">Contoh: 3201 1234 5678 0001</string>
+    <string name="detail_nik_invalid">NIK harus %1$d digit angka.</string>
+    <string name="detail_nik_duplicate">NIK ini sudah dipakai di Tiket %1$d. Setiap tiket butuh NIK orang yang berbeda.</string>
+    <string name="detail_section_email">Kirim e-tiket ke</string>
+    <string name="detail_email_label">Email</string>
+    <string name="detail_email_hint">Dari akun Anda. E-tiket juga muncul di menu Tiket Saya.</string>
+    <string name="detail_email_change">Ubah</string>
+    <string name="detail_summary_subtotal">Subtotal tiket</string>
+    <string name="detail_summary_admin_fee">Biaya layanan</string>
     <string name="detail_total">Total</string>
-    <string name="detail_proceed">Lanjut ke pembayaran</string>
-    <string name="detail_niks_incomplete">Lengkapi NIK 16 digit untuk setiap tiket agar dapat melanjutkan.</string>
+    <string name="detail_bar_tickets">%1$d tiket</string>
+    <string name="detail_proceed">Lanjut bayar</string>
     <string name="detail_loading_description">Memuat detail tiket</string>
     <string name="detail_loading">Memuat detail tiket…</string>
     <string name="detail_empty_title">Belum ada kategori</string>
@@ -135,10 +152,13 @@
     <string name="detail_expired_headline">5 menit sudah lewat.</string>
     <string name="detail_expired_body">Pilihan Anda belum disimpan dan tempat Anda kami berikan ke nomor berikutnya. Antre lagi untuk mencoba lagi.</string>
     <string name="detail_expired_action">Antre lagi</string>
+    <string name="detail_expired_home">Ke beranda</string>
 
     <!-- Seat category card -->
-    <string name="seat_sold_out">Habis</string>
-    <string name="seat_remaining">Sisa %1$s tiket</string>
+    <string name="seat_category_available">Tersedia</string>
+    <string name="seat_category_almost_gone">Hampir habis</string>
+    <string name="seat_category_sold_out">Habis</string>
+    <string name="seat_category_selected">%1$d dipilih</string>
     <string name="seat_decrement">Kurangi %1$s</string>
     <string name="seat_increment">Tambah %1$s</string>
 </resources>

@@ -62,8 +62,27 @@ object RusuhColors {
     val InkMuted = Ink2
     val InkSubtle = Ink3
 
+    // Neo-brutalist brand tokens used by the Figma-aligned Detail Ticket screen
+    // (flat paper background, ink borders, magenta accent). Additive: the
+    // Material scheme above is unchanged for the other screens.
+    val BrandInk = Color(0xFF141414)
+    val BrandPaper = Color(0xFFF2EEE3)
+    val BrandCream = Color(0xFFFBF9F3)
+    val BrandMagenta = Color(0xFFD81F72)
+    val BrandMagentaDeep = Color(0xFFB8125C)
+    val BrandMuted = Color(0xFF4A4740)
+    val BrandSubtle = Color(0xFF6B665E)
+    val BrandHairline = Color(0xFFCFC8B6)
+    val BrandChip = Color(0xFFE8E2D2)
+    val BrandDanger = Color(0xFFC21F1F)
+    val BrandDangerSurface = Color(0xFFFFF7F5)
+    val BrandBlue = Color(0xFF2F5BEA)
+
     // Scrim applied over a poster image so overlaid chrome stays legible.
     val PosterScrim = Color(0x99000000)
+
+    // Dim layer over the page behind the Detail Ticket expired sheet (Figma ~32% ink).
+    val ExpiredScrim = Color(0x52141414)
 }
 
 /**

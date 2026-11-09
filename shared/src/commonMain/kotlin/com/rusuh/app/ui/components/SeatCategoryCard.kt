@@ -1,97 +1,98 @@
-@file:Suppress("MatchingDeclarationName")
+@file:Suppress("MatchingDeclarationName", "LongParameterList")
 
 package com.rusuh.app.ui.components
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import com.rusuh.app.ui.theme.RusuhShapes
+import com.rusuh.app.ui.theme.RusuhBrandTextStyles
+import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
+import com.rusuh.app.ui.theme.body
+import com.rusuh.app.ui.theme.display
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.seat_category_almost_gone
+import rusuh_app.shared.generated.resources.seat_category_available
+import rusuh_app.shared.generated.resources.seat_category_selected
+import rusuh_app.shared.generated.resources.seat_category_sold_out
 import rusuh_app.shared.generated.resources.seat_decrement
 import rusuh_app.shared.generated.resources.seat_increment
-import rusuh_app.shared.generated.resources.seat_remaining
-import rusuh_app.shared.generated.resources.seat_sold_out
+
+/**
+ * Availability label the backend returns for a category (`Category.availability`,
+ * a snapshot at load): "Tersedia" / "Hampir habis" / "Habis". There is no seat number
+ * and no seat map — entry is by category.
+ */
+enum class SeatAvailability { Available, AlmostGone, SoldOut }
 
 /**
  * Display data for one seat category on the Detail Ticket page (FR-11/FR-12).
  *
- * UI-facing view model: every string is already localized/formatted by the
- * caller so the component stays clock- and locale-agnostic. "Seat category"
- * here is capacity-only — there are NO seat numbers and NO seat map (FR-11);
- * [available] is simply how many tickets remain in this category.
+ * Every string is already localized by the caller; the price stays numeric so the screen can
+ * sum the order and format it canonically via [formatRupiah].
  *
- * @param id stable identity for list keys and quantity callbacks.
+ * @param id stable identity for list keys and quantity callbacks (`categoryId`).
  * @param name category name (e.g. "Festival B").
- * @param description short supporting line (e.g. "Berdiri · di belakang Festival A"); null hides it.
- * @param priceRupiah raw price in whole rupiah for ONE ticket (e.g. 850_000).
- *   Kept numeric (not a pre-formatted string) so the component renders the
- *   canonical "Rp 850.000" form via [formatRupiah] and the running total on the
- *   screen can sum categories without re-parsing.
- * @param available tickets left in this category; 0 means sold out (disabled).
+ * @param description seating + position line (e.g. "Berdiri · di belakang Festival A"); null hides it.
+ * @param priceRupiah price in whole rupiah for ONE ticket.
+ * @param availability availability label; [SeatAvailability.SoldOut] disables the card.
+ * @param entryGate entry gate (e.g. "Gerbang 5"); null hides it.
  */
+@Immutable
 data class SeatCategoryUi(
     val id: String,
     val name: String,
     val description: String?,
     val priceRupiah: Int,
-    val available: Int,
+    val availability: SeatAvailability = SeatAvailability.Available,
+    val entryGate: String? = null,
 ) {
     init {
         require(id.isNotBlank()) { "id must not be blank" }
         require(name.isNotBlank()) { "name must not be blank" }
         require(priceRupiah >= 0) { "priceRupiah must be >= 0, was $priceRupiah" }
-        require(available >= 0) { "available must be >= 0, was $available" }
     }
 
-    /** True when nothing is left in this category — the card renders disabled. */
-    val isSoldOut: Boolean get() = available == 0
+    /** True when the category cannot be bought; the card renders disabled. */
+    val isSoldOut: Boolean get() = availability == SeatAvailability.SoldOut
 }
 
 /**
- * Seat-category card for the Detail Ticket page (FR-05 M1).
+ * Seat-category row for the Detail Ticket page (FR-05 M1), matching the Figma "Item":
+ * name, seating line, availability label, right-aligned price and a boxed quantity stepper.
  *
- * Stateless and token-driven: it shows the category name, its own formatted IDR
- * price, the available (capacity-only) count, and a quantity stepper. It holds
- * NO business logic — the current [quantity] is supplied by the caller and
- * every change is reported through [onQuantityChange]. The caller owns the
- * 3-ticket-total cap (FR-13) and passes [canIncrement] = false once the cap is
- * reached, which disables the `+` button here without this component knowing
- * the rule.
- *
- * A sold-out category ([SeatCategoryUi.isSoldOut]) is dimmed with both stepper
- * buttons disabled, mirroring the hi-fi "Habis" state.
- *
- * NO ViewModel, NO repository, NO API — the caller supplies [data] and [quantity].
- *
- * @param quantity how many tickets are currently selected in this category (>= 0).
- * @param canIncrement whether `+` is allowed right now (false when the order
- *   cap is hit); ignored when sold out (always disabled then).
- * @param onQuantityChange invoked with the new quantity after a +/- tap.
+ * Stateless: [quantity] is supplied and every change goes through [onQuantityChange]. The
+ * caller owns the per-order cap (max 3, bounded by reserved units) and passes
+ * [canIncrement] = false once it is reached. Sold-out categories show a "Habis" chip, a
+ * struck-through price and a disabled stepper.
  */
 @Composable
 fun SeatCategoryCard(
@@ -103,157 +104,164 @@ fun SeatCategoryCard(
 ) {
     val soldOut = data.isSoldOut
     val description = buildSeatCategoryDescription(data, quantity)
+    val nameColor =
+        when {
+            soldOut -> RusuhColors.BrandSubtle
+            quantity > 0 -> RusuhColors.BrandMagentaDeep
+            else -> RusuhColors.BrandInk
+        }
 
-    Card(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .alpha(if (soldOut) RusuhSpacing.DISABLED_ALPHA else 1f)
-                .semantics(mergeDescendants = true) { contentDescription = description },
-        shape = MaterialTheme.shapes.large,
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(RusuhSpacing.xl),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(vertical = RusuhSpacing.xl),
+            horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = description },
+                verticalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
+            ) {
                 Text(
                     text = data.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
+                    style = RusuhBrandTextStyles.itemTitle.display(),
+                    color = nameColor,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 data.description?.let { desc ->
-                    Spacer(Modifier.height(RusuhSpacing.xxs))
                     Text(
                         text = desc,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        style = RusuhBrandTextStyles.note.body(),
+                        color = RusuhColors.BrandMuted,
                     )
                 }
-                Spacer(Modifier.height(RusuhSpacing.sm))
+                data.entryGate?.let { gate ->
+                    Text(
+                        text = gate,
+                        style = RusuhBrandTextStyles.note.body(),
+                        color = RusuhColors.BrandMuted,
+                    )
+                }
+                AvailabilityLabelView(data.availability)
+            }
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = formatRupiah(data.priceRupiah),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = RusuhBrandTextStyles.price.body(),
+                    color = if (soldOut) RusuhColors.BrandSubtle else RusuhColors.BrandInk,
+                    textDecoration = if (soldOut) TextDecoration.LineThrough else null,
                 )
-                Spacer(Modifier.height(RusuhSpacing.xxs))
-                Text(
-                    text = resolveAvailabilityLabel(data),
-                    style = MaterialTheme.typography.bodySmall,
-                    color =
-                        if (soldOut) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                )
-            }
-            Spacer(Modifier.width(RusuhSpacing.xl))
-            // +/- quantity stepper. Purely presentational: the caller decides
-            // whether each button is enabled and what the resulting quantity is.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
-            ) {
-                StepperButton(
-                    // \u2212 is the minus sign (visually balanced against "+").
-                    symbol = "\u2212",
-                    enabled = !soldOut && quantity > 0,
-                    label = stringResource(Res.string.seat_decrement, data.name),
-                    onClick = { onQuantityChange((quantity - 1).coerceAtLeast(0)) },
-                )
-                Text(
-                    text = quantity.toString(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.width(RusuhSpacing.stepperValue),
-                    textAlign = TextAlign.Center,
-                )
-                StepperButton(
-                    symbol = "+",
-                    enabled = !soldOut && canIncrement,
-                    label = stringResource(Res.string.seat_increment, data.name),
-                    onClick = { onQuantityChange(quantity + 1) },
+                Spacer(Modifier.height(RusuhSpacing.lg))
+                QuantityStepper(
+                    quantity = quantity,
+                    // Decrement stays available when the category turned sold out, so the user can back out.
+                    canDecrement = quantity > 0,
+                    canIncrement = !soldOut && canIncrement,
+                    decrementLabel = stringResource(Res.string.seat_decrement, data.name),
+                    incrementLabel = stringResource(Res.string.seat_increment, data.name),
+                    onDecrement = { onQuantityChange((quantity - 1).coerceAtLeast(0)) },
+                    onIncrement = { onQuantityChange(quantity + 1) },
                 )
             }
         }
+        Box(Modifier.fillMaxWidth().height(RusuhSpacing.borderThin).background(RusuhColors.BrandHairline))
     }
 }
 
 @Composable
-private fun StepperButton(
+private fun AvailabilityLabelView(availability: SeatAvailability) {
+    val text = stringResource(availabilityLabel(availability)).uppercase()
+    val style = RusuhBrandTextStyles.eyebrow.body()
+    when (availability) {
+        SeatAvailability.SoldOut ->
+            Text(
+                text = text,
+                style = style,
+                color = RusuhColors.BrandInk,
+                modifier =
+                    Modifier
+                        .background(RusuhColors.BrandChip)
+                        .padding(horizontal = RusuhSpacing.sm, vertical = RusuhSpacing.xs),
+            )
+        SeatAvailability.AlmostGone -> Text(text = text, style = style, color = RusuhColors.BrandMagentaDeep)
+        SeatAvailability.Available -> Text(text = text, style = style, color = RusuhColors.BrandMuted)
+    }
+}
+
+/** Boxed "- n +" stepper (Figma 129x45). The centre cell fills magenta once quantity > 0. */
+@Composable
+private fun QuantityStepper(
+    quantity: Int,
+    canDecrement: Boolean,
+    canIncrement: Boolean,
+    decrementLabel: String,
+    incrementLabel: String,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .size(width = RusuhSpacing.stepperWidth, height = RusuhSpacing.stepperHeight)
+                .brutalBox(fill = RusuhColors.BrandCream),
+    ) {
+        StepperButton("−", canDecrement, decrementLabel, onDecrement) // minus sign
+        val selected = quantity > 0
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier =
+                Modifier
+                    .width(RusuhSpacing.stepperCell)
+                    .fillMaxHeight()
+                    .drawBehind {
+                        if (selected) drawRect(RusuhColors.BrandMagenta)
+                        val rule = RusuhSpacing.borderHeavy.toPx()
+                        drawRect(RusuhColors.BrandInk, Offset.Zero, Size(rule, size.height))
+                        drawRect(RusuhColors.BrandInk, Offset(size.width - rule, 0f), Size(rule, size.height))
+                    },
+        ) {
+            Text(
+                text = quantity.toString(),
+                style = RusuhBrandTextStyles.stepperValue.display(),
+                color = if (selected) Color.White else RusuhColors.BrandInk,
+                textAlign = TextAlign.Center,
+            )
+        }
+        StepperButton("+", canIncrement, incrementLabel, onIncrement)
+    }
+}
+
+@Composable
+private fun RowScope.StepperButton(
     symbol: String,
     enabled: Boolean,
     label: String,
     onClick: () -> Unit,
 ) {
-    // A bordered box rather than a material IconButton so the control reads as
-    // the boxed +/- cells in the hi-fi, and no material-icons dependency is
-    // pulled in for two glyphs (matches EventCard's text-chevron choice).
     Box(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
-                .size(RusuhSpacing.stepperButton)
-                .border(
-                    width = RusuhSpacing.stepperBorder,
-                    color = MaterialTheme.colorScheme.outline,
-                    shape = RusuhShapes.small,
-                )
-                .alpha(if (enabled) 1f else RusuhSpacing.DISABLED_ALPHA)
+                .weight(1f)
+                .fillMaxHeight()
                 .semantics { contentDescription = label }
-                .clickable(enabled = enabled, onClick = onClick),
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
     ) {
         Text(
             text = symbol,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = RusuhBrandTextStyles.stepperSymbol.body(),
+            color = if (enabled) RusuhColors.BrandInk else RusuhColors.BrandSubtle,
         )
     }
 }
 
-/**
- * Availability line resource (and optional formatted-count arg) for a category.
- * Pure function — unit-tested directly; [resolveAvailabilityLabel] resolves it.
- * Capacity-only (FR-11): a remaining count or the sold-out label, never a seat
- * number.
- */
-internal fun availabilityLabel(data: SeatCategoryUi): AvailabilityLabel =
-    if (data.isSoldOut) {
-        AvailabilityLabel(Res.string.seat_sold_out)
-    } else {
-        AvailabilityLabel(Res.string.seat_remaining, data.available.formatThousands())
+/** String resource for an availability label. Pure — unit-tested directly. */
+internal fun availabilityLabel(availability: SeatAvailability): StringResource =
+    when (availability) {
+        SeatAvailability.Available -> Res.string.seat_category_available
+        SeatAvailability.AlmostGone -> Res.string.seat_category_almost_gone
+        SeatAvailability.SoldOut -> Res.string.seat_category_sold_out
     }
-
-/** Resource (and optional pre-formatted remaining count) for the availability line. */
-internal data class AvailabilityLabel(
-    val resource: StringResource,
-    val remaining: String? = null,
-)
-
-/** Resolves [availabilityLabel] to its localized string in a composition. */
-@Composable
-internal fun resolveAvailabilityLabel(data: SeatCategoryUi): String {
-    val label = availabilityLabel(data)
-    return if (label.remaining != null) {
-        stringResource(label.resource, label.remaining)
-    } else {
-        stringResource(label.resource)
-    }
-}
 
 /**
  * Formats whole rupiah as "Rp 850.000" with Indonesian thousands dots.
@@ -262,25 +270,20 @@ internal fun resolveAvailabilityLabel(data: SeatCategoryUi): String {
  */
 internal fun formatRupiah(amount: Int): String = "Rp ${amount.formatThousands()}"
 
-/**
- * Full accessibility description combining name, price, availability and current
- * quantity. `@Composable` so the availability segment resolves from resources.
- *
- * shortcut: the "N dipilih" / "N selected" quantity suffix is not yet a resource
- * (it is only spoken by screen readers, never shown on screen); migrate it to a
- * plural-aware key when the detail screen's a11y copy is localized end to end.
- */
+/** Screen-reader description: name, seating, gate, price, availability and current selection. */
 @Composable
 internal fun buildSeatCategoryDescription(
     data: SeatCategoryUi,
     quantity: Int,
 ): String {
-    val availability = resolveAvailabilityLabel(data)
-    return buildString {
-        append("${data.name}. ")
-        data.description?.let { append("$it. ") }
-        append("${formatRupiah(data.priceRupiah)}. ")
-        append("$availability.")
-        if (!data.isSoldOut) append(" $quantity dipilih.")
-    }
+    val availability = stringResource(availabilityLabel(data.availability))
+    val selected = if (data.isSoldOut) null else stringResource(Res.string.seat_category_selected, quantity)
+    return listOfNotNull(
+        data.name,
+        data.description,
+        data.entryGate,
+        formatRupiah(data.priceRupiah),
+        availability,
+        selected,
+    ).joinToString(". ", postfix = ".")
 }

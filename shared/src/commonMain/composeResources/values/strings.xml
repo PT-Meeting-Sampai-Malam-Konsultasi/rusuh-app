@@ -112,20 +112,37 @@
 
     <!-- Detail (Pick ticket) screen -->
     <string name="detail_title">Pick ticket</string>
+    <string name="detail_back_description">Back</string>
+    <string name="detail_timer_description">Time left %1$s</string>
     <string name="detail_section_categories">Categories</string>
-    <string name="detail_categories_hint">Max. %1$d tickets per transaction. No seat numbers — entry is by category.</string>
-    <string name="detail_cap_reached">%1$d/%2$d — ticket limit reached. Remove one to switch category.</string>
-    <string name="detail_cap_selected">%1$d/%2$d tickets selected.</string>
-    <string name="detail_section_nik">Ticket holder NIK</string>
-    <string name="detail_nik_hint">1 NIK = 1 ticket per event. At the entrance, show your e-ticket and the original KTP with the matching NIK.</string>
-    <string name="detail_nik_field_label">Ticket %1$d</string>
-    <string name="detail_nik_field_placeholder">16 digits as on the KTP</string>
-    <string name="detail_nik_valid">✓ Valid NIK format</string>
-    <string name="detail_nik_invalid">NIK must be %1$d digits.</string>
+    <string name="detail_categories_hint">Max. %1$d tickets per order. No seat numbers — entry is by category.</string>
+    <string name="detail_cap_chip">%1$d/%2$d</string>
+    <string name="detail_cap_message">%1$d-ticket limit reached. Remove one to switch category.</string>
+    <string name="detail_section_holders">Ticket holders</string>
+    <string name="detail_holders_hint">Name and NIK as on the KTP. 1 NIK = 1 ticket per event — at the gate, your e-ticket is matched against the original KTP.</string>
+    <string name="detail_ticket_label">Ticket %1$d · %2$s</string>
+    <string name="detail_holder_toggle_description">Who is this ticket for</string>
+    <string name="detail_holder_self">Myself</string>
+    <string name="detail_holder_other">Someone else</string>
+    <string name="detail_name_label">Name as on KTP</string>
+    <string name="detail_name_placeholder">Full name</string>
+    <string name="detail_name_hint">Printed on the e-ticket.</string>
+    <string name="detail_nik_label">NIK</string>
+    <string name="detail_nik_field_description">NIK, ticket %1$d</string>
+    <string name="detail_name_field_description">Name as on the KTP, ticket %1$d</string>
+    <string name="detail_nik_placeholder">16 digits as on the KTP</string>
     <string name="detail_nik_example">Example: 3201 1234 5678 0001</string>
+    <string name="detail_nik_invalid">NIK must be %1$d digits.</string>
+    <string name="detail_nik_duplicate">This NIK is already used on Ticket %1$d. Each ticket needs a different person's NIK.</string>
+    <string name="detail_section_email">Send e-ticket to</string>
+    <string name="detail_email_label">Email</string>
+    <string name="detail_email_hint">From your account. Your e-ticket also appears in the My Tickets menu.</string>
+    <string name="detail_email_change">Change</string>
+    <string name="detail_summary_subtotal">Ticket subtotal</string>
+    <string name="detail_summary_admin_fee">Service fee</string>
     <string name="detail_total">Total</string>
-    <string name="detail_proceed">Proceed to payment</string>
-    <string name="detail_niks_incomplete">Enter a 16-digit NIK for every ticket to proceed.</string>
+    <string name="detail_bar_tickets">%1$d tickets</string>
+    <string name="detail_proceed">Continue to pay</string>
     <string name="detail_loading_description">Loading ticket detail</string>
     <string name="detail_loading">Loading ticket detail…</string>
     <string name="detail_empty_title">No categories yet</string>
@@ -136,10 +153,13 @@
     <string name="detail_expired_headline">5 minutes have passed.</string>
     <string name="detail_expired_body">Your selection was not saved and your place has been given to the next in line. Queue again to try once more.</string>
     <string name="detail_expired_action">Queue again</string>
+    <string name="detail_expired_home">Go home</string>
 
     <!-- Seat category card -->
-    <string name="seat_sold_out">Sold out</string>
-    <string name="seat_remaining">%1$s tickets left</string>
+    <string name="seat_category_available">Available</string>
+    <string name="seat_category_almost_gone">Almost gone</string>
+    <string name="seat_category_sold_out">Sold out</string>
+    <string name="seat_category_selected">%1$d selected</string>
     <string name="seat_decrement">Decrease %1$s</string>
     <string name="seat_increment">Increase %1$s</string>
 </resources>
