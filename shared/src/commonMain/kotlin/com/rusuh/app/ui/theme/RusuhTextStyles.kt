@@ -19,6 +19,15 @@ object RusuhTextStyles {
     val eventTitle = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold)
     val stamp = TextStyle(fontSize = 11.sp, lineHeight = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.55.sp)
     val button = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
+
+    // Waiting Room display styles. Font family is applied by the caller (display font).
+    val queueNumber =
+        TextStyle(fontSize = 120.sp, lineHeight = 112.sp, fontWeight = FontWeight.Bold, letterSpacing = (-4).sp)
+    val queueNumberCompact = queueNumber.copy(fontSize = 92.sp, lineHeight = 88.sp, letterSpacing = (-3).sp)
+    val displayHeadline =
+        TextStyle(fontSize = 64.sp, lineHeight = 60.sp, fontWeight = FontWeight.Bold, letterSpacing = (-2).sp)
+    val etaHeadline = TextStyle(fontSize = 32.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
+    val queueSectionTitle = TextStyle(fontSize = 19.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
 }
 
 internal val RusuhTypography =
