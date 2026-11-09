@@ -44,7 +44,6 @@ class MyQueuesScreenTest {
         actions.onOpenWaitingRoom("evt")
         actions.onBrowseEvents()
         actions.onRetry()
-        actions.onLanguageSelected("en")
     }
 
     @Test

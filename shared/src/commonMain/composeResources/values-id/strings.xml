@@ -192,4 +192,9 @@
     <string name="queue_list_item_updated_hours">Diperbarui %1$d jam lalu</string>
     <string name="queue_list_item_open_action">Lihat antrian</string>
     <string name="queue_list_item_description">%1$s. %2$s. %3$s. %4$s. %5$s.</string>
+    <string name="tab_event">Event</string>
+    <string name="tab_queues">Antrian</string>
+    <string name="tab_tickets">Tiket</string>
+    <string name="tab_account">Akun</string>
+    <string name="tab_coming_soon">%1$s — segera hadir</string>
 </resources>

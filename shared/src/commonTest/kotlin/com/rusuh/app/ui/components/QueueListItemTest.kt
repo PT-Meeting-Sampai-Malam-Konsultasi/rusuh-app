@@ -26,6 +26,7 @@ class QueueListItemTest {
         position: Int = 10,
         nowServing: Int? = 5,
         updatedAgoSeconds: Int = 3,
+        etaMinutes: Int? = null,
     ) = QueueListItemUi(
         eventId = "evt-1",
         title = "Samudra",
@@ -34,6 +35,7 @@ class QueueListItemTest {
         nowServing = nowServing,
         phase = phase,
         updatedAgoSeconds = updatedAgoSeconds,
+        etaMinutes = etaMinutes,
     )
 
     @Test
@@ -83,8 +85,37 @@ class QueueListItemTest {
     }
 
     @Test
-    fun positionMustBeAtLeastOne() {
+    fun waitingPhasesRequirePositionOfAtLeastOne() {
         assertFailsWith<IllegalArgumentException> { item(QueueListPhase.Live, position = 0) }
+        assertFailsWith<IllegalArgumentException> { item(QueueListPhase.Paused, position = 0) }
+        assertFailsWith<IllegalArgumentException> { item(QueueListPhase.QueueOpen, position = -1) }
+    }
+
+    @Test
+    fun yourTurnAndClosedAcceptPositionZeroOrNegative() {
+        assertEquals(0, item(QueueListPhase.YourTurn, position = 0).position)
+        assertEquals(-3, item(QueueListPhase.YourTurn, position = -3).position)
+        assertEquals(0, item(QueueListPhase.Closed, position = 0).position)
+    }
+
+    @Test
+    fun etaOnlyShowsOnLiveRowsWithAnEstimate() {
+        assertEquals(12, visibleEtaMinutes(item(QueueListPhase.Live, etaMinutes = 12)))
+        assertNull(visibleEtaMinutes(item(QueueListPhase.Live, etaMinutes = null)))
+        assertNull(visibleEtaMinutes(item(QueueListPhase.Paused, etaMinutes = 12)))
+        assertNull(visibleEtaMinutes(item(QueueListPhase.YourTurn, position = 0, etaMinutes = 12)))
+    }
+
+    @Test
+    fun etaMustNotBeNegative() {
+        assertFailsWith<IllegalArgumentException> { item(QueueListPhase.Live, etaMinutes = -1) }
+    }
+
+    @Test
+    fun leadAndNumberSeparatorDependsOnTrailingHyphen() {
+        assertEquals("You are number 128", joinLeadAndNumber("You are number", "128"))
+        assertEquals("Anda antrian ke-128", joinLeadAndNumber("Anda antrian ke-", "128"))
+        assertEquals("You are number 5", joinLeadAndNumber("You are number ", "5"))
     }
 
     @Test

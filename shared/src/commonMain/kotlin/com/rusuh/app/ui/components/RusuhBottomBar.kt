@@ -18,14 +18,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.rusuh.app.ui.theme.RusuhBrandColors
 import com.rusuh.app.ui.theme.RusuhBrandMetrics
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Shared bottom navigation bar used by every top-level tab screen (Event /
@@ -94,11 +96,9 @@ private fun BottomBarItem(
     Column(
         modifier =
             modifier
-                .clickable(onClick = onClick)
-                .clearAndSetSemantics {
-                    contentDescription = "${tab.label}${if (selected) ", terpilih" else ""}"
-                    this.selected = selected
-                }
+                .clickable(role = Role.Tab, onClick = onClick)
+                // Announce "<label>, selected" from the tab semantics; the decorative glyph is hidden below.
+                .semantics(mergeDescendants = true) { this.selected = selected }
                 .padding(vertical = RusuhSpacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -108,6 +108,7 @@ private fun BottomBarItem(
             style = MaterialTheme.typography.titleMedium,
             color = iconColor,
             textAlign = TextAlign.Center,
+            modifier = Modifier.clearAndSetSemantics {},
         )
         Spacer(Modifier.height(RusuhSpacing.xxs))
         TabLabel(tab = tab, selected = selected)
@@ -126,7 +127,7 @@ private fun TabLabel(
 ) {
     if (selected) {
         Text(
-            text = tab.label,
+            text = stringResource(tab.label),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = RusuhBrandColors.Paper,
@@ -138,7 +139,7 @@ private fun TabLabel(
         )
     } else {
         Text(
-            text = tab.label,
+            text = stringResource(tab.label),
             style = MaterialTheme.typography.labelMedium,
             color = RusuhBrandColors.Ink2,
         )

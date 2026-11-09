@@ -40,6 +40,7 @@ import rusuh_app.shared.generated.resources.queue_list_item_description
 import rusuh_app.shared.generated.resources.queue_list_item_open_action
 import rusuh_app.shared.generated.resources.queue_list_item_position_lead
 import rusuh_app.shared.generated.resources.queue_list_item_your_turn_headline
+import rusuh_app.shared.generated.resources.queue_position_eta_minutes
 
 /**
  * Live phase of a queue the user is in, as shown on a My Queues row. Richer
@@ -75,10 +76,15 @@ enum class QueueListPhase {
  * @param eventId stable id used as the list key and passed to the tap callback.
  * @param title event name.
  * @param dateVenue pre-formatted "date, venue" line.
- * @param position the user's 1-based position in this queue. Must be >= 1.
+ * @param position the user's place in this queue (seq - served). Must be >= 1 while
+ *   waiting (open / live / paused); a [QueueListPhase.YourTurn] or
+ *   [QueueListPhase.Closed] row may legitimately be 0 or negative, and its number
+ *   is never shown.
  * @param nowServing the number currently being served; null hides the slot
  *   (e.g. before the queue starts admitting).
  * @param phase current queue phase, drives the stamp label + color.
+ * @param etaMinutes estimated minutes until the user's turn; null = unknown. Only
+ *   shown on [QueueListPhase.Live] rows. Must be >= 0 when set.
  * @param updatedAgoSeconds seconds since the status was last refreshed. Must be >= 0.
  */
 @Immutable
@@ -90,10 +96,12 @@ data class QueueListItemUi(
     val nowServing: Int?,
     val phase: QueueListPhase,
     val updatedAgoSeconds: Int,
+    val etaMinutes: Int? = null,
 ) {
     init {
         require(eventId.isNotBlank()) { "eventId must not be blank" }
-        require(position >= 1) { "position must be >= 1, was $position" }
+        require(!phase.showsPosition() || position >= 1) { "position must be >= 1 while waiting, was $position" }
+        require(etaMinutes == null || etaMinutes >= 0) { "etaMinutes must be >= 0, was $etaMinutes" }
         require(updatedAgoSeconds >= 0) { "updatedAgoSeconds must be >= 0, was $updatedAgoSeconds" }
     }
 }
@@ -252,6 +260,13 @@ private fun StatusRow(data: QueueListItemUi) {
                         color = RusuhBrandColors.PinkInk,
                         maxLines = 1,
                     )
+                    visibleEtaMinutes(data)?.let { minutes ->
+                        Text(
+                            text = stringResource(Res.string.queue_position_eta_minutes, minutes),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = RusuhBrandColors.Ink2,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(RusuhSpacing.xxs))
@@ -320,12 +335,16 @@ private fun contextLine(data: QueueListItemUi): String {
 /** Full accessibility description for a row (event, venue, position/state, phase, freshness). */
 @Composable
 internal fun buildQueueItemDescription(data: QueueListItemUi): String {
+    val etaText = visibleEtaMinutes(data)?.let { stringResource(Res.string.queue_position_eta_minutes, it) }
     val state =
         when (data.phase) {
             QueueListPhase.Closed -> stringResource(Res.string.queue_list_item_closed_headline)
             QueueListPhase.YourTurn -> stringResource(Res.string.queue_list_item_your_turn_headline)
             else ->
-                "${stringResource(Res.string.queue_list_item_position_lead)}${formatQueueNumber(data.position)}"
+                joinLeadAndNumber(
+                    stringResource(Res.string.queue_list_item_position_lead),
+                    formatQueueNumber(data.position),
+                ) + etaText?.let { ", $it" }.orEmpty()
         }
     return stringResource(
         Res.string.queue_list_item_description,

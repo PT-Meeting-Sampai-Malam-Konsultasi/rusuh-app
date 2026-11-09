@@ -2,23 +2,24 @@ package com.rusuh.app.feature.queues
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -38,11 +39,14 @@ import rusuh_app.shared.generated.resources.my_queues_logo_description
 
 /** App bar: RUSUH! logo (pink bang) on the left, ID|EN toggle on the right, ink rule below. */
 @Composable
-internal fun MyQueuesHeader(
-    language: AppLanguageOption,
-    onLanguageSelected: (AppLanguageOption) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth().background(RusuhBrandColors.Paper)) {
+internal fun MyQueuesHeader(language: AppLanguageOption) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(RusuhBrandColors.Paper)
+                .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
         Row(
             modifier =
                 Modifier
@@ -64,7 +68,7 @@ internal fun MyQueuesHeader(
                 color = RusuhBrandColors.Ink,
                 modifier = Modifier.logoDescription(),
             )
-            LanguageToggle(selected = language, onSelected = onLanguageSelected)
+            LanguageToggle(selected = language)
         }
         Box(Modifier.fillMaxWidth().height(RusuhBrandMetrics.borderWidth).background(RusuhBrandColors.Ink))
     }
@@ -76,19 +80,21 @@ private fun Modifier.logoDescription(): Modifier {
     return semantics { contentDescription = description }
 }
 
-/** Pill toggle: the selected option is a filled ink segment with paper text. */
+/**
+ * Pill toggle: the selected option is a filled ink segment with paper text.
+ * Look only until locale switching exists (same as the Home toggle): not
+ * clickable or focusable, so assistive tech announces one description, not a
+ * control that does nothing.
+ */
 @Composable
-private fun LanguageToggle(
-    selected: AppLanguageOption,
-    onSelected: (AppLanguageOption) -> Unit,
-) {
+private fun LanguageToggle(selected: AppLanguageOption) {
     val groupDescription = stringResource(Res.string.my_queues_language_group)
     Row(
         modifier =
             Modifier
                 .border(RusuhBrandMetrics.borderWidth, RusuhBrandColors.Ink, RusuhShapes.pill)
                 .padding(RusuhSpacing.xs)
-                .semantics { contentDescription = groupDescription },
+                .clearAndSetSemantics { contentDescription = groupDescription },
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xxs),
     ) {
         AppLanguageOption.entries.forEach { option ->
@@ -108,8 +114,6 @@ private fun LanguageToggle(
                 modifier =
                     Modifier
                         .background(if (isSelected) RusuhBrandColors.Ink else Color.Transparent, RusuhShapes.pill)
-                        .clickable(role = Role.RadioButton) { onSelected(option) }
-                        .semantics { this.selected = isSelected }
                         .padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.xs),
             )
         }

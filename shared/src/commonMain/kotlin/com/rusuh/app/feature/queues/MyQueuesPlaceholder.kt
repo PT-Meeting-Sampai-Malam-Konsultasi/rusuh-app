@@ -8,7 +8,7 @@ import com.rusuh.app.ui.components.QueueListPhase
  *
  * UI-only sample data so the stateless screen renders a realistic list before
  * M3 wires the ViewModel and M4 the API. Covers the phase variants the row can
- * show (live, your-turn, open, paused, closed) so the placeholder exercises the
+ * show (live with an ETA, your-turn at position 0, open, paused, closed) so the placeholder exercises the
  * whole [QueueListItem] surface.
  *
  * shortcut: hard-coded sample; swap for live data once M3/M4 land.
@@ -23,13 +23,14 @@ fun placeholderQueues(): List<QueueListItemUi> =
             nowServing = 102,
             phase = QueueListPhase.Live,
             updatedAgoSeconds = 3,
+            etaMinutes = 12,
         ),
         QueueListItemUi(
             eventId = "evt-nyala",
             title = "Nyala Fest",
             dateVenue = "20 Des 2026 · GOR Saparua, Bandung",
-            position = 4,
-            nowServing = 1,
+            position = 0,
+            nowServing = 4,
             phase = QueueListPhase.YourTurn,
             updatedAgoSeconds = 1,
         ),
