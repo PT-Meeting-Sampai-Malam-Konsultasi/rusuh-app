@@ -1,9 +1,6 @@
 package com.rusuh.app.feature.home
 
 import com.rusuh.app.ui.components.EventCardData
-import com.rusuh.app.ui.components.EventFormat
-import com.rusuh.app.ui.components.EventStatus
-import com.rusuh.app.ui.components.TimeZoneLabel
 
 /**
  * Maps an MVI [HomeEventItem] to the richer [EventCardData] that M1's `EventCard`
@@ -19,9 +16,9 @@ import com.rusuh.app.ui.components.TimeZoneLabel
  * [EventFormat.UNKNOWN] (renders no format badge, so nothing is mislabeled) and a
  * blank venue/city/date/subtitle/price so no fabricated schedule is shown.
  *
- * This is bounded by M1's required-field card model rather than by M2: the stub
- * repository returns an empty list today, so no placeholder card actually renders
- * until M4 supplies real values.
+ * [HomeEventItem] now carries optional, defaulted display fields that pass straight
+ * through here; an item built with only id + title still maps to the placeholders
+ * above. The stub repository fills them with sample data (TODO(M4)).
  *
  * shortcut: placeholder status/format + blank detail fields until M4's API maps the
  * real domain fields; replace this mapper (not the screen) when the event model
@@ -31,11 +28,12 @@ import com.rusuh.app.ui.components.TimeZoneLabel
 internal fun HomeEventItem.toEventCardData(): EventCardData =
     EventCardData(
         title = title,
-        subtitle = "",
-        format = EventFormat.UNKNOWN,
-        venue = "",
-        city = "",
-        dateTime = "",
-        timeZone = TimeZoneLabel.WIB,
-        status = EventStatus.Available,
+        subtitle = subtitle,
+        format = format,
+        venue = venue,
+        city = city,
+        dateTime = dateTime,
+        timeZone = timeZone,
+        status = status,
+        priceFrom = priceFrom,
     )

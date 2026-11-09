@@ -2,6 +2,8 @@ package com.rusuh.app.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -10,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,15 +19,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.rusuh.app.ui.theme.RusuhColors
+import com.rusuh.app.ui.theme.RusuhShapes
 import com.rusuh.app.ui.theme.RusuhSpacing
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -100,24 +106,40 @@ fun EventCard(
     val clickable = onClick != null && !disabled
     val cardDescription = buildCardDescription(data)
 
-    Card(
+    Column(
         modifier =
             modifier
                 .fillMaxWidth()
                 .alpha(if (disabled) RusuhSpacing.DISABLED_ALPHA else 1f)
+                // Hard (zero-blur) offset shadow drawn behind the bordered card.
+                .padding(end = RusuhSpacing.hardShadowOffset, bottom = RusuhSpacing.hardShadowOffset)
+                .drawBehind {
+                    val offset = RusuhSpacing.hardShadowOffset.toPx()
+                    val radius = RusuhShapes.cardRadius.toPx()
+                    drawRoundRect(
+                        color = RusuhColors.Ink,
+                        topLeft = Offset(offset, offset),
+                        size = size,
+                        cornerRadius = CornerRadius(radius, radius),
+                    )
+                }
+                .clip(RusuhShapes.card)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(RusuhSpacing.inkBorder, RusuhColors.Ink, RusuhShapes.card)
+                .clickable(enabled = clickable, role = Role.Button) { onClick?.invoke() }
+                // clickable(enabled = false) already marks the node disabled.
                 .semantics(mergeDescendants = true) { contentDescription = cardDescription },
-        shape = MaterialTheme.shapes.large,
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-        enabled = clickable,
-        onClick = { if (clickable) onClick?.invoke() },
     ) {
         PosterSlot(
             image = image,
             format = data.format,
+        )
+        // Ink rule separating poster and body.
+        Spacer(
+            Modifier
+                .fillMaxWidth()
+                .height(RusuhSpacing.inkBorder)
+                .background(RusuhColors.Ink),
         )
         Column(modifier = Modifier.padding(RusuhSpacing.xl)) {
             StatusBadge(status = data.status)
@@ -178,8 +200,7 @@ private fun PosterSlot(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(POSTER_ASPECT_RATIO)
-                .clip(MaterialTheme.shapes.large),
+                .aspectRatio(POSTER_ASPECT_RATIO),
     ) {
         if (image != null) {
             Image(
@@ -229,15 +250,19 @@ private fun FormatBadge(
     format: EventFormat,
     modifier: Modifier = Modifier,
 ) {
+    // Diagonal tag: rotated, ink-outlined pill.
     Text(
-        text = format.label,
+        text = format.label.uppercase(),
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onPrimary,
+        fontWeight = FontWeight.Bold,
+        color = RusuhColors.OnFormatBadge,
         modifier =
             modifier
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(horizontal = RusuhSpacing.md, vertical = RusuhSpacing.xxs),
+                .rotate(RusuhSpacing.FORMAT_BADGE_ROTATION)
+                .clip(RusuhShapes.small)
+                .background(RusuhColors.FormatBadge)
+                .border(RusuhSpacing.inkBorder, RusuhColors.Ink, RusuhShapes.small)
+                .padding(horizontal = RusuhSpacing.md, vertical = RusuhSpacing.xs),
     )
 }
 

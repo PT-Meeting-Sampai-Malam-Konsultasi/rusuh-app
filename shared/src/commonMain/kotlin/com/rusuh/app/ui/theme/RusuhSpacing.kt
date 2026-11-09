@@ -45,6 +45,23 @@ object RusuhSpacing {
     /** Fixed width of the quantity readout between the stepper buttons. */
     val stepperValue = 28.dp
 
+    // TODO(figma-verify): provisional card-style tokens, see RusuhColors.Ink.
+
+    /** Stroke width of the ink outline on cards and badges. */
+    val inkBorder = 2.dp
+
+    /** X/Y offset of the solid (zero-blur) hard shadow under a card. */
+    val hardShadowOffset = 4.dp
+
+    /** Outer padding of the Home event grid. */
+    val homeGridPadding = 16.dp
+
+    /** Gap between Home grid cells, both axes. */
+    val homeGridGap = 20.dp
+
+    /** Rotation (degrees) of the diagonal format badge on the poster. */
+    const val FORMAT_BADGE_ROTATION = -6f
+
     /** Alpha applied to a disabled (sold-out) card. */
     const val DISABLED_ALPHA = 0.5f
 }
