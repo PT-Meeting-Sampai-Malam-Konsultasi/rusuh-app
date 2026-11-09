@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -40,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
@@ -47,6 +46,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.components.BrutalButton
 import com.rusuh.app.ui.components.CountdownChip
@@ -485,7 +485,6 @@ private fun SummaryRow(
 }
 
 /** Sticky bottom bar: ticket count + total on the left, "Lanjut bayar →" on the right. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BottomBar(
     tickets: Int,
@@ -502,32 +501,72 @@ private fun BottomBar(
                 .windowInsetsPadding(WindowInsets.navigationBars.exclude(WindowInsets.ime)),
     ) {
         Box(Modifier.fillMaxWidth().height(RusuhSpacing.borderHeavy).background(RusuhColors.BrandInk))
-        // FlowRow: price and CTA share a line when they fit; at large font scale on narrow
-        // phones the CTA drops below instead of clipping the total.
-        FlowRow(
-            verticalArrangement = Arrangement.spacedBy(RusuhSpacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
+        PriceAndAction(
             modifier = Modifier.fillMaxWidth().padding(RusuhSpacing.xl),
-        ) {
-            Column {
-                Text(
-                    text = stringResource(Res.string.detail_bar_tickets, tickets),
-                    style = RusuhBrandTextStyles.note.body(),
-                    color = RusuhColors.BrandMuted,
+            gap = RusuhSpacing.xl,
+            price = {
+                Column {
+                    Text(
+                        text = stringResource(Res.string.detail_bar_tickets, tickets),
+                        style = RusuhBrandTextStyles.note.body(),
+                        color = RusuhColors.BrandMuted,
+                    )
+                    Text(
+                        text = formatRupiah(total),
+                        style = RusuhBrandTextStyles.stat.display(),
+                        color = RusuhColors.BrandInk,
+                    )
+                }
+            },
+            action = {
+                BrutalButton(
+                    text = stringResource(Res.string.detail_proceed),
+                    onClick = onProceed,
+                    enabled = enabled,
+                    modifier = Modifier.padding(end = RusuhSpacing.xs, bottom = RusuhSpacing.xs),
                 )
-                Text(
-                    text = formatRupiah(total),
-                    style = RusuhBrandTextStyles.stat.display(),
-                    color = RusuhColors.BrandInk,
-                )
+            },
+        )
+    }
+}
+
+/**
+ * Price on the left, CTA on the right when both fit on one line at their natural
+ * (unwrapped) width; otherwise the CTA drops below at full width. Never clips the
+ * total and never wraps the CTA label (large font scale, narrow phones).
+ */
+@Composable
+private fun PriceAndAction(
+    gap: Dp,
+    price: @Composable () -> Unit,
+    action: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Layout(content = {
+        price()
+        action()
+    }, modifier = modifier) { measurables, constraints ->
+        val (priceM, actionM) = measurables
+        val gapPx = gap.roundToPx()
+        val maxW = constraints.maxWidth
+        val priceW = priceM.maxIntrinsicWidth(Int.MAX_VALUE).coerceAtMost(maxW)
+        val actionW = actionM.maxIntrinsicWidth(Int.MAX_VALUE)
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        if (priceW + gapPx + actionW <= maxW) {
+            val p = priceM.measure(loose.copy(maxWidth = priceW))
+            val a = actionM.measure(loose.copy(minWidth = actionW, maxWidth = maxW - priceW - gapPx))
+            val h = maxOf(p.height, a.height)
+            layout(maxW, h) {
+                p.placeRelative(0, (h - p.height) / 2)
+                a.placeRelative(maxW - a.width, (h - a.height) / 2)
             }
-            BrutalButton(
-                text = stringResource(Res.string.detail_proceed),
-                onClick = onProceed,
-                enabled = enabled,
-                // weight(1f): takes the space beside the price, or the full width when it wraps below.
-                modifier = Modifier.weight(1f).padding(end = RusuhSpacing.xs, bottom = RusuhSpacing.xs),
-            )
+        } else {
+            val p = priceM.measure(loose.copy(maxWidth = maxW))
+            val a = actionM.measure(loose.copy(minWidth = maxW, maxWidth = maxW))
+            layout(maxW, p.height + gapPx + a.height) {
+                p.placeRelative(0, 0)
+                a.placeRelative(0, p.height + gapPx)
+            }
         }
     }
 }
