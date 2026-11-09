@@ -57,6 +57,11 @@ object RusuhColors {
     val BlueInk = Color(0xFF1F3FB8)
     val Green = Color(0xFF16784A)
 
+    // Aliases used by the Waiting Room code (same values as Paper2 / Ink2 / Ink3).
+    val PaperDeep = Paper2
+    val InkMuted = Ink2
+    val InkSubtle = Ink3
+
     // Scrim applied over a poster image so overlaid chrome stays legible.
     val PosterScrim = Color(0x99000000)
 }
