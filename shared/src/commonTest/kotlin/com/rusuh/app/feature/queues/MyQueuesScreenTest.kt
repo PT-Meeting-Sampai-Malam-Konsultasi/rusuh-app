@@ -27,9 +27,28 @@ class MyQueuesScreenTest {
     }
 
     @Test
-    fun emptyLoadingAndContentAreDistinctStates() {
+    fun allFourUiStatesAreDistinct() {
         val states: List<MyQueuesUiState> =
-            listOf(MyQueuesUiState.Empty, MyQueuesUiState.Loading, MyQueuesUiState.Content(placeholderQueues()))
+            listOf(
+                MyQueuesUiState.Empty,
+                MyQueuesUiState.Loading,
+                MyQueuesUiState.Content(placeholderQueues()),
+                MyQueuesUiState.Error("x"),
+            )
         assertEquals(states.size, states.map { it::class }.toSet().size)
+    }
+
+    @Test
+    fun actionsDefaultToNoOps() {
+        val actions = MyQueuesActions()
+        actions.onOpenWaitingRoom("evt")
+        actions.onBrowseEvents()
+        actions.onRetry()
+        actions.onLanguageSelected("en")
+    }
+
+    @Test
+    fun languageOptionsAreIdThenEn() {
+        assertEquals(listOf("id", "en"), AppLanguageOption.entries.map { it.code })
     }
 }

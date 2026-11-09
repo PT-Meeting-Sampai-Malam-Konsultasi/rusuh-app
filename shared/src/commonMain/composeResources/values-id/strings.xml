@@ -161,4 +161,35 @@
     <string name="seat_category_selected">%1$d dipilih</string>
     <string name="seat_decrement">Kurangi %1$s</string>
     <string name="seat_increment">Tambah %1$s</string>
+
+    <!-- My Queues (Antrian) screen + queue list item -->
+    <string name="my_queues_title">Antrian saya</string>
+    <string name="my_queues_count">%1$d antrian aktif</string>
+    <string name="my_queues_logo_description">Rusuh</string>
+    <string name="my_queues_language_group">Bahasa</string>
+    <string name="my_queues_language_id">ID</string>
+    <string name="my_queues_language_en">EN</string>
+    <string name="my_queues_loading_description">Memuat antrian Anda</string>
+    <string name="my_queues_empty_title">Anda belum ada di antrian mana pun</string>
+    <string name="my_queues_empty_body">Pilih event lalu masuk antriannya. Posisi Anda akan muncul di sini.</string>
+    <string name="my_queues_empty_action">Lihat event</string>
+    <string name="my_queues_error_title">Gagal memuat antrian</string>
+    <string name="queue_list_item_phase_open">Antrian dibuka</string>
+    <string name="queue_list_item_phase_live">Berlangsung</string>
+    <string name="queue_list_item_phase_paused">Dijeda</string>
+    <string name="queue_list_item_phase_your_turn">Giliran Anda</string>
+    <string name="queue_list_item_phase_closed">Ditutup</string>
+    <string name="queue_list_item_position_lead">Anda antrian ke-</string>
+    <string name="queue_list_item_your_turn_headline">Giliran Anda!</string>
+    <string name="queue_list_item_closed_headline">Antrian ditutup</string>
+    <string name="queue_list_item_now_serving">Sedang dilayani No. %1$s</string>
+    <string name="queue_list_item_open_hint">Nomor dibagikan saat antrian dimulai.</string>
+    <string name="queue_list_item_paused_hint">Antrian dijeda. Nomor Anda tetap.</string>
+    <string name="queue_list_item_your_turn_hint">Buka sekarang untuk memilih tiket.</string>
+    <string name="queue_list_item_closed_hint">Tiket habis sebelum giliran Anda.</string>
+    <string name="queue_list_item_updated_seconds">Diperbarui %1$d detik lalu</string>
+    <string name="queue_list_item_updated_minutes">Diperbarui %1$d menit lalu</string>
+    <string name="queue_list_item_updated_hours">Diperbarui %1$d jam lalu</string>
+    <string name="queue_list_item_open_action">Lihat antrian</string>
+    <string name="queue_list_item_description">%1$s. %2$s. %3$s. %4$s. %5$s.</string>
 </resources>
