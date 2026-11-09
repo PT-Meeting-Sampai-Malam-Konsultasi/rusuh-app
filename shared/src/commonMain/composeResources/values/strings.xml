@@ -162,4 +162,35 @@
     <string name="seat_category_selected">%1$d selected</string>
     <string name="seat_decrement">Decrease %1$s</string>
     <string name="seat_increment">Increase %1$s</string>
+
+    <!-- My Queues (Antrian) screen + queue list item -->
+    <string name="my_queues_title">My queues</string>
+    <string name="my_queues_count">%1$d active queues</string>
+    <string name="my_queues_logo_description">Rusuh</string>
+    <string name="my_queues_language_group">Language</string>
+    <string name="my_queues_language_id">ID</string>
+    <string name="my_queues_language_en">EN</string>
+    <string name="my_queues_loading_description">Loading your queues</string>
+    <string name="my_queues_empty_title">You\'re not in any queue</string>
+    <string name="my_queues_empty_body">Pick an event and join its queue. Your places will show up here.</string>
+    <string name="my_queues_empty_action">Browse events</string>
+    <string name="my_queues_error_title">Couldn\'t load your queues</string>
+    <string name="queue_list_item_phase_open">Queue open</string>
+    <string name="queue_list_item_phase_live">Live</string>
+    <string name="queue_list_item_phase_paused">Paused</string>
+    <string name="queue_list_item_phase_your_turn">Your turn</string>
+    <string name="queue_list_item_phase_closed">Closed</string>
+    <string name="queue_list_item_position_lead">You are number</string>
+    <string name="queue_list_item_your_turn_headline">Your turn!</string>
+    <string name="queue_list_item_closed_headline">Queue closed</string>
+    <string name="queue_list_item_now_serving">Now serving No. %1$s</string>
+    <string name="queue_list_item_open_hint">Numbers are handed out when the queue starts.</string>
+    <string name="queue_list_item_paused_hint">Queue paused. Your place stays.</string>
+    <string name="queue_list_item_your_turn_hint">Open now to pick your tickets.</string>
+    <string name="queue_list_item_closed_hint">Tickets sold out before your turn.</string>
+    <string name="queue_list_item_updated_seconds">Updated %1$d s ago</string>
+    <string name="queue_list_item_updated_minutes">Updated %1$d min ago</string>
+    <string name="queue_list_item_updated_hours">Updated %1$d h ago</string>
+    <string name="queue_list_item_open_action">Open queue</string>
+    <string name="queue_list_item_description">%1$s. %2$s. %3$s. %4$s. %5$s.</string>
 </resources>
