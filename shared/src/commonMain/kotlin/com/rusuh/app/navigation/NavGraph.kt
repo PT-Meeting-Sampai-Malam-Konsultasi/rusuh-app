@@ -12,6 +12,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -28,6 +29,7 @@ import com.rusuh.app.ui.components.QueuePhase
 import com.rusuh.app.ui.components.QueuePositionUi
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
+import com.rusuh.app.ui.theme.RusuhColors
 import org.koin.compose.koinInject
 
 /**
@@ -80,7 +82,11 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
         // Event tab: the existing Home screen, retrofitted with the bottom bar.
         // Its business logic is unchanged — only the Scaffold chrome is added.
         val viewModel = koinInject<HomeViewModel>()
-        TabScaffold(selectedTab = RusuhTab.Event, onTabSelected = onTabSelected) { innerPadding ->
+        TabScaffold(
+            selectedTab = RusuhTab.Event,
+            onTabSelected = onTabSelected,
+            containerColor = RusuhColors.Paper,
+        ) { innerPadding ->
             // Home's own content and business logic are unchanged; only the
             // bottom-bar Scaffold wraps it. onEventClick (Detail routing) is left
             // at its no-op default — the Detail destination is out of this task's
@@ -138,10 +144,12 @@ private fun NavHostController.switchTab(tab: RusuhTab) {
 private fun TabScaffold(
     selectedTab: RusuhTab,
     onTabSelected: (RusuhTab) -> Unit,
+    containerColor: Color = MaterialTheme.colorScheme.background,
     content: @Composable (androidx.compose.foundation.layout.PaddingValues) -> Unit,
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = containerColor,
         bottomBar = { RusuhBottomBar(selectedTab = selectedTab, onTabSelected = onTabSelected) },
         content = content,
     )
