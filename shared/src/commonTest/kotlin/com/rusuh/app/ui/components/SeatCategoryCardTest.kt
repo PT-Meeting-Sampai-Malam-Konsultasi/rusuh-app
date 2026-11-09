@@ -1,21 +1,23 @@
 package com.rusuh.app.ui.components
 
 import rusuh_app.shared.generated.resources.Res
-import rusuh_app.shared.generated.resources.seat_remaining
-import rusuh_app.shared.generated.resources.seat_sold_out
+import rusuh_app.shared.generated.resources.seat_category_almost_gone
+import rusuh_app.shared.generated.resources.seat_category_available
+import rusuh_app.shared.generated.resources.seat_category_sold_out
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SeatCategoryCardTest {
-    private fun sample(available: Int) =
+    private fun sample(availability: SeatAvailability) =
         SeatCategoryUi(
             id = "fest-b",
             name = "Festival B",
             description = "Berdiri · di belakang Festival A",
             priceRupiah = 850_000,
-            available = available,
+            availability = availability,
         )
 
     @Test
@@ -26,21 +28,23 @@ class SeatCategoryCardTest {
     }
 
     @Test
-    fun availabilityUsesRemainingKeyWithFormattedCountWhenInStock() {
-        assertEquals(
-            AvailabilityLabel(Res.string.seat_remaining, "1.200"),
-            availabilityLabel(sample(1_200)),
-        )
+    fun availabilityMapsToItsLabelResource() {
+        assertEquals(Res.string.seat_category_available, availabilityLabel(SeatAvailability.Available))
+        assertEquals(Res.string.seat_category_almost_gone, availabilityLabel(SeatAvailability.AlmostGone))
+        assertEquals(Res.string.seat_category_sold_out, availabilityLabel(SeatAvailability.SoldOut))
     }
 
     @Test
-    fun availabilityUsesSoldOutKeyWhenZero() {
-        assertEquals(AvailabilityLabel(Res.string.seat_sold_out), availabilityLabel(sample(0)))
+    fun isSoldOutOnlyForSoldOutAvailability() {
+        assertTrue(sample(SeatAvailability.SoldOut).isSoldOut)
+        assertFalse(sample(SeatAvailability.AlmostGone).isSoldOut)
+        assertFalse(sample(SeatAvailability.Available).isSoldOut)
     }
 
     @Test
-    fun isSoldOutOnlyWhenAvailabilityZero() {
-        assertTrue(sample(0).isSoldOut)
-        assertFalse(sample(1).isSoldOut)
+    fun rejectsBlankIdNameAndNegativePrice() {
+        assertFailsWith<IllegalArgumentException> { SeatCategoryUi(" ", "A", null, 1) }
+        assertFailsWith<IllegalArgumentException> { SeatCategoryUi("a", " ", null, 1) }
+        assertFailsWith<IllegalArgumentException> { SeatCategoryUi("a", "A", null, -1) }
     }
 }
