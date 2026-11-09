@@ -103,13 +103,14 @@ fun EventCard(
     val disabled = data.status.isDisabled
     val clickable = onClick != null && !disabled
     val cardDescription = buildCardDescription(data)
+    val actionLabel = data.status.cardAction()?.label?.let { stringResource(it) }
 
     Column(
         modifier =
             modifier
                 .fillMaxWidth()
                 .semantics(mergeDescendants = true) { contentDescription = cardDescription }
-                .clickable(enabled = clickable, role = Role.Button) { onClick?.invoke() },
+                .clickable(enabled = clickable, onClickLabel = actionLabel, role = Role.Button) { onClick?.invoke() },
     ) {
         Row(
             modifier = Modifier.padding(vertical = RusuhSpacing.xl),

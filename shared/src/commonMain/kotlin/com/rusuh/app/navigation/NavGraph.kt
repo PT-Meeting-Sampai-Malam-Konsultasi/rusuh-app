@@ -1,6 +1,7 @@
 package com.rusuh.app.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,7 +88,7 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
             // wrong screen.
             HomeScreen(
                 viewModel = viewModel,
-                modifier = Modifier.padding(innerPadding),
+                modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
             )
         }
     }
