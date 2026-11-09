@@ -1,83 +1,85 @@
 package com.rusuh.app.ui.components
 
-import com.rusuh.app.ui.theme.RusuhStatusColors
-import rusuh_app.shared.generated.resources.Res
-import rusuh_app.shared.generated.resources.queue_people_ahead_count
-import rusuh_app.shared.generated.resources.queue_people_ahead_none
-import rusuh_app.shared.generated.resources.queue_people_ahead_sold_out
-import rusuh_app.shared.generated.resources.queue_position_closed
-import rusuh_app.shared.generated.resources.queue_position_waiting
-import rusuh_app.shared.generated.resources.queue_position_your_turn
+import com.rusuh.app.ui.theme.RusuhColors
+import com.rusuh.app.ui.theme.RusuhTextStyles
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class QueuePositionCardTest {
-    private fun data(
-        position: Int = 42,
-        peopleAhead: Int = 41,
-        phase: QueuePhase = QueuePhase.Waiting,
-        eta: String? = "~8 menit",
-    ) = QueuePositionUi(position = position, peopleAhead = peopleAhead, phase = phase, estimatedWait = eta)
-
     @Test
-    fun accentColorsMapPerPhase() {
-        assertEquals(RusuhStatusColors.upcoming, QueuePhase.Waiting.accentColors())
-        assertEquals(RusuhStatusColors.available, QueuePhase.YourTurn.accentColors())
-        assertEquals(RusuhStatusColors.soldOut, QueuePhase.QueueClosed.accentColors())
+    fun formatQueueNumberGroupsThousandsWithDots() {
+        assertEquals("1", formatQueueNumber(1))
+        assertEquals("310", formatQueueNumber(310))
+        assertEquals("1.248", formatQueueNumber(1248))
+        assertEquals("19.700", formatQueueNumber(19_700))
+        assertEquals("1.234.567", formatQueueNumber(1_234_567))
     }
 
     @Test
-    fun positionLabelPerPhase() {
-        assertEquals(Res.string.queue_position_waiting, QueuePhase.Waiting.positionLabel())
-        assertEquals(Res.string.queue_position_your_turn, QueuePhase.YourTurn.positionLabel())
-        assertEquals(Res.string.queue_position_closed, QueuePhase.QueueClosed.positionLabel())
+    fun formatCountdownIsMinutesAndPaddedSeconds() {
+        assertEquals("8:42", formatCountdown(522))
+        assertEquals("0:52", formatCountdown(52))
+        assertEquals("1:00", formatCountdown(60))
+        assertEquals("0:00", formatCountdown(-5))
     }
 
     @Test
-    fun peopleAheadLabelCountsWhileWaiting() {
-        assertEquals(
-            PeopleAheadLabel(Res.string.queue_people_ahead_count, 41),
-            peopleAheadLabel(data(peopleAhead = 41)),
-        )
+    fun progressPositionIsSeqMinusServed() {
+        val progress = QueueProgressUi(servedAtJoin = 17_400, nowServing = 18_452, myNumber = 19_700)
+        assertEquals(1248, progress.position)
     }
 
     @Test
-    fun peopleAheadLabelZeroWhileWaiting() {
-        assertEquals(
-            PeopleAheadLabel(Res.string.queue_people_ahead_none),
-            peopleAheadLabel(data(peopleAhead = 0)),
-        )
+    fun progressFractionIsServedShareOfSpan() {
+        assertEquals(0.5f, QueueProgressUi(servedAtJoin = 0, nowServing = 50, myNumber = 100).fraction)
+        assertEquals(0f, QueueProgressUi(servedAtJoin = 10, nowServing = 10, myNumber = 100).fraction)
+        assertEquals(1f, QueueProgressUi(servedAtJoin = 10, nowServing = 100, myNumber = 100).fraction)
+        assertEquals(1f, QueueProgressUi(servedAtJoin = 100, nowServing = 100, myNumber = 100).fraction)
     }
 
     @Test
-    fun peopleAheadLabelYourTurnIgnoresCount() {
-        assertEquals(
-            PeopleAheadLabel(Res.string.queue_people_ahead_none),
-            peopleAheadLabel(data(peopleAhead = 5, phase = QueuePhase.YourTurn)),
-        )
+    fun progressPositionNeverDropsBelowOne() {
+        assertEquals(1, QueueProgressUi(servedAtJoin = 0, nowServing = 100, myNumber = 100).position)
     }
 
     @Test
-    fun peopleAheadLabelClosedShowsSoldOut() {
-        assertEquals(
-            PeopleAheadLabel(Res.string.queue_people_ahead_sold_out),
-            peopleAheadLabel(data(phase = QueuePhase.QueueClosed)),
-        )
+    fun progressRejectsInconsistentNumbers() {
+        assertFailsWith<IllegalArgumentException> {
+            QueueProgressUi(
+                servedAtJoin = 200,
+                nowServing = 200,
+                myNumber = 100,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            QueueProgressUi(
+                servedAtJoin = 50,
+                nowServing = 40,
+                myNumber = 100,
+            )
+        }
     }
 
     @Test
     fun positionMustBeAtLeastOne() {
-        assertFailsWith<IllegalArgumentException> { data(position = 0) }
+        assertFailsWith<IllegalArgumentException> { QueuePositionUi(position = 0) }
     }
 
     @Test
-    fun peopleAheadMustBeNonNegative() {
-        assertFailsWith<IllegalArgumentException> { data(peopleAhead = -1) }
+    fun etaMustBeNonNegative() {
+        assertFailsWith<IllegalArgumentException> { QueuePositionUi(position = 1, estimatedWaitMinutes = -1) }
     }
 
     @Test
-    fun peopleAheadCannotExceedPositionMinusOne() {
-        assertFailsWith<IllegalArgumentException> { data(position = 3, peopleAhead = 3) }
+    fun faceColorPerPhase() {
+        assertEquals(RusuhColors.Pink, QueuePhase.Waiting.faceColor())
+        assertEquals(RusuhColors.Ink, QueuePhase.Paused.faceColor())
+    }
+
+    @Test
+    fun longNumbersUseCompactStyle() {
+        assertEquals(RusuhTextStyles.queueNumber, queueNumberStyle("1.248"))
+        assertEquals(RusuhTextStyles.queueNumberCompact, queueNumberStyle("19.700"))
     }
 }

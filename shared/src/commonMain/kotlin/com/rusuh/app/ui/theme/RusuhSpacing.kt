@@ -69,6 +69,21 @@ object RusuhSpacing {
     /** Minimum touch height of an event card action button. */
     val actionMinHeight = 44.dp
 
+    /** Heavy border width used by Waiting Room tracks, timer and stamp. */
+    val borderBold = 2.dp
+
+    /** Offset of the hard (blur-free) drop shadow behind posters and buttons. */
+    val hardShadow = 4.dp
+
+    /** Height of the Waiting Room queue progress track. */
+    val queueTrackHeight = 36.dp
+
+    /** Width of the "my number" marker on the queue progress track. */
+    val queueTrackMarker = 6.dp
+
+    /** Minimum touch height of a primary Waiting Room button. */
+    val primaryButtonHeight = 56.dp
+
     /** Alpha applied to a disabled (sold-out) card. */
     const val DISABLED_ALPHA = 0.5f
 }
