@@ -39,10 +39,11 @@ class StubWaitingRoomRepository(
 
     private fun script(eventId: String): List<QueuePlace> {
         val opensAt = serverStartMillis + OPENS_AFTER_MILLIS
-        val turnExpiresAt = serverStartMillis + TURN_STEP * STEP_MILLIS + TURN_WINDOW_MILLIS
+        val turnStart = opensAt + TURN_AFTER_MILLIS
+        val turnExpiresAt = turnStart + TURN_WINDOW_MILLIS
 
         fun place(
-            step: Int,
+            serverNow: Long,
             state: QueueState,
             served: Int,
         ) = QueuePlace(
@@ -51,22 +52,33 @@ class StubWaitingRoomRepository(
             state = state,
             seq = MY_SEQ,
             served = served,
-            serverNowEpochMillis = serverStartMillis + step * STEP_MILLIS,
+            serverNowEpochMillis = serverNow,
         )
 
-        val preOpen = place(0, QueueState.PreOpen, 0).copy(opensAtEpochMillis = opensAt, opensAtLabel = OPENS_AT_LABEL)
-        val turn = place(TURN_STEP, QueueState.Turn, MY_SEQ - 1).copy(turnExpiresAtEpochMillis = turnExpiresAt)
+        // Server time only moves forward: Open starts at/after opensAt, Missed after turnExpiresAt.
+        fun preOpen(serverNow: Long) =
+            place(serverNow, QueueState.PreOpen, 0)
+                .copy(opensAtEpochMillis = opensAt, opensAtLabel = OPENS_AT_LABEL)
+
+        fun open(
+            serverNow: Long,
+            served: Int,
+        ) = place(serverNow, QueueState.Open, served).copy(ratePerMinute = RATE)
+
+        fun turn(serverNow: Long) =
+            place(serverNow, QueueState.Turn, MY_SEQ - 1).copy(turnExpiresAtEpochMillis = turnExpiresAt)
+
         return listOf(
-            preOpen,
-            preOpen.copy(serverNowEpochMillis = serverStartMillis + STEP_MILLIS),
-            place(2, QueueState.Open, 20).copy(ratePerMinute = RATE),
-            place(3, QueueState.Open, 60).copy(ratePerMinute = RATE),
-            place(4, QueueState.Paused, 60).copy(pauseReason = QueuePauseReason.StockFull),
-            place(5, QueueState.Open, 100).copy(ratePerMinute = RATE),
-            turn,
-            turn.copy(serverNowEpochMillis = serverStartMillis + (TURN_STEP + 1) * STEP_MILLIS),
-            place(TURN_STEP + 2, QueueState.Missed, MY_SEQ).copy(rejoinEstimateMinutes = REJOIN_ESTIMATE),
-            place(TURN_STEP + 3, QueueState.Closed, MY_SEQ),
+            preOpen(serverStartMillis),
+            preOpen(serverStartMillis + STEP_MILLIS),
+            open(opensAt, 20),
+            open(opensAt + STEP_MILLIS, 60),
+            place(opensAt + 2 * STEP_MILLIS, QueueState.Paused, 60).copy(pauseReason = QueuePauseReason.StockFull),
+            open(opensAt + 3 * STEP_MILLIS, 100),
+            turn(turnStart),
+            turn(turnStart + STEP_MILLIS),
+            place(turnExpiresAt + STEP_MILLIS, QueueState.Missed, MY_SEQ).copy(rejoinEstimateMinutes = REJOIN_ESTIMATE),
+            place(turnExpiresAt + 2 * STEP_MILLIS, QueueState.Closed, MY_SEQ),
         )
     }
 
@@ -74,11 +86,13 @@ class StubWaitingRoomRepository(
         const val DEFAULT_STEP_DELAY_MILLIS = 1_500L
         const val STEP_MILLIS = 1_000L
         const val TURN_WINDOW_MILLIS = 60_000L
-        const val OPENS_AFTER_MILLIS = 3_000L
+        const val OPENS_AFTER_MILLIS = 2_000L
+        const val TURN_AFTER_MILLIS = 5_000L
+
+        // shortcut: fixed display label; real data formats the opening time in M4.
         const val OPENS_AT_LABEL = "10.00 WIB"
         const val MY_SEQ = 128
         const val RATE = 20
-        const val TURN_STEP = 6
         const val REJOIN_ESTIMATE = 12
     }
 }

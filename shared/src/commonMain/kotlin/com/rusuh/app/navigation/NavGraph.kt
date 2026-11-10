@@ -39,6 +39,7 @@ import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 import rusuh_app.shared.generated.resources.Res
@@ -73,7 +74,10 @@ fun RusuhNavGraph(navController: NavHostController) {
             arguments = listOf(navArgument(Screen.WaitingRoom.ARG_EVENT_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getString(Screen.WaitingRoom.ARG_EVENT_ID).orEmpty()
-            val viewModel = koinInject<WaitingRoomViewModel>(parameters = { parametersOf(eventId) })
+            // remember(eventId): koinInject's parameters lambda is a new instance every recomposition,
+            // so resolve once per event id to keep a single ViewModel for this destination.
+            val koin = getKoin()
+            val viewModel = remember(eventId) { koin.get<WaitingRoomViewModel> { parametersOf(eventId) } }
             WaitingRoomRoute(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },

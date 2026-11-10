@@ -14,15 +14,24 @@ private const val MILLIS_PER_SECOND = 1_000L
  */
 internal fun QueuePlace.position(): Int = (seq - served).coerceAtLeast(1)
 
-/** Whole seconds until [targetEpochMillis] on the server clock, rounded up, never negative. */
-private fun QueuePlace.secondsUntil(targetEpochMillis: Long?): Int {
-    val remaining = ((targetEpochMillis ?: serverNowEpochMillis) - serverNowEpochMillis).coerceAtLeast(0L)
-    return ((remaining + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND).toInt()
+/**
+ * Whole seconds from the server "now" to [targetEpochMillis], rounded up, clamped to
+ * `0..Int.MAX_VALUE`. The server "now" is the snapshot's own server time plus
+ * [elapsedMillis] of monotonic time since it was received; never the device wall clock.
+ */
+private fun QueuePlace.secondsUntil(
+    targetEpochMillis: Long,
+    elapsedMillis: Long,
+): Int {
+    val remaining = (targetEpochMillis - (serverNowEpochMillis + elapsedMillis)).coerceAtLeast(0L)
+    return ((remaining + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 }
 
-/** Estimated wait in whole minutes (rounded up) from [ratePerMinute]; null when the rate is unknown. */
-private fun QueuePlace.etaMinutes(): Int? =
-    ratePerMinute?.takeIf { it > 0 }?.let { rate -> (position() + rate - 1) / rate }
+/** Estimated wait in whole minutes (rounded up) from the rate; null when the rate is unknown. */
+private fun QueuePlace.etaMinutes(): Int? {
+    val rate = ratePerMinute?.takeIf { it > 0 } ?: return null
+    return (position() + rate - 1) / rate
+}
 
 private fun QueuePauseReason?.toUi(): PauseReason =
     when (this) {
@@ -30,10 +39,15 @@ private fun QueuePauseReason?.toUi(): PauseReason =
         QueuePauseReason.StockFull, null -> PauseReason.Stock
     }
 
-/** The [WaitingRoomPhase] this place renders as. */
-internal fun QueuePlace.toPhase(): WaitingRoomPhase =
+/**
+ * The [WaitingRoomPhase] this place renders as, or null when the snapshot is invalid
+ * (a pre-open without `opensAt`, or a turn without `turnExpiresAt`: a countdown would
+ * be meaningless, so it must not render as 0:00).
+ */
+internal fun QueuePlace.toPhase(elapsedMillis: Long = 0L): WaitingRoomPhase? =
     when (state) {
-        QueueState.PreOpen -> WaitingRoomPhase.PreQueue(secondsUntil(opensAtEpochMillis), opensAtLabel)
+        QueueState.PreOpen ->
+            opensAtEpochMillis?.let { WaitingRoomPhase.PreQueue(secondsUntil(it, elapsedMillis), opensAtLabel) }
         QueueState.Open ->
             WaitingRoomPhase.Waiting(
                 QueuePositionUi(
@@ -44,18 +58,23 @@ internal fun QueuePlace.toPhase(): WaitingRoomPhase =
                 ),
             )
         QueueState.Paused -> WaitingRoomPhase.Paused(position(), pauseReason.toUi())
-        QueueState.Turn -> WaitingRoomPhase.YourTurn(seq.coerceAtLeast(0), secondsUntil(turnExpiresAtEpochMillis))
+        QueueState.Turn ->
+            turnExpiresAtEpochMillis?.let {
+                WaitingRoomPhase.YourTurn(seq.coerceAtLeast(0), secondsUntil(it, elapsedMillis))
+            }
         QueueState.Missed -> WaitingRoomPhase.MissedTurn(rejoinEstimateMinutes)
         QueueState.Closed -> WaitingRoomPhase.SoldOut
     }
 
 /**
- * Maps a domain [QueuePlace] to what the screen renders.
+ * Maps a domain [QueuePlace] to what the screen renders, [elapsedMillis] of monotonic time
+ * after it was received. An invalid snapshot becomes a blank-message [WaitingRoomUiState.Error].
  *
  * shortcut: `isGuest` stays false until the auth state seam (AUTH-00) exists.
  */
-fun QueuePlace.toUiState(): WaitingRoomUiState.Active =
-    WaitingRoomUiState.Active(
+fun QueuePlace.toUiState(elapsedMillis: Long = 0L): WaitingRoomUiState {
+    val phase = toPhase(elapsedMillis) ?: return WaitingRoomUiState.Error("")
+    return WaitingRoomUiState.Active(
         event =
             WaitingRoomEventUi(
                 title = event.title,
@@ -63,5 +82,6 @@ fun QueuePlace.toUiState(): WaitingRoomUiState.Active =
                 dateTimeLine = event.dateTimeLine,
                 venueLine = event.venueLine,
             ),
-        phase = toPhase(),
+        phase = phase,
     )
+}

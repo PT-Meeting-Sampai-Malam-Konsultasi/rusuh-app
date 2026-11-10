@@ -97,13 +97,39 @@ class WaitingRoomMapperTest {
             assertEquals(1, it.position())
         }
         val paused = assertIs<WaitingRoomPhase.Paused>(place(QueueState.Paused, seq = 3, served = 50).toPhase())
-        assertTrue(paused.position >= 0)
+        assertTrue(paused.position >= 1)
     }
 
     @Test
     fun toUiStateCarriesEventCopy() {
-        val ui = place(QueueState.Closed).toUiState()
+        val ui = assertIs<WaitingRoomUiState.Active>(place(QueueState.Closed).toUiState())
         assertEquals(WaitingRoomEventUi("Konser", "Sub", "Sab", "GBK"), ui.event)
         assertEquals(false, ui.isGuest)
+    }
+
+    @Test
+    fun turnWithoutExpiryIsInvalidNotZero() {
+        val place = place(QueueState.Turn)
+        assertEquals(null, place.toPhase())
+        assertIs<WaitingRoomUiState.Error>(place.toUiState())
+    }
+
+    @Test
+    fun preOpenWithoutOpensAtIsInvalid() {
+        assertIs<WaitingRoomUiState.Error>(place(QueueState.PreOpen).toUiState())
+    }
+
+    @Test
+    fun elapsedMonotonicTimeAdvancesCountdown() {
+        val turn = place(QueueState.Turn) { it.copy(turnExpiresAtEpochMillis = 70_000L) }
+        assertEquals(60, assertIs<WaitingRoomPhase.YourTurn>(turn.toPhase(0)).secondsLeft)
+        assertEquals(57, assertIs<WaitingRoomPhase.YourTurn>(turn.toPhase(3_000)).secondsLeft)
+        assertEquals(0, assertIs<WaitingRoomPhase.YourTurn>(turn.toPhase(90_000)).secondsLeft)
+    }
+
+    @Test
+    fun hugeDeadlineClampsSeconds() {
+        val turn = place(QueueState.Turn) { it.copy(turnExpiresAtEpochMillis = Long.MAX_VALUE) }
+        assertEquals(Int.MAX_VALUE, assertIs<WaitingRoomPhase.YourTurn>(turn.toPhase()).secondsLeft)
     }
 }
