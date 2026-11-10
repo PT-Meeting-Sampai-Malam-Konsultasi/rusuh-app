@@ -21,6 +21,8 @@ private const val PLACEHOLDER_EXPIRED_CODE = "000000"
  * Demo rules: after entering an email and a code, "123456" continues to the new-account
  * step, "000000" shows the expired step, any other code is wrong (5 attempts, then expired).
  * Creating the account or tapping outside the sheet closes it.
+ *
+ * Demo state lives in `remember`, so it is NOT saved across rotation or process death.
  */
 @Stable
 class PlaceholderSignIn {
@@ -51,29 +53,35 @@ class PlaceholderSignIn {
                 else -> false
             }
 
+    private var attemptsLeft = PLACEHOLDER_ATTEMPTS
+
     val actions: SignInActions =
         SignInActions(
             onEmailChange = { value -> (state as? SignInUiState.Email)?.let { state = it.copy(email = value) } },
             onSendCode = {
                 (state as? SignInUiState.Email)?.takeIf { isPlausibleEmail(it.email) }?.let {
+                    attemptsLeft = PLACEHOLDER_ATTEMPTS
                     state = SignInUiState.Code(email = it.email.trim())
                 }
             },
+            // The first edit after a wrong code goes back to the plain code step (error styling
+            // cleared, cooldown kept); the remaining attempts are tracked in [attemptsLeft].
             onCodeChange = { value ->
                 state =
                     when (val current = state) {
                         is SignInUiState.Code -> current.copy(code = value)
-                        is SignInUiState.WrongCode -> current.copy(code = value)
+                        is SignInUiState.WrongCode ->
+                            SignInUiState.Code(current.email, value, current.resendInSeconds)
                         else -> current
                     }
             },
             onCodeComplete = ::verify,
             onResendCode = {
+                attemptsLeft = PLACEHOLDER_ATTEMPTS
                 state =
                     when (val current = state) {
-                        is SignInUiState.Code -> current.copy(code = "", resendInSeconds = RESEND_COOLDOWN_SECONDS)
-                        is SignInUiState.WrongCode ->
-                            SignInUiState.Code(current.email, resendInSeconds = RESEND_COOLDOWN_SECONDS)
+                        is SignInUiState.Code -> SignInUiState.Code(current.email)
+                        is SignInUiState.WrongCode -> SignInUiState.Code(current.email)
                         is SignInUiState.CodeExpired -> SignInUiState.Code(current.email)
                         else -> current
                     }
@@ -99,18 +107,19 @@ class PlaceholderSignIn {
         )
 
     private fun verify(code: String) {
-        val email =
-            when (val current = state) {
-                is SignInUiState.Code -> current.email
-                is SignInUiState.WrongCode -> current.email
+        val current = state
+        val (email, cooldown) =
+            when (current) {
+                is SignInUiState.Code -> current.email to current.resendInSeconds
+                is SignInUiState.WrongCode -> current.email to current.resendInSeconds
                 else -> return
             }
-        val attemptsBefore = (state as? SignInUiState.WrongCode)?.attemptsLeft ?: PLACEHOLDER_ATTEMPTS
+        if (code != PLACEHOLDER_NEW_ACCOUNT_CODE && code != PLACEHOLDER_EXPIRED_CODE) attemptsLeft -= 1
         state =
             when {
                 code == PLACEHOLDER_NEW_ACCOUNT_CODE -> SignInUiState.NewAccount(email)
-                code == PLACEHOLDER_EXPIRED_CODE || attemptsBefore <= 1 -> SignInUiState.CodeExpired(email)
-                else -> SignInUiState.WrongCode(email, code, attemptsLeft = attemptsBefore - 1)
+                code == PLACEHOLDER_EXPIRED_CODE || attemptsLeft <= 0 -> SignInUiState.CodeExpired(email)
+                else -> SignInUiState.WrongCode(email, code, attemptsLeft, cooldown)
             }
     }
 }

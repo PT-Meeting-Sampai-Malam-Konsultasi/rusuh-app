@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -141,6 +142,8 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
         Box(Modifier.fillMaxSize()) {
             TicketsScreen(
                 state = state,
+                // Inert for TalkBack while the sheet is open.
+                modifier = if (signIn.state != null) Modifier.clearAndSetSemantics {} else Modifier,
                 actions =
                     TicketsActions(
                         onTabSelected = onTabSelected,
