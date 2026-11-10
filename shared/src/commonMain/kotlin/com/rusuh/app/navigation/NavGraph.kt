@@ -26,8 +26,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
-import com.rusuh.app.feature.queues.MyQueuesActions
-import com.rusuh.app.feature.queues.MyQueuesScreen
+import com.rusuh.app.feature.queues.MyQueuesRoute
+import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
 import com.rusuh.app.feature.tickets.TicketsActions
 import com.rusuh.app.feature.tickets.TicketsScreen
@@ -116,13 +116,11 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
     }
 
     composable(Screen.Queues.route) {
-        MyQueuesScreen(
-            actions =
-                MyQueuesActions(
-                    onOpenWaitingRoom = { eventId -> navController.navigate(Screen.WaitingRoom.routeFor(eventId)) },
-                    onTabSelected = onTabSelected,
-                    onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
-                ),
+        MyQueuesRoute(
+            viewModel = koinInject<MyQueuesViewModel>(),
+            onOpenWaitingRoom = { eventId -> navController.navigate(Screen.WaitingRoom.routeFor(eventId)) },
+            onSwitchTab = onTabSelected,
+            onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
         )
     }
 
