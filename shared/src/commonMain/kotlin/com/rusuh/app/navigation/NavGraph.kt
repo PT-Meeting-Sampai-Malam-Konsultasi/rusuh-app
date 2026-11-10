@@ -18,6 +18,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -26,6 +29,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.rusuh.app.feature.detail.DetailRoute
 import com.rusuh.app.feature.detail.DetailViewModel
+import com.rusuh.app.feature.detail.DetailViewModelHolder
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesActions
@@ -45,6 +49,7 @@ import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 import rusuh_app.shared.generated.resources.Res
@@ -79,7 +84,16 @@ fun RusuhNavGraph(navController: NavHostController) {
             arguments = listOf(navArgument(Screen.Detail.ARG_EVENT_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val eventId = backStackEntry.arguments?.getString(Screen.Detail.ARG_EVENT_ID).orEmpty()
-            val viewModel = koinInject<DetailViewModel>(parameters = { parametersOf(eventId) })
+            val koin = getKoin()
+            val viewModel =
+                viewModel<DetailViewModelHolder>(
+                    viewModelStoreOwner = backStackEntry,
+                    key = "detail-$eventId",
+                    factory =
+                        viewModelFactory {
+                            initializer { DetailViewModelHolder(koin.get<DetailViewModel> { parametersOf(eventId) }) }
+                        },
+                ).viewModel
             DetailRoute(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },

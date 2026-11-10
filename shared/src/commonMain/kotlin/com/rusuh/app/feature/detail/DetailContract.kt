@@ -42,7 +42,7 @@ data class DetailContent(
     val categories: List<SeatCategoryUi>,
     val accountName: String,
     val accountEmail: String,
-    val adminFeeRupiah: Int,
+    val adminFeeRupiah: Long,
     val reservedUnits: Int = MAX_TICKETS_PER_ORDER,
     val stockByCategory: Map<String, Int> = emptyMap(),
 ) {
@@ -67,6 +67,8 @@ sealed interface DetailUiState {
      * @param remainingSeconds order countdown shown in the top bar.
      * @param form selected quantities and attendee forms (owned by the ViewModel).
      * @param isSubmitting true while "Lanjut bayar" is validating/booking; disables it.
+     * @param subtotalRupiah ticket subtotal; [totalRupiah] adds ONE service fee; [canProceed] gates
+     *   "Lanjut bayar". All three are computed by [DetailState].
      */
     @Immutable
     data class Content(
@@ -74,6 +76,9 @@ sealed interface DetailUiState {
         val remainingSeconds: Int = ORDER_WINDOW_SECONDS,
         val form: DetailFormState = DetailFormState(),
         val isSubmitting: Boolean = false,
+        val subtotalRupiah: Long = 0L,
+        val totalRupiah: Long = 0L,
+        val canProceed: Boolean = false,
     ) : DetailUiState
 
     /** No categories to sell. */
@@ -129,9 +134,14 @@ enum class AttendeeKind { Self, Other }
 
 /**
  * One attendee slot (one per ticket). [nik] holds digits only; the screen groups them for display.
+ *
+ * @param id stable ticket identity, unique within the order; UI state is keyed by it.
+ * @param categoryId the category this ticket belongs to; the booking pairs the holder with it.
  */
 @Immutable
 data class AttendeeForm(
+    val id: Long = 0L,
+    val categoryId: String = "",
     val kind: AttendeeKind = AttendeeKind.Other,
     val name: String = "",
     val nik: String = "",
@@ -142,6 +152,7 @@ data class AttendeeForm(
 data class DetailFormState(
     val quantities: Map<String, Int> = emptyMap(),
     val attendees: List<AttendeeForm> = emptyList(),
+    val nextTicketId: Long = 1L,
 ) {
     val totalTickets: Int get() = quantities.values.sum()
 }
@@ -160,7 +171,10 @@ internal fun isNikValid(nik: String): Boolean = NikRules.isValid(nik)
 /** ASCII 0-9 only: `Char.isDigit` also accepts Arabic-Indic and other Unicode digits. */
 internal fun isAsciiDigit(c: Char): Boolean = c in '0'..'9'
 
-/** Sets a category quantity, clamped to 0..min(remaining cap, [stock]), and resizes the attendee slots. */
+/**
+ * Sets a category quantity, clamped to 0..min(remaining cap, [stock]), and reconciles the
+ * attendees of THAT category only.
+ */
 internal fun DetailFormState.withQuantity(
     categoryId: String,
     quantity: Int,
@@ -170,16 +184,23 @@ internal fun DetailFormState.withQuantity(
     val others = quantities.filterKeys { it != categoryId }.values.sum()
     val clamped = quantity.coerceIn(0, (maxTickets - others).coerceAtLeast(0).coerceAtMost(stock.coerceAtLeast(0)))
     val next = quantities + (categoryId to clamped)
-    val total = next.values.sum()
-    // shortcut: slots are positional, so shrinking drops the LAST attendee rather than the one
-    // tied to the removed ticket; revisit when M3 keys attendees per ticket in the ViewModel.
-    val resized =
-        when {
-            total == attendees.size -> attendees
-            total < attendees.size -> attendees.take(total)
-            else -> attendees + List(total - attendees.size) { AttendeeForm() }
+    val current = attendees.count { it.categoryId == categoryId }
+    return when {
+        clamped == current -> copy(quantities = next)
+        clamped > current -> {
+            // Growing appends new tickets at the end; existing tickets never move.
+            val added = List(clamped - current) { AttendeeForm(id = nextTicketId + it, categoryId = categoryId) }
+            copy(quantities = next, attendees = attendees + added, nextTicketId = nextTicketId + added.size)
         }
-    return copy(quantities = next, attendees = resized)
+        else -> {
+            // Shrinking removes the LAST tickets of this category only.
+            val drop =
+                attendees.filter { it.categoryId == categoryId }.takeLast(
+                    current - clamped,
+                ).map { it.id }.toSet()
+            copy(quantities = next, attendees = attendees.filterNot { it.id in drop })
+        }
+    }
 }
 
 /** Switches ticket [index] between self/other. "Saya sendiri" prefills ONLY the name. */
@@ -227,12 +248,6 @@ internal fun DetailFormState.duplicateOf(index: Int): Int? {
     return if (earlier >= 0) earlier + 1 else null
 }
 
-/** Categories expanded to one entry per selected ticket, in list order ("Tiket 1 · Festival B"). */
-internal fun ticketCategories(
-    categories: List<SeatCategoryUi>,
-    quantities: Map<String, Int>,
-): List<SeatCategoryUi> = categories.flatMap { c -> List(quantities[c.id] ?: 0) { c } }
-
 /**
  * Whether "Lanjut bayar" is enabled: 1..cap tickets, no selected category sold out, every attendee
  * named, NIK valid and unique.
@@ -254,14 +269,14 @@ internal fun canProceed(
 internal fun subtotalRupiah(
     categories: List<SeatCategoryUi>,
     quantities: Map<String, Int>,
-): Int = categories.sumOf { it.priceRupiah * (quantities[it.id] ?: 0) }
+): Long = categories.sumOf { it.priceRupiah * (quantities[it.id] ?: 0) }
 
 /** Order total: ticket subtotal plus ONE admin fee per order (0 when nothing is selected). */
 internal fun orderTotalRupiah(
-    subtotal: Int,
-    adminFee: Int,
+    subtotal: Long,
+    adminFee: Long,
     tickets: Int,
-): Int = if (tickets > 0) subtotal + adminFee else 0
+): Long = if (tickets > 0) subtotal + adminFee else 0L
 
 /** Formats seconds as "m:ss" for the countdown chip. */
 internal fun formatCountdown(seconds: Int): String {

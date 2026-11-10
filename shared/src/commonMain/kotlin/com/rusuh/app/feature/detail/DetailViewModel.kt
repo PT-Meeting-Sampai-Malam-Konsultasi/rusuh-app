@@ -25,9 +25,12 @@ class DetailViewModel(
     private val createBooking: CreateBookingUseCase,
     private val serverClock: ServerClock,
 ) : MviViewModel<DetailState, DetailIntent, DetailEffect>(DetailState()) {
+    @Suppress("CyclomaticComplexMethod")
     override suspend fun reduce(intent: DetailIntent) {
         when (intent) {
-            DetailIntent.Load, DetailIntent.Retry -> load()
+            // Load once per ViewModel: re-entering the route must not reset the form or the window.
+            DetailIntent.Load -> if (!loadStarted) load()
+            DetailIntent.Retry -> if (currentState.phase is DetailPhase.Failed) load()
             DetailIntent.Back -> sendEffect(DetailEffect.NavigateBack)
             DetailIntent.GoHome -> sendEffect(DetailEffect.NavigateHome)
             DetailIntent.QueueAgain -> sendEffect(DetailEffect.NavigateToQueue(eventId))
@@ -46,8 +49,11 @@ class DetailViewModel(
         }
     }
 
+    private var loadStarted = false
+
     @Suppress("SwallowedException")
     private suspend fun load() {
+        loadStarted = true
         setState { copy(phase = DetailPhase.Loading) }
         try {
             val offering = getDetail(eventId)
@@ -57,7 +63,8 @@ class DetailViewModel(
                 copy(
                     phase =
                         when {
-                            content.categories.isEmpty() -> DetailPhase.Empty
+                            // No categories, or the queue reserved no units: nothing can be bought.
+                            content.categories.isEmpty() || content.maxTickets <= 0 -> DetailPhase.Empty
                             remaining <= 0 -> DetailPhase.Expired
                             else -> DetailPhase.Ready
                         },
@@ -74,8 +81,8 @@ class DetailViewModel(
             // Intentionally broad: any repository/network failure maps to the error state.
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {
+            // The error screen is the single signal for a failed load (no extra snackbar).
             setState { copy(phase = DetailPhase.Failed(DetailError.LoadFailed)) }
-            sendEffect(DetailEffect.ShowError(DetailError.LoadFailed))
         }
     }
 
@@ -136,23 +143,35 @@ class DetailViewModel(
                     val a = form.attendees[i]
                     validateAttendee(a.name, a.nik, form.attendees.take(i).map { it.nik }).isValid
                 }
-            if (allValid) {
-                // TODO(FR-16-M1 #81): real booking + stock hold; the stub returns a fake id.
-                val booking = createBooking(form.toBookingRequest(eventId, content.categories))
-                // TODO(FR-16-M1 #81): the payment route does not exist yet; the host ignores this.
-                sendEffect(DetailEffect.NavigateToPayment(booking.bookingId))
-            } else {
-                sendEffect(DetailEffect.ShowError(DetailError.NikRejected))
+            // TODO(FR-16-M1 #81): real booking + stock hold; the stub returns a fake id.
+            val booking = if (allValid) createBooking(form.toBookingRequest(eventId)) else null
+            if (isOrderActive()) {
+                if (booking != null) {
+                    // TODO(FR-16-M1 #81): the payment route does not exist yet; the host ignores this.
+                    sendEffect(DetailEffect.NavigateToPayment(booking.bookingId))
+                } else {
+                    sendEffect(DetailEffect.ShowError(DetailError.NikRejected))
+                }
             }
+            // else: the window closed while awaiting. TODO(FR-16-M1 #81): release the stock hold
+            // of [booking] here; emit nothing so the expired sheet is not raced by navigation.
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (
             // Intentionally broad: any repository/network failure maps to a transient error.
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {
-            sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
+            if (isOrderActive()) sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
         } finally {
             setState { copy(isSubmitting = false) }
         }
+    }
+
+    /** Still Ready with time left; flips to Expired when the window closed during an await. */
+    private fun isOrderActive(): Boolean {
+        val ready = currentState.phase == DetailPhase.Ready
+        val timeLeft = remainingSeconds(currentState.expiresAtMillis, serverClock.nowMillis()) > 0
+        if (ready && !timeLeft) expire()
+        return ready && timeLeft
     }
 }
