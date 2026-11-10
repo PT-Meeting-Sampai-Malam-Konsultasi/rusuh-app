@@ -24,6 +24,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.rusuh.app.feature.auth.SignInSheet
+import com.rusuh.app.feature.auth.rememberPlaceholderSignIn
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesActions
@@ -134,15 +136,21 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
             value = TicketsUiState.Loading
             value = getMyTickets.loadUiState()
         }
-        TicketsScreen(
-            state = state,
-            actions =
-                TicketsActions(
-                    onTabSelected = onTabSelected,
-                    onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
-                    onRetry = { attempt++ },
-                ),
-        )
+        // Placeholder sign-in (local UI state only) until AUTH-00-M3 wires the real auth state.
+        val signIn = rememberPlaceholderSignIn()
+        Box(Modifier.fillMaxSize()) {
+            TicketsScreen(
+                state = state,
+                actions =
+                    TicketsActions(
+                        onTabSelected = onTabSelected,
+                        onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
+                        onSignIn = signIn::open,
+                        onRetry = { attempt++ },
+                    ),
+            )
+            signIn.state?.let { SignInSheet(state = it, actions = signIn.actions) }
+        }
     }
 
     composable(Screen.Account.route) {
