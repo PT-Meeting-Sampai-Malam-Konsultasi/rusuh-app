@@ -10,11 +10,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,11 +26,11 @@ import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesActions
 import com.rusuh.app.feature.queues.MyQueuesScreen
-import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
 import com.rusuh.app.feature.tickets.TicketsActions
+import com.rusuh.app.feature.tickets.TicketsEffect
+import com.rusuh.app.feature.tickets.TicketsIntent
 import com.rusuh.app.feature.tickets.TicketsScreen
-import com.rusuh.app.feature.tickets.TicketsUiState
-import com.rusuh.app.feature.tickets.loadUiState
+import com.rusuh.app.feature.tickets.TicketsViewModel
 import com.rusuh.app.feature.waitingroom.WaitingRoomAction
 import com.rusuh.app.feature.waitingroom.WaitingRoomEventUi
 import com.rusuh.app.feature.waitingroom.WaitingRoomPhase
@@ -127,20 +125,30 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
     }
 
     composable(Screen.Tickets.route) {
-        val getMyTickets = koinInject<GetMyTicketsUseCase>()
-        // shortcut: loaded inline until TICKET-00-M3 adds the ViewModel.
-        var attempt by remember { mutableIntStateOf(0) }
-        val state by produceState<TicketsUiState>(TicketsUiState.Loading, attempt) {
-            value = TicketsUiState.Loading
-            value = getMyTickets.loadUiState()
+        val viewModel = koinInject<TicketsViewModel>()
+        val state by viewModel.state.collectAsState()
+
+        LaunchedEffect(viewModel) { viewModel.dispatch(TicketsIntent.Load) }
+        LaunchedEffect(viewModel) {
+            viewModel.effect.collect { effect ->
+                when (effect) {
+                    TicketsEffect.GoToEvents -> navController.switchTab(RusuhTab.Event)
+                    // TODO(FR-22-M2 #71): navigate to the e-ticket page once the destination exists.
+                    is TicketsEffect.OpenETicket -> Unit
+                    // TODO(AUTH-00 #74): navigate to sign-in once the auth flow exists.
+                    TicketsEffect.OpenSignIn -> Unit
+                }
+            }
         }
         TicketsScreen(
-            state = state,
+            state = state.ui,
             actions =
                 TicketsActions(
+                    onViewETicket = { viewModel.dispatch(TicketsIntent.ViewETicket(it)) },
                     onTabSelected = onTabSelected,
-                    onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
-                    onRetry = { attempt++ },
+                    onBrowseEvents = { viewModel.dispatch(TicketsIntent.BrowseEvents) },
+                    onSignIn = { viewModel.dispatch(TicketsIntent.SignIn) },
+                    onRetry = { viewModel.dispatch(TicketsIntent.Retry) },
                 ),
         )
     }
