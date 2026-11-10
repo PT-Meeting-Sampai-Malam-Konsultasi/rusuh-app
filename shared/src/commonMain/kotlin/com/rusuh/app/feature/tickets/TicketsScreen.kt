@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -276,7 +277,11 @@ private fun MessageState(
     onAction: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(RusuhSpacing.xl),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(RusuhSpacing.xl)
+                .semantics { liveRegion = LiveRegionMode.Polite },
         verticalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
     ) {
         PageHeading(showSubtitle = false)
@@ -289,13 +294,14 @@ private fun MessageState(
         Text(text = body, style = MaterialTheme.typography.bodyMedium, color = RusuhBrandColors.Ink2)
         Button(
             onClick = onAction,
+            modifier = Modifier.heightIn(min = RusuhSpacing.actionMinHeight),
             shape = RusuhShapes.small,
             colors =
                 ButtonDefaults.buttonColors(
                     containerColor = RusuhBrandColors.Ink,
                     contentColor = RusuhBrandColors.Paper,
                 ),
-        ) { Text(text = "$actionLabel →", fontWeight = FontWeight.SemiBold) }
+        ) { Text(text = actionLabel, fontWeight = FontWeight.SemiBold) }
     }
 }
 

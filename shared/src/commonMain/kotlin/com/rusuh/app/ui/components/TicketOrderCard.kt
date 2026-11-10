@@ -211,7 +211,7 @@ private fun StatusBadge(muted: Boolean) {
         stringResource(if (muted) Res.string.ticket_order_done_badge else Res.string.ticket_order_paid_description)
     val color = if (muted) RusuhBrandColors.Ink2 else RusuhColors.BlueInk
     Text(
-        text = if (muted) text else "✓ $text",
+        text = text,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Bold,
         color = color,

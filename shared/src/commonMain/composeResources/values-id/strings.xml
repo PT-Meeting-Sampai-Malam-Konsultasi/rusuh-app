@@ -210,7 +210,7 @@
     <string name="tickets_signed_out_action">Masuk →</string>
     <string name="ticket_order_paid_badge">✓ LUNAS</string>
     <string name="ticket_order_done_badge">SELESAI</string>
-        <string name="ticket_order_view_eticket">Lihat e-tiket</string>
+    <string name="ticket_order_view_eticket">Lihat e-tiket</string>
     <string name="ticket_order_view_eticket_primary">Lihat e-tiket →</string>
     <string name="ticket_order_view_eticket_for">Lihat e-tiket %1$s</string>
     <string name="ticket_order_paid_description">Lunas</string>

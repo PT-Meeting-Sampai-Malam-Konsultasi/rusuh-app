@@ -211,7 +211,7 @@
     <string name="tickets_signed_out_action">Sign in →</string>
     <string name="ticket_order_paid_badge">✓ PAID</string>
     <string name="ticket_order_done_badge">DONE</string>
-        <string name="ticket_order_view_eticket">View e-ticket</string>
+    <string name="ticket_order_view_eticket">View e-ticket</string>
     <string name="ticket_order_view_eticket_primary">View e-ticket →</string>
     <string name="ticket_order_view_eticket_for">View e-ticket for %1$s</string>
     <string name="ticket_order_paid_description">Paid</string>
