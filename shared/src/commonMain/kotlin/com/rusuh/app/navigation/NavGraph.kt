@@ -24,6 +24,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.rusuh.app.feature.detail.DetailRoute
+import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesActions
@@ -44,6 +46,7 @@ import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import org.koin.core.parameter.parametersOf
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.tab_coming_soon
 
@@ -70,6 +73,27 @@ fun RusuhNavGraph(navController: NavHostController) {
         composable(Screen.Splash.route) { SplashPlaceholder() }
 
         topLevelTabs(navController)
+
+        composable(
+            route = Screen.Detail.route,
+            arguments = listOf(navArgument(Screen.Detail.ARG_EVENT_ID) { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getString(Screen.Detail.ARG_EVENT_ID).orEmpty()
+            val viewModel = koinInject<DetailViewModel>(parameters = { parametersOf(eventId) })
+            DetailRoute(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onHome = { navController.popBackStack(Screen.Home.route, inclusive = false) },
+                // TODO(FR-04-M5 #78): temporary queue entry until the join/route decision lands.
+                onQueue = { id ->
+                    navController.navigate(Screen.WaitingRoom.routeFor(id)) {
+                        popUpTo(Screen.Detail.route) { inclusive = true }
+                    }
+                },
+                // TODO(FR-16-M1 #81): no payment route yet; do not navigate.
+                onPayment = {},
+            )
+        }
 
         composable(
             route = Screen.WaitingRoom.route,
@@ -104,12 +128,11 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
             containerColor = RusuhColors.Paper,
         ) { innerPadding ->
             // Home's own content and business logic are unchanged; only the
-            // bottom-bar Scaffold wraps it. onEventClick (Detail routing) is left
-            // at its no-op default — the Detail destination is out of this task's
-            // scope, so wiring it here is deferred rather than pointed at the
-            // wrong screen.
+            // bottom-bar Scaffold wraps it. Tapping an event opens Detail directly.
+            // TODO(FR-04-M5 #78): temporary until the queue join/route decision lands.
             HomeScreen(
                 viewModel = viewModel,
+                onEventClick = { eventId -> navController.navigate(Screen.Detail.routeFor(eventId)) },
                 modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
             )
         }
