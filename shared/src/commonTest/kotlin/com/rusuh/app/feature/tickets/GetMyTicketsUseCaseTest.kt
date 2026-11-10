@@ -52,7 +52,7 @@ class GetMyTicketsUseCaseTest {
             val result = assertIs<MyTickets.Content>(GetMyTicketsUseCase(StubTicketsRepository())())
             val starts = result.upcoming.map { it.startsAtEpochMillis }
             assertEquals(starts.sorted(), starts)
-            // Displayed day must agree with the stored start (12 Des = 2026-12-12 UTC day 12).
+            // Soonest first: 4 Des (Pelita) precedes 12 Des (Samudra).
             assertEquals("4", result.upcoming.first().dayLabel)
         }
 
