@@ -118,6 +118,12 @@ object RusuhSpacing {
     /** Height of a text input (Figma 52). */
     val inputHeight = 52.dp
 
+    /** Height of one OTP digit box (width flexes so six boxes fill the row). */
+    val otpBoxHeight = 56.dp
+
+    /** Side length of the consent checkbox square (the row around it is 44dp+). */
+    val checkboxSize = 24.dp
+
     /** Event poster thumbnail in the Detail header (Figma 58x72). */
     val posterWidth = 58.dp
     val posterHeight = 72.dp
