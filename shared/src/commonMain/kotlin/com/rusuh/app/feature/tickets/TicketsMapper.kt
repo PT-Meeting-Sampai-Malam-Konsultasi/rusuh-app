@@ -20,7 +20,6 @@ internal fun TicketOrder.toUi(): TicketOrderUi =
         posterLabel = posterLabel,
         poster = if (isPast) TicketPoster.Grey else posterTone.toUi(),
         attendees = attendees.map { TicketAttendeeUi(it.category, it.holderName) },
-        orderCode = orderId,
         totalLabel = totalLabel,
         dayLabel = dayLabel,
         monthLabel = monthLabel,

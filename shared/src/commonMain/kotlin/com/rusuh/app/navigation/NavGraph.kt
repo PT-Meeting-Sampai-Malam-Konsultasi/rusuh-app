@@ -11,7 +11,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,7 +32,7 @@ import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
 import com.rusuh.app.feature.tickets.TicketsActions
 import com.rusuh.app.feature.tickets.TicketsScreen
 import com.rusuh.app.feature.tickets.TicketsUiState
-import com.rusuh.app.feature.tickets.toUiState
+import com.rusuh.app.feature.tickets.loadUiState
 import com.rusuh.app.feature.waitingroom.WaitingRoomAction
 import com.rusuh.app.feature.waitingroom.WaitingRoomEventUi
 import com.rusuh.app.feature.waitingroom.WaitingRoomPhase
@@ -126,8 +129,10 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
     composable(Screen.Tickets.route) {
         val getMyTickets = koinInject<GetMyTicketsUseCase>()
         // shortcut: loaded inline until TICKET-00-M3 adds the ViewModel.
-        val state by produceState<TicketsUiState>(TicketsUiState.Loading) {
-            value = getMyTickets().toUiState()
+        var attempt by remember { mutableIntStateOf(0) }
+        val state by produceState<TicketsUiState>(TicketsUiState.Loading, attempt) {
+            value = TicketsUiState.Loading
+            value = getMyTickets.loadUiState()
         }
         TicketsScreen(
             state = state,
@@ -135,6 +140,7 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
                 TicketsActions(
                     onTabSelected = onTabSelected,
                     onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
+                    onRetry = { attempt++ },
                 ),
         )
     }

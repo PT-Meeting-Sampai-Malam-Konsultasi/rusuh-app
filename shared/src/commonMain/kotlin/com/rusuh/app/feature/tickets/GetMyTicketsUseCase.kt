@@ -1,5 +1,7 @@
 package com.rusuh.app.feature.tickets
 
+import kotlin.coroutines.cancellation.CancellationException
+
 /**
  * Loads the Tiket tab: guests get [MyTickets.SignedOut]; signed-in users get
  * their orders split into upcoming (soonest first) and past (latest first), or
@@ -28,3 +30,17 @@ class GetMyTicketsUseCase(
         }
     }
 }
+
+/**
+ * Loads the tab state for the UI, turning any failure into [TicketsUiState.Error]
+ * so the screen never hangs on the skeleton. Cancellation is rethrown.
+ */
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
+suspend fun GetMyTicketsUseCase.loadUiState(): TicketsUiState =
+    try {
+        invoke().toUiState()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        TicketsUiState.Error
+    }
