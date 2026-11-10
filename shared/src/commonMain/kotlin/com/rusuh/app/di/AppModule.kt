@@ -6,6 +6,7 @@ import com.rusuh.app.feature.home.StubHomeRepository
 import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
 import com.rusuh.app.feature.tickets.StubTicketsRepository
 import com.rusuh.app.feature.tickets.TicketsRepository
+import com.rusuh.app.feature.tickets.TicketsViewModel
 import org.koin.dsl.module
 
 /** Main app module. Register shared (common) dependencies here. */
@@ -20,4 +21,5 @@ val appModule =
         // shortcut: StubTicketsRepository parses JSON strings until TICKET-00-M4 provides the real one.
         single<TicketsRepository> { StubTicketsRepository() }
         factory { GetMyTicketsUseCase(get()) }
+        factory { TicketsViewModel(get()) }
     }
