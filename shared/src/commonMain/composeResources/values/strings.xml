@@ -198,4 +198,21 @@
     <string name="tab_tickets">Tickets</string>
     <string name="tab_account">Account</string>
     <string name="tab_coming_soon">%1$s — coming soon</string>
+    <string name="tickets_title">My tickets</string>
+    <string name="tickets_subtitle">All orders are paid. At the door, show each QR together with the holder ID card.</string>
+    <string name="tickets_upcoming_title">Upcoming</string>
+    <string name="tickets_upcoming_count">%1$d orders · %2$d tickets</string>
+    <string name="tickets_past_title">Past</string>
+    <string name="tickets_past_count">%1$d orders</string>
+    <string name="tickets_loading_description">Loading your tickets</string>
+    <string name="tickets_empty_title">No tickets yet.</string>
+    <string name="tickets_empty_body">Tickets show up here once payment is done, with a QR for each holder. We also email the e-ticket.</string>
+    <string name="tickets_empty_action">Browse events</string>
+    <string name="tickets_signed_out_title">Sign in to see your tickets.</string>
+    <string name="tickets_signed_out_body">Tickets are saved to your account. Sign in with the email you used to order.</string>
+    <string name="tickets_signed_out_action">Sign in</string>
+    <string name="ticket_order_paid_badge">PAID</string>
+    <string name="ticket_order_done_badge">DONE</string>
+    <string name="ticket_order_order_label">Order</string>
+    <string name="ticket_order_view_eticket">View e-ticket</string>
 </resources>
