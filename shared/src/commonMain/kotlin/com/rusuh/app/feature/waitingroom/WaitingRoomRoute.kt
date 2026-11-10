@@ -1,19 +1,34 @@
 package com.rusuh.app.feature.waitingroom
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.action_retry
 import rusuh_app.shared.generated.resources.waiting_error_body
+import rusuh_app.shared.generated.resources.waiting_refresh_error
+
+private const val TICK_MILLIS = 1_000L
 
 /**
  * Stateful host for the Waiting Room: starts the [viewModel], renders its state through the
- * stateless [WaitingRoomScreen] and routes one-time effects to the navigation callbacks.
+ * stateless [WaitingRoomScreen], ticks countdowns once a second and routes one-time effects.
  *
  * Navigation to the event Detail is not wired yet: [WaitingRoomEffect.NavigateToDetail] is ignored.
  * TODO(FR-08-M1 #79): navigate to Detail once its route exists (claim #79).
@@ -28,14 +43,30 @@ fun WaitingRoomRoute(
     val state by viewModel.state.collectAsState()
     val currentOnBack by rememberUpdatedState(onBack)
     val currentOnBrowseEvents by rememberUpdatedState(onBrowseEvents)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val refreshMessage = stringResource(Res.string.waiting_refresh_error)
+    val retryLabel = stringResource(Res.string.action_retry)
 
     LaunchedEffect(viewModel) { viewModel.dispatch(WaitingRoomIntent.Start) }
     DisposableEffect(viewModel) { onDispose { viewModel.clear() } }
+    // Ticks only while a countdown is on screen; the ViewModel derives seconds from server time.
+    LaunchedEffect(viewModel, state.hasCountdown) {
+        while (state.hasCountdown) {
+            delay(TICK_MILLIS)
+            viewModel.dispatch(WaitingRoomIntent.Tick)
+        }
+    }
     LaunchedEffect(viewModel) {
         viewModel.effect.collect { effect ->
             when (effect) {
                 WaitingRoomEffect.NavigateBack -> currentOnBack()
                 WaitingRoomEffect.NavigateToEvents -> currentOnBrowseEvents()
+                WaitingRoomEffect.ShowRefreshError ->
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(refreshMessage, actionLabel = retryLabel)
+                        if (result == SnackbarResult.ActionPerformed) viewModel.dispatch(WaitingRoomIntent.Retry)
+                    }
                 // TODO(FR-08-M1 #79): no Detail route yet; do not navigate.
                 is WaitingRoomEffect.NavigateToDetail -> Unit
             }
@@ -43,13 +74,18 @@ fun WaitingRoomRoute(
     }
 
     val errorMessage = stringResource(Res.string.waiting_error_body)
-    WaitingRoomScreen(
-        state = state.toScreenState(errorMessage),
-        dispatch = { action -> viewModel.dispatch(action.toIntent()) },
-        modifier = modifier,
-    )
+    Box(modifier = modifier.fillMaxSize()) {
+        WaitingRoomScreen(
+            state = state.toScreenState(errorMessage),
+            dispatch = { action -> viewModel.dispatch(action.toIntent()) },
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding(),
+        )
+    }
 }
 
-/** The state the stateless screen renders: a load failure becomes [WaitingRoomUiState.Error]. */
+/** The state the stateless screen renders: a blank error message is filled with [errorMessage]. */
 internal fun WaitingRoomState.toScreenState(errorMessage: String): WaitingRoomUiState =
-    if (loadFailed) WaitingRoomUiState.Error(errorMessage) else ui
+    if (ui is WaitingRoomUiState.Error && ui.message.isBlank()) WaitingRoomUiState.Error(errorMessage) else ui

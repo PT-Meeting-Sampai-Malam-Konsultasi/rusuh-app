@@ -59,6 +59,7 @@
     <string name="waiting_empty_body">Anda tidak sedang berada dalam antrian untuk acara ini.</string>
     <string name="waiting_error_title">Gagal memuat antrian</string>
     <string name="waiting_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="waiting_refresh_error">Koneksi terputus. Menampilkan posisi terakhir Anda.</string>
 
     <!-- Queue position card -->
     <string name="waiting_back_description">Kembali</string>

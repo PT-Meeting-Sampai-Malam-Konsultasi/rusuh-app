@@ -1,12 +1,15 @@
 package com.rusuh.app.feature.waitingroom
 
 import com.rusuh.app.feature.waitingroom.data.repository.StubWaitingRoomRepository
+import com.rusuh.app.feature.waitingroom.domain.model.QueueEventInfo
 import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
+import com.rusuh.app.feature.waitingroom.domain.model.QueueState
 import com.rusuh.app.feature.waitingroom.domain.repository.WaitingRoomRepository
 import com.rusuh.app.feature.waitingroom.domain.usecase.ObserveQueuePlaceUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -23,6 +26,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -39,8 +43,32 @@ class WaitingRoomViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private var now = 0L
+
     private fun viewModel(repository: WaitingRoomRepository = StubWaitingRoomRepository(STEP)) =
-        WaitingRoomViewModel("evt", ObserveQueuePlaceUseCase(repository))
+        WaitingRoomViewModel("evt", ObserveQueuePlaceUseCase(repository)) { now }
+
+    private fun place(
+        state: QueueState,
+        expiresAt: Long? = null,
+        opensAt: Long? = null,
+    ) = QueuePlace(
+        eventId = "evt",
+        event = QueueEventInfo(title = "evt"),
+        state = state,
+        seq = 10,
+        served = 5,
+        serverNowEpochMillis = 1_000L,
+        opensAtEpochMillis = opensAt,
+        turnExpiresAtEpochMillis = expiresAt,
+    )
+
+    private fun repoOf(vararg flows: Flow<QueuePlace>): WaitingRoomRepository {
+        var call = 0
+        return object : WaitingRoomRepository {
+            override fun observePlace(eventId: String): Flow<QueuePlace> = flows[minOf(call++, flows.size - 1)]
+        }
+    }
 
     private fun WaitingRoomViewModel.phase(): WaitingRoomPhase =
         assertIs<WaitingRoomUiState.Active>(
@@ -92,7 +120,7 @@ class WaitingRoomViewModelTest {
                 if (index > 0) step(vm)
                 when (val phase = vm.phase()) {
                     is WaitingRoomPhase.Waiting -> assertTrue(phase.queue.position >= 1)
-                    is WaitingRoomPhase.Paused -> assertTrue(phase.position >= 0)
+                    is WaitingRoomPhase.Paused -> assertTrue(phase.position >= 1)
                     else -> Unit
                 }
             }
@@ -123,7 +151,7 @@ class WaitingRoomViewModelTest {
                 )
             vm.dispatch(WaitingRoomIntent.Start)
             runCurrent()
-            assertTrue(vm.state.value.loadFailed)
+            assertIs<WaitingRoomUiState.Error>(vm.state.value.ui)
             assertEquals(WaitingRoomUiState.Error("msg"), vm.state.value.toScreenState("msg"))
         }
 
@@ -167,6 +195,110 @@ class WaitingRoomViewModelTest {
             runCurrent()
             assertIs<WaitingRoomPhase.PreQueue>(vm.phase())
             vm.clear()
+        }
+
+    @Test
+    fun errorAfterEmissionKeepsPlaceThenRetryResumes() =
+        runTest(dispatcher) {
+            val first =
+                flow {
+                    emit(place(QueueState.Open))
+                    error("boom")
+                }
+            val vm = viewModel(repoOf(first, flow { emit(place(QueueState.Paused)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            assertIs<WaitingRoomPhase.Waiting>(vm.phase())
+            assertEquals(WaitingRoomEffect.ShowRefreshError, vm.effect.first())
+            assertIs<WaitingRoomPhase.Waiting>(vm.phase())
+            vm.dispatch(WaitingRoomIntent.Retry)
+            runCurrent()
+            assertIs<WaitingRoomPhase.Paused>(vm.phase())
+        }
+
+    @Test
+    fun retryAfterHardFailureRecovers() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { error("boom") }, flow { emit(place(QueueState.Open)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            assertIs<WaitingRoomUiState.Error>(vm.state.value.ui)
+            vm.dispatch(WaitingRoomIntent.Retry)
+            runCurrent()
+            assertIs<WaitingRoomPhase.Waiting>(vm.phase())
+        }
+
+    @Test
+    fun completionAfterEmissionKeepsLastPlace() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Closed)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            assertEquals(WaitingRoomPhase.SoldOut, vm.phase())
+        }
+
+    @Test
+    fun oldJobCannotEmitAfterQueueAgain() =
+        runTest(dispatcher) {
+            val old = MutableSharedFlow<QueuePlace>()
+            val vm = viewModel(repoOf(old, flow { emit(place(QueueState.Paused)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            vm.dispatch(WaitingRoomIntent.QueueAgain)
+            runCurrent()
+            old.emit(place(QueueState.Closed))
+            runCurrent()
+            assertIs<WaitingRoomPhase.Paused>(vm.phase())
+        }
+
+    @Test
+    fun effectIsDeliveredExactlyOnceAndBackOnlyOnce() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.dispatch(WaitingRoomIntent.Back)
+            vm.dispatch(WaitingRoomIntent.Back)
+            vm.dispatch(WaitingRoomIntent.BrowseOtherEvents)
+            runCurrent()
+            assertEquals(WaitingRoomEffect.NavigateBack, vm.effect.first())
+            assertEquals(WaitingRoomEffect.NavigateToEvents, vm.effect.first())
+        }
+
+    @Test
+    fun clearStopsCollection() =
+        runTest(dispatcher) {
+            val source = MutableSharedFlow<QueuePlace>()
+            val vm = viewModel(repoOf(source))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            source.emit(place(QueueState.Open))
+            runCurrent()
+            vm.clear()
+            source.emit(place(QueueState.Closed))
+            runCurrent()
+            assertIs<WaitingRoomPhase.Waiting>(vm.phase())
+        }
+
+    @Test
+    fun turnWithoutExpiryBecomesError() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            assertIs<WaitingRoomUiState.Error>(vm.state.value.ui)
+        }
+
+    @Test
+    fun tickCountsDownFromMonotonicClock() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            assertEquals(60, assertIs<WaitingRoomPhase.YourTurn>(vm.phase()).secondsLeft)
+            now = 3_000L
+            vm.dispatch(WaitingRoomIntent.Tick)
+            runCurrent()
+            assertEquals(57, assertIs<WaitingRoomPhase.YourTurn>(vm.phase()).secondsLeft)
+            assertNotEquals(60, assertIs<WaitingRoomPhase.YourTurn>(vm.phase()).secondsLeft)
         }
 
     @Test

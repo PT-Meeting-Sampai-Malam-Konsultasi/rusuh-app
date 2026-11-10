@@ -60,6 +60,7 @@
     <string name="waiting_empty_body">You are not currently in a queue for this event.</string>
     <string name="waiting_error_title">Could not load the queue</string>
     <string name="waiting_error_body">Check your connection and try again.</string>
+    <string name="waiting_refresh_error">Connection lost. Showing your last known position.</string>
 
     <!-- Queue position card -->
     <string name="waiting_back_description">Back</string>
