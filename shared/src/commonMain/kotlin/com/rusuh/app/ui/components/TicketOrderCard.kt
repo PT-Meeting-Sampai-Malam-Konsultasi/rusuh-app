@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -25,6 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,9 +41,12 @@ import com.rusuh.app.ui.theme.RusuhSpacing
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.ticket_order_done_badge
-import rusuh_app.shared.generated.resources.ticket_order_order_label
 import rusuh_app.shared.generated.resources.ticket_order_paid_badge
+import rusuh_app.shared.generated.resources.ticket_order_paid_description
+import rusuh_app.shared.generated.resources.ticket_order_summary
 import rusuh_app.shared.generated.resources.ticket_order_view_eticket
+import rusuh_app.shared.generated.resources.ticket_order_view_eticket_for
+import rusuh_app.shared.generated.resources.ticket_order_view_eticket_primary
 
 /** Poster artwork stand-in until real event images are wired (M4). */
 enum class TicketPoster { Pink, Blue, Grey }
@@ -67,17 +74,12 @@ data class TicketOrderUi(
     val posterLabel: String,
     val poster: TicketPoster,
     val attendees: List<TicketAttendeeUi>,
-    val orderCode: String,
     val totalLabel: String,
     val dayLabel: String,
     val monthLabel: String,
     val countdownLabel: String? = null,
     val isPast: Boolean = false,
-) {
-    init {
-        require(orderId.isNotBlank()) { "orderId must not be blank" }
-    }
-}
+)
 
 /**
  * A purchased-order card on the Tiket tab (Figma "Event Purchased"): poster
@@ -142,9 +144,7 @@ fun TicketOrderCard(
                 }
             }
             Text(
-                text =
-                    stringResource(Res.string.ticket_order_order_label) +
-                        " " + data.orderCode + " · " + data.totalLabel,
+                text = stringResource(Res.string.ticket_order_summary, data.orderId, data.totalLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = RusuhBrandColors.Ink3,
             )
@@ -156,7 +156,11 @@ fun TicketOrderCard(
             ) {
                 DateBlock(data, muted)
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                    ViewETicketButton(onClick = { onViewETicket(data.orderId) }, primary = !muted)
+                    ViewETicketButton(
+                        eventTitle = data.eventTitle,
+                        onClick = { onViewETicket(data.orderId) },
+                        primary = !muted,
+                    )
                 }
             }
         }
@@ -180,6 +184,7 @@ private fun PosterThumb(
             Modifier
                 .width(RusuhSpacing.queueThumb)
                 .height(RusuhSpacing.posterHeight + RusuhSpacing.xl)
+                .clearAndSetSemantics {}
                 .clip(RusuhShapes.small)
                 .background(if (muted) color.copy(alpha = POSTER_MUTED_ALPHA) else color),
         contentAlignment = Alignment.BottomStart,
@@ -202,6 +207,8 @@ private fun PosterThumb(
 private fun StatusBadge(muted: Boolean) {
     val text =
         stringResource(if (muted) Res.string.ticket_order_done_badge else Res.string.ticket_order_paid_badge)
+    val plain =
+        stringResource(if (muted) Res.string.ticket_order_done_badge else Res.string.ticket_order_paid_description)
     val color = if (muted) RusuhBrandColors.Ink2 else RusuhColors.BlueInk
     Text(
         text = if (muted) text else "✓ $text",
@@ -210,6 +217,7 @@ private fun StatusBadge(muted: Boolean) {
         color = color,
         modifier =
             Modifier
+                .semantics { contentDescription = plain }
                 .border(RusuhSpacing.borderThin, color, RusuhShapes.small)
                 .padding(horizontal = RusuhSpacing.md, vertical = RusuhSpacing.xxs),
     )
@@ -220,6 +228,7 @@ private fun AttendeeChip(attendee: TicketAttendeeUi) {
     Column(
         modifier =
             Modifier
+                .semantics(mergeDescendants = true) {}
                 .border(RusuhSpacing.borderThin, RusuhBrandColors.Ink3, RusuhShapes.small)
                 .padding(horizontal = RusuhSpacing.md, vertical = RusuhSpacing.xs),
     ) {
@@ -243,6 +252,7 @@ private fun DateBlock(
     muted: Boolean,
 ) {
     Row(
+        modifier = Modifier.semantics(mergeDescendants = true) {},
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
         verticalAlignment = Alignment.Bottom,
     ) {
@@ -272,13 +282,23 @@ private fun DateBlock(
 
 @Composable
 private fun ViewETicketButton(
+    eventTitle: String,
     onClick: () -> Unit,
     primary: Boolean,
 ) {
-    val label = stringResource(Res.string.ticket_order_view_eticket) + if (primary) " →" else ""
+    val label =
+        stringResource(
+            if (primary) Res.string.ticket_order_view_eticket_primary else Res.string.ticket_order_view_eticket,
+        )
+    val description = stringResource(Res.string.ticket_order_view_eticket_for, eventTitle)
+    val modifier =
+        Modifier
+            .heightIn(min = RusuhSpacing.actionMinHeight)
+            .semantics { contentDescription = description }
     if (primary) {
         Button(
             onClick = onClick,
+            modifier = modifier,
             shape = RusuhShapes.small,
             colors =
                 ButtonDefaults.buttonColors(
@@ -289,6 +309,7 @@ private fun ViewETicketButton(
     } else {
         OutlinedButton(
             onClick = onClick,
+            modifier = modifier,
             shape = RusuhShapes.small,
             border = BorderStroke(RusuhBrandMetrics.borderWidth, RusuhBrandColors.Ink),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = RusuhBrandColors.Ink),

@@ -21,8 +21,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,20 +38,26 @@ import com.rusuh.app.ui.theme.RusuhBrandColors
 import com.rusuh.app.ui.theme.RusuhBrandMetrics
 import com.rusuh.app.ui.theme.RusuhShapes
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.tickets_count_summary
 import rusuh_app.shared.generated.resources.tickets_empty_action
 import rusuh_app.shared.generated.resources.tickets_empty_body
 import rusuh_app.shared.generated.resources.tickets_empty_title
+import rusuh_app.shared.generated.resources.tickets_error_action
+import rusuh_app.shared.generated.resources.tickets_error_body
+import rusuh_app.shared.generated.resources.tickets_error_title
 import rusuh_app.shared.generated.resources.tickets_loading_description
-import rusuh_app.shared.generated.resources.tickets_past_count
+import rusuh_app.shared.generated.resources.tickets_orders_count
 import rusuh_app.shared.generated.resources.tickets_past_title
 import rusuh_app.shared.generated.resources.tickets_signed_out_action
 import rusuh_app.shared.generated.resources.tickets_signed_out_body
 import rusuh_app.shared.generated.resources.tickets_signed_out_title
 import rusuh_app.shared.generated.resources.tickets_subtitle
+import rusuh_app.shared.generated.resources.tickets_tickets_count
 import rusuh_app.shared.generated.resources.tickets_title
-import rusuh_app.shared.generated.resources.tickets_upcoming_count
 import rusuh_app.shared.generated.resources.tickets_upcoming_title
 
 /**
@@ -72,6 +80,9 @@ sealed interface TicketsUiState {
 
     /** Tickets belong to the account, so a guest must sign in first. */
     data object SignedOut : TicketsUiState
+
+    /** Loading failed; the user can retry. */
+    data object Error : TicketsUiState
 }
 
 /**
@@ -83,6 +94,7 @@ data class TicketsActions(
     val onTabSelected: (RusuhTab) -> Unit = {},
     val onBrowseEvents: () -> Unit = {},
     val onSignIn: () -> Unit = {},
+    val onRetry: () -> Unit = {},
 )
 
 /**
@@ -90,13 +102,14 @@ data class TicketsActions(
  * plus the empty, signed-out and loading variants, inside the shared header and
  * bottom bar (Tiket selected). Stateless and placeholder-driven.
  *
- * TODO(M3): wire the TicketsViewModel and map its state onto [TicketsUiState].
+ * TODO(M3): wire the TicketsViewModel and map its state onto [TicketsUiState], and
+ *  wire [TicketsActions.onViewETicket] (e-ticket page) and [TicketsActions.onSignIn] (AUTH-00).
  * TODO(M4): feed orders from the my-tickets API.
  */
 @Composable
 fun TicketsScreen(
     modifier: Modifier = Modifier,
-    state: TicketsUiState = TicketsUiState.Content(placeholderUpcomingOrders(), placeholderPastOrders()),
+    state: TicketsUiState,
     actions: TicketsActions = TicketsActions(),
 ) {
     Scaffold(
@@ -115,6 +128,13 @@ fun TicketsScreen(
                         actionLabel = stringResource(Res.string.tickets_empty_action),
                         onAction = actions.onBrowseEvents,
                     )
+                TicketsUiState.Error ->
+                    MessageState(
+                        title = stringResource(Res.string.tickets_error_title),
+                        body = stringResource(Res.string.tickets_error_body),
+                        actionLabel = stringResource(Res.string.tickets_error_action),
+                        onAction = actions.onRetry,
+                    )
                 TicketsUiState.SignedOut ->
                     MessageState(
                         title = stringResource(Res.string.tickets_signed_out_title),
@@ -128,6 +148,19 @@ fun TicketsScreen(
     }
 }
 
+@OptIn(ExperimentalResourceApi::class)
+@Composable
+private fun countSummary(
+    orders: Int,
+    tickets: Int,
+): String =
+    stringResource(
+        Res.string.tickets_count_summary,
+        pluralStringResource(Res.plurals.tickets_orders_count, orders, orders),
+        pluralStringResource(Res.plurals.tickets_tickets_count, tickets, tickets),
+    )
+
+@OptIn(ExperimentalResourceApi::class)
 @Composable
 private fun OrderList(
     state: TicketsUiState.Content,
@@ -148,19 +181,19 @@ private fun OrderList(
             item(key = "upcoming-header") {
                 SectionHeader(
                     title = stringResource(Res.string.tickets_upcoming_title),
-                    count = stringResource(Res.string.tickets_upcoming_count, state.upcoming.size, ticketCount),
+                    count = countSummary(state.upcoming.size, ticketCount),
                 )
             }
-            items(items = state.upcoming, key = { it.orderId }) { TicketOrderCard(it, onViewETicket) }
+            items(items = state.upcoming, key = { "up-${it.orderId}" }) { TicketOrderCard(it, onViewETicket) }
         }
         if (state.past.isNotEmpty()) {
             item(key = "past-header") {
                 SectionHeader(
                     title = stringResource(Res.string.tickets_past_title),
-                    count = stringResource(Res.string.tickets_past_count, state.past.size),
+                    count = pluralStringResource(Res.plurals.tickets_orders_count, state.past.size, state.past.size),
                 )
             }
-            items(items = state.past, key = { it.orderId }) { TicketOrderCard(it, onViewETicket) }
+            items(items = state.past, key = { "past-${it.orderId}" }) { TicketOrderCard(it, onViewETicket) }
         }
     }
 }
@@ -215,7 +248,10 @@ private fun LoadingState() {
             Modifier
                 .fillMaxSize()
                 .padding(RusuhSpacing.xl)
-                .semantics { contentDescription = description },
+                .semantics(mergeDescendants = true) {
+                    contentDescription = description
+                    liveRegion = LiveRegionMode.Polite
+                },
         verticalArrangement = Arrangement.spacedBy(RusuhSpacing.xxl),
     ) {
         PageHeading(showSubtitle = false)
@@ -248,6 +284,7 @@ private fun MessageState(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
             color = RusuhBrandColors.Ink,
+            modifier = Modifier.semantics { heading() },
         )
         Text(text = body, style = MaterialTheme.typography.bodyMedium, color = RusuhBrandColors.Ink2)
         Button(

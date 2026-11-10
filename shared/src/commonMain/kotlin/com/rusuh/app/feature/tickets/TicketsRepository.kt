@@ -25,7 +25,9 @@ class StubTicketsRepository(
     private val json: String = StubTicketsJson.ORDERS,
 ) : TicketsRepository {
     override suspend fun getMyOrders(): List<TicketOrder> =
-        lenientJson.decodeFromString<StubOrdersDto>(json).orders.map { it.toDomain() }
+        lenientJson.decodeFromString<StubOrdersDto>(json).orders
+            .filter { it.orderId.isNotBlank() } // drop bad rows at the boundary
+            .map { it.toDomain() }
 
     private companion object {
         val lenientJson = Json { ignoreUnknownKeys = true }
@@ -86,7 +88,7 @@ internal object StubTicketsJson {
                         {"category":"Festival B","holderName":"Rina Wulandari"},
                         {"category":"Tribun Atas","holderName":"Dimas Pratama"}],
            "totalLabel":"Rp 2.180.000","dayLabel":"12","monthLabel":"DES",
-           "startsAtEpochMillis":1796122800000,"countdownLabel":"33 hari lagi"},
+           "startsAtEpochMillis":1797076800000,"countdownLabel":"33 hari lagi"},
           {"orderId":"RSH-26-071205","eventTitle":"Pelita – Tur Kota Lama",
            "dateVenue":"Jum, 4 Des 2026 · 19.30 WIB · Lapangan Simpang Lima, Semarang","posterLabel":"PELITA",
            "attendees":[{"category":"Festival A","holderName":"Nadia Saputri"},
