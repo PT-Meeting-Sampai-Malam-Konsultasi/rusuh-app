@@ -10,10 +10,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.detail_error_booking
@@ -40,6 +42,7 @@ fun DetailRoute(
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val errorTexts =
         mapOf(
             DetailError.LoadFailed to stringResource(Res.string.detail_error_load),
@@ -69,8 +72,13 @@ fun DetailRoute(
                 DetailEffect.NavigateHome -> currentOnHome()
                 is DetailEffect.NavigateToQueue -> currentOnQueue(effect.eventId)
                 is DetailEffect.NavigateToPayment -> currentOnPayment(effect.bookingId)
+                // Own coroutine: showSnackbar suspends until dismissed and must never delay
+                // the navigation effects queued behind it.
                 is DetailEffect.ShowError ->
-                    snackbarHostState.showSnackbar(currentErrorTexts.getValue(effect.error))
+                    scope.launch {
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        snackbarHostState.showSnackbar(currentErrorTexts.getValue(effect.error))
+                    }
             }
         }
     }

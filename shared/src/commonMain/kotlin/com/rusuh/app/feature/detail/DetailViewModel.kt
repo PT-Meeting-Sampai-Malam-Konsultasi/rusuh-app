@@ -144,7 +144,8 @@ class DetailViewModel(
                     validateAttendee(a.name, a.nik, form.attendees.take(i).map { it.nik }).isValid
                 }
             // TODO(FR-16-M1 #81): real booking + stock hold; the stub returns a fake id.
-            val booking = if (allValid) createBooking(form.toBookingRequest(eventId)) else null
+            // Re-check between the awaits so no booking is created after the window closed.
+            val booking = if (allValid && isOrderActive()) createBooking(form.toBookingRequest(eventId)) else null
             if (isOrderActive()) {
                 if (booking != null) {
                     // TODO(FR-16-M1 #81): the payment route does not exist yet; the host ignores this.
