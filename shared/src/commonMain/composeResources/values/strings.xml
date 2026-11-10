@@ -198,4 +198,34 @@
     <string name="tab_tickets">Tickets</string>
     <string name="tab_account">Account</string>
     <string name="tab_coming_soon">%1$s — coming soon</string>
+    <string name="tickets_title">My tickets</string>
+    <string name="tickets_subtitle">All orders are paid. At the door, show each QR together with the holder ID card.</string>
+    <string name="tickets_upcoming_title">Upcoming</string>
+    <string name="tickets_past_title">Past</string>
+    <string name="tickets_loading_description">Loading your tickets</string>
+    <string name="tickets_empty_title">No tickets yet.</string>
+    <string name="tickets_empty_body">Tickets show up here once payment is done, with a QR for each holder. We also email the e-ticket.</string>
+    <string name="tickets_empty_action">Browse events →</string>
+    <string name="tickets_signed_out_title">Sign in to see your tickets.</string>
+    <string name="tickets_signed_out_body">Tickets are saved to your account. Sign in with the email you used to order.</string>
+    <string name="tickets_signed_out_action">Sign in →</string>
+    <string name="ticket_order_paid_badge">✓ PAID</string>
+    <string name="ticket_order_done_badge">DONE</string>
+    <string name="ticket_order_view_eticket">View e-ticket</string>
+    <string name="ticket_order_view_eticket_primary">View e-ticket →</string>
+    <string name="ticket_order_view_eticket_for">View e-ticket for %1$s</string>
+    <string name="ticket_order_paid_description">Paid</string>
+    <string name="ticket_order_summary">Order %1$s · %2$s</string>
+    <string name="tickets_count_summary">%1$s · %2$s</string>
+    <plurals name="tickets_orders_count">
+        <item quantity="one">%1$d order</item>
+        <item quantity="other">%1$d orders</item>
+    </plurals>
+    <plurals name="tickets_tickets_count">
+        <item quantity="one">%1$d ticket</item>
+        <item quantity="other">%1$d tickets</item>
+    </plurals>
+    <string name="tickets_error_title">Couldn\'t load your tickets</string>
+    <string name="tickets_error_body">Check your connection and try again.</string>
+    <string name="tickets_error_action">Try again</string>
 </resources>
