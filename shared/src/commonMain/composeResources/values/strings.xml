@@ -175,6 +175,7 @@
     <string name="my_queues_empty_body">Pick an event and join its queue. Your places will show up here.</string>
     <string name="my_queues_empty_action">Browse events</string>
     <string name="my_queues_error_title">Couldn\'t load your queues</string>
+    <string name="my_queues_error_body">Check your connection and try again.</string>
     <string name="queue_list_item_phase_open">Queue open</string>
     <string name="queue_list_item_phase_live">Live</string>
     <string name="queue_list_item_phase_paused">Paused</string>

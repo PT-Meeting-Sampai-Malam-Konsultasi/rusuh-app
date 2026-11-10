@@ -57,8 +57,8 @@ import rusuh_app.shared.generated.resources.my_queues_title
  *
  * NOT an MVI state: a presentation-only discriminator so the stateless screen
  * can render each visual placeholder the design calls for (loading / content /
- * empty / error). FR-APP-01-M3 introduces the real MyQueuesViewModel and maps
- * its MVI state onto these cases.
+ * empty / error). [MyQueuesState.toUiState] maps the ViewModel's MVI state onto
+ * these cases.
  */
 @Immutable
 sealed interface MyQueuesUiState {
@@ -98,9 +98,8 @@ internal enum class AppLanguageOption(val code: String) {
  * NO ViewModel, NO repository and NO API here. The header's ID|EN toggle is
  * visual only until locale switching exists.
  *
- * TODO(M3): wire MyQueuesViewModel, collect the MVI state/effects and map them
- *  onto [MyQueuesUiState], replacing the caller-supplied [state].
- * TODO(M4): feed [QueueListItemUi] from the live my-queues API (FR-07/FR-10).
+ * State comes from [MyQueuesViewModel] via [MyQueuesRoute].
+ * TODO(FR-APP-01-M4 #50): feed [QueueListItemUi] from the live my-queues API (FR-07/FR-10).
  *
  * @param state what to render.
  * @param actions the callbacks the screen raises (row tap, tab switch, browse,
