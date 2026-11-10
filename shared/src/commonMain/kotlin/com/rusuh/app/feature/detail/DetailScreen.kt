@@ -30,10 +30,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -97,14 +93,8 @@ import rusuh_app.shared.generated.resources.detail_total
  * "Booking time expired" states.
  *
  * Pure `DetailScreen(state, dispatch)`: it renders [state] and reports user actions as
- * [DetailIntent]s. Only ephemeral UI form state (quantities, attendees) lives here via
- * `remember`, so the placeholder is interactive without a ViewModel.
- *
- * TODO(M3): wire DetailViewModel — map its MVI state onto [DetailUiState], hoist [DetailFormState]
- *  into it, drive [DetailUiState.Content.remainingSeconds] from the server clock (5-minute order
- *  window) and handle [DetailIntent]s.
- * TODO(M4): feed [DetailContent] from `getCategories`, validate each attendee through
- *  `validateAttendee`, and submit the booking from [DetailIntent.Proceed].
+ * [DetailIntent]s. All state (quantities, attendees, countdown) is owned by [DetailViewModel]
+ * and arrives through [state]; see the stateful `DetailRoute` host.
  */
 @Composable
 fun DetailScreen(
@@ -112,7 +102,6 @@ fun DetailScreen(
     dispatch: (DetailIntent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var form by remember { mutableStateOf(DetailFormState()) }
     val remaining =
         when (state) {
             is DetailUiState.Content -> state.remainingSeconds
@@ -153,7 +142,7 @@ fun DetailScreen(
                             )
                         }
                     is DetailUiState.Content ->
-                        DetailContentBody(state.detail, form, { form = it }, dispatch)
+                        DetailContentBody(state, dispatch)
                     // Inert: only the (PII-free) header is composed, never attendee names/NIKs or
                     // steppers/fields, so focus and TalkBack cannot reach them.
                     is DetailUiState.Expired -> ExpiredBackdrop(state.detail)
@@ -215,11 +204,11 @@ private fun DetailTopBar(
 
 @Composable
 private fun DetailContentBody(
-    detail: DetailContent,
-    form: DetailFormState,
-    onFormChange: (DetailFormState) -> Unit,
+    state: DetailUiState.Content,
     dispatch: (DetailIntent) -> Unit,
 ) {
+    val detail = state.detail
+    val form = state.form
     val focusManager = LocalFocusManager.current
     val maxTickets = detail.maxTickets
     val total = form.totalTickets
@@ -257,9 +246,15 @@ private fun DetailContentBody(
                 SeatCategoryCard(
                     data = category,
                     quantity = quantity,
-                    canIncrement = !capReached,
+                    canIncrement = !capReached && quantity < detail.stockOf(category.id),
                     onQuantityChange = { new ->
-                        onFormChange(form.withQuantity(category.id, new, maxTickets))
+                        dispatch(
+                            if (new > quantity) {
+                                DetailIntent.IncrementCategory(category.id)
+                            } else {
+                                DetailIntent.DecrementCategory(category.id)
+                            },
+                        )
                     },
                 )
             }
@@ -282,9 +277,9 @@ private fun DetailContentBody(
                     attendee = attendee,
                     duplicateOf = form.duplicateOf(index),
                     isLast = index == tickets.lastIndex,
-                    onKindChange = { onFormChange(form.withKind(index, it, detail.accountName)) },
-                    onNameChange = { onFormChange(form.withName(index, it)) },
-                    onNikChange = { onFormChange(form.withNik(index, it)) },
+                    onKindChange = { dispatch(DetailIntent.AttendeeKindChanged(index, it)) },
+                    onNameChange = { dispatch(DetailIntent.AttendeeNameChanged(index, it)) },
+                    onNikChange = { dispatch(DetailIntent.AttendeeNikChanged(index, it)) },
                 )
             }
             Spacer(Modifier.height(RusuhSpacing.xxxl))
@@ -305,7 +300,7 @@ private fun DetailContentBody(
         BottomBar(
             tickets = total,
             total = orderTotal,
-            enabled = canProceed(form, maxTickets, detail.categories),
+            enabled = !state.isSubmitting && canProceed(form, maxTickets, detail.categories),
             onProceed = { dispatch(DetailIntent.Proceed) },
         )
     }

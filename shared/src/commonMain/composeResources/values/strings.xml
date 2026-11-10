@@ -148,6 +148,9 @@
     <string name="detail_empty_title">No categories yet</string>
     <string name="detail_empty_body">Tickets for this event are not available yet.</string>
     <string name="detail_error_title">Could not load the detail</string>
+    <string name="detail_error_load">Could not load the detail. Please try again.</string>
+    <string name="detail_error_booking">Could not continue to payment. Please try again.</string>
+    <string name="detail_error_nik_rejected">One of the NIKs could not be verified. Check the NIK and try again.</string>
     <string name="detail_expired_description">Time is up. 5 minutes have passed. Your selection was not saved.</string>
     <string name="detail_expired_badge">Time is up</string>
     <string name="detail_expired_headline">5 minutes have passed.</string>

@@ -147,6 +147,9 @@
     <string name="detail_empty_title">Belum ada kategori</string>
     <string name="detail_empty_body">Tiket untuk acara ini belum tersedia.</string>
     <string name="detail_error_title">Gagal memuat detail</string>
+    <string name="detail_error_load">Detail tidak bisa dimuat. Coba lagi.</string>
+    <string name="detail_error_booking">Belum bisa lanjut ke pembayaran. Coba lagi.</string>
+    <string name="detail_error_nik_rejected">Salah satu NIK tidak bisa diverifikasi. Periksa NIK lalu coba lagi.</string>
     <string name="detail_expired_description">Waktu habis. 5 menit sudah lewat. Pilihan Anda belum disimpan.</string>
     <string name="detail_expired_badge">Waktu habis</string>
     <string name="detail_expired_headline">5 menit sudah lewat.</string>

@@ -3,20 +3,24 @@
 package com.rusuh.app.feature.detail
 
 import androidx.compose.runtime.Immutable
+import com.rusuh.app.domain.model.NikRules
+import com.rusuh.app.domain.model.isValid
+import com.rusuh.app.domain.model.validateAttendeeLocally
+import com.rusuh.app.mvi.MviIntent
 import com.rusuh.app.ui.components.SeatCategoryUi
 
 /** Hard cap on tickets in one order (ADR-0004 / FR-13). */
 const val MAX_TICKETS_PER_ORDER = 3
 
 /** Required NIK length: 16 digits as printed on a KTP (FR-13). */
-const val NIK_LENGTH = 16
+const val NIK_LENGTH = NikRules.LENGTH
 
 /** Length of the order window in seconds (server-driven in the real app; 5 minutes). */
 const val ORDER_WINDOW_SECONDS = 5 * 60
 
 /**
- * Static placeholder content for the Detail Ticket page (FR-05 M1+M2). UI-only sample data:
- * there is NO ViewModel, repository or API behind it (M3/M4 replace it).
+ * Loaded content for the Detail Ticket page, mapped from the domain offering by the ViewModel
+ * (placeholder data behind the stub repository until the APIs land).
  *
  * @param eventTitle main event name (e.g. "Samudra").
  * @param eventSubtitle tagline under the title; null hides it.
@@ -28,6 +32,7 @@ const val ORDER_WINDOW_SECONDS = 5 * 60
  * @param adminFeeRupiah "Biaya layanan": ONE fixed fee per ORDER, not per ticket (ADR-0010).
  * @param reservedUnits units the queue admission reserved; the order is capped at
  *   min([MAX_TICKETS_PER_ORDER], [reservedUnits]).
+ * @param stockByCategory remaining stock per category id; a missing id means no stock limit.
  */
 @Immutable
 data class DetailContent(
@@ -39,14 +44,18 @@ data class DetailContent(
     val accountEmail: String,
     val adminFeeRupiah: Int,
     val reservedUnits: Int = MAX_TICKETS_PER_ORDER,
+    val stockByCategory: Map<String, Int> = emptyMap(),
 ) {
     /** Maximum tickets this order may hold. */
     val maxTickets: Int get() = minOf(MAX_TICKETS_PER_ORDER, reservedUnits)
+
+    /** Remaining stock of [categoryId] (unbounded when unknown). */
+    fun stockOf(categoryId: String): Int = stockByCategory[categoryId] ?: Int.MAX_VALUE
 }
 
 /**
- * UI-level render state for the Detail Ticket page. NOT the MVI state: FR-05-M3 introduces the
- * real DetailViewModel and maps its state onto these cases.
+ * UI-level render state for the Detail Ticket page. NOT the MVI state: [DetailState] is mapped
+ * onto these cases by [DetailState.toUiState].
  */
 sealed interface DetailUiState {
     /** Fetching the event + categories. */
@@ -55,13 +64,16 @@ sealed interface DetailUiState {
     /**
      * Loaded.
      *
-     * @param remainingSeconds order countdown shown in the top bar (server-driven in the real
-     *   app; ticked by the placeholder host here).
+     * @param remainingSeconds order countdown shown in the top bar.
+     * @param form selected quantities and attendee forms (owned by the ViewModel).
+     * @param isSubmitting true while "Lanjut bayar" is validating/booking; disables it.
      */
     @Immutable
     data class Content(
         val detail: DetailContent,
         val remainingSeconds: Int = ORDER_WINDOW_SECONDS,
+        val form: DetailFormState = DetailFormState(),
+        val isSubmitting: Boolean = false,
     ) : DetailUiState
 
     /** No categories to sell. */
@@ -75,19 +87,41 @@ sealed interface DetailUiState {
     data class Expired(val detail: DetailContent) : DetailUiState
 }
 
-/** User intents emitted by the stateless [DetailScreen]. */
-sealed interface DetailIntent {
+/** User intents emitted by the stateless [DetailScreen] and handled by [DetailViewModel]. */
+sealed interface DetailIntent : MviIntent {
+    /** Initial load of the event, categories and account profile. */
+    data object Load : DetailIntent
+
+    /** Reload after a failed load. */
+    data object Retry : DetailIntent
+
     data object Back : DetailIntent
 
-    /** Proceed to payment. TODO(M3/M4): carry the validated selection + attendees. */
+    /** Validate every attendee, create the booking and continue to payment. */
     data object Proceed : DetailIntent
 
     /** Change the e-ticket email (opens account settings later). */
     data object ChangeEmail : DetailIntent
 
+    /** Queue again after the order window expired. */
     data object QueueAgain : DetailIntent
 
     data object GoHome : DetailIntent
+
+    /** One more ticket of [categoryId] (capped by the order cap and the category stock). */
+    data class IncrementCategory(val categoryId: String) : DetailIntent
+
+    data class DecrementCategory(val categoryId: String) : DetailIntent
+
+    /** Switch ticket [index] between "Saya sendiri" and "Orang lain". */
+    data class AttendeeKindChanged(val index: Int, val kind: AttendeeKind) : DetailIntent
+
+    data class AttendeeNameChanged(val index: Int, val name: String) : DetailIntent
+
+    data class AttendeeNikChanged(val index: Int, val nik: String) : DetailIntent
+
+    /** The countdown ticked: recompute remaining time from the server clock. */
+    data object Tick : DetailIntent
 }
 
 /** Who a ticket is for. */
@@ -103,7 +137,7 @@ data class AttendeeForm(
     val nik: String = "",
 )
 
-/** UI-only local form state: quantities per category plus one [AttendeeForm] per ticket. */
+/** Form state: quantities per category plus one [AttendeeForm] per ticket. */
 @Immutable
 data class DetailFormState(
     val quantities: Map<String, Int> = emptyMap(),
@@ -121,19 +155,20 @@ internal fun isCapReached(
 ): Boolean = selectedTotal >= maxTickets
 
 /** Visual-only NIK validity: exactly [NIK_LENGTH] digits. Real validation is `validateAttendee`. */
-internal fun isNikValid(nik: String): Boolean = nik.length == NIK_LENGTH && nik.all(::isAsciiDigit)
+internal fun isNikValid(nik: String): Boolean = NikRules.isValid(nik)
 
 /** ASCII 0-9 only: `Char.isDigit` also accepts Arabic-Indic and other Unicode digits. */
 internal fun isAsciiDigit(c: Char): Boolean = c in '0'..'9'
 
-/** Sets a category quantity, clamped to 0..(remaining cap), and resizes the attendee slots. */
+/** Sets a category quantity, clamped to 0..min(remaining cap, [stock]), and resizes the attendee slots. */
 internal fun DetailFormState.withQuantity(
     categoryId: String,
     quantity: Int,
     maxTickets: Int,
+    stock: Int = Int.MAX_VALUE,
 ): DetailFormState {
     val others = quantities.filterKeys { it != categoryId }.values.sum()
-    val clamped = quantity.coerceIn(0, (maxTickets - others).coerceAtLeast(0))
+    val clamped = quantity.coerceIn(0, (maxTickets - others).coerceAtLeast(0).coerceAtMost(stock.coerceAtLeast(0)))
     val next = quantities + (categoryId to clamped)
     val total = next.values.sum()
     // shortcut: slots are positional, so shrinking drops the LAST attendee rather than the one
@@ -212,7 +247,7 @@ internal fun canProceed(
         form.attendees.size == form.totalTickets &&
         form.attendees.indices.all { i ->
             val a = form.attendees[i]
-            a.name.isNotBlank() && isNikValid(a.nik) && form.duplicateOf(i) == null
+            validateAttendeeLocally(a.name, a.nik, form.attendees.take(i).map { it.nik }).isValid
         }
 
 /** Running subtotal of selected categories in whole rupiah. */
