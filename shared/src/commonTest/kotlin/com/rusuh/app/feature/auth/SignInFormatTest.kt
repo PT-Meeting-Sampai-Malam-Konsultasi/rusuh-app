@@ -35,5 +35,6 @@ class SignInFormatTest {
         assertFalse(isPlausibleEmail("nama@email."))
         assertFalse(isPlausibleEmail("a b@email.com"))
         assertFalse(isPlausibleEmail("a@@email.com"))
+        assertFalse(isPlausibleEmail("a@b..c"))
     }
 }

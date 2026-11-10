@@ -21,5 +21,5 @@ fun isPlausibleEmail(raw: String): Boolean {
     if (at <= 0 || at != email.lastIndexOf('@') || email.any { it.isWhitespace() }) return false
     val domain = email.substring(at + 1)
     val dot = domain.lastIndexOf('.')
-    return dot > 0 && dot < domain.length - 1
+    return dot > 0 && dot < domain.length - 1 && !domain.contains("..")
 }

@@ -22,6 +22,25 @@ class OtpCodeInputTest {
     }
 
     @Test
+    fun completionFiresOncePerCompletedValue() {
+        val tracker = OtpCompletionTracker()
+        assertEquals(false, tracker.shouldComplete("12345"))
+        assertEquals(true, tracker.shouldComplete("123456"))
+        assertEquals(false, tracker.shouldComplete("123456"))
+        // Value changed away (backspace) and back.
+        tracker.onCurrentValue("12345")
+        assertEquals(true, tracker.shouldComplete("123456"))
+    }
+
+    @Test
+    fun completionRearmsWhenParentClearsValue() {
+        val tracker = OtpCompletionTracker()
+        assertEquals(true, tracker.shouldComplete("654321"))
+        tracker.onCurrentValue("")
+        assertEquals(true, tracker.shouldComplete("654321"))
+    }
+
+    @Test
     fun emptyStaysEmpty() {
         assertEquals("", sanitizeOtpInput(""))
     }

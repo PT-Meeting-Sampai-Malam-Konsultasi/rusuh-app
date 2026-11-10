@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
@@ -24,20 +25,27 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
+import com.rusuh.app.ui.PlatformBackHandler
 import com.rusuh.app.ui.components.BrutalButton
 import com.rusuh.app.ui.components.BrutalTextField
 import com.rusuh.app.ui.components.OtpCodeInput
@@ -91,12 +99,16 @@ fun SignInSheet(
     actions: SignInActions = SignInActions(),
 ) {
     val description = stringResource(Res.string.sign_in_sheet_description)
+    PlatformBackHandler(enabled = true, onBack = actions.onDismiss)
     Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .background(RusuhColors.ExpiredScrim)
+                    // Hidden from TalkBack (outer clearAndSetSemantics drops the click action);
+                    // "Nanti saja" and system back are the accessible ways to close.
+                    .clearAndSetSemantics {}
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -108,9 +120,14 @@ fun SignInSheet(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    // Tall steps (new account + keyboard) must not slide under the status bar.
+                    .statusBarsPadding()
                     .imePadding()
                     .background(RusuhColors.BrandPaper)
-                    .semantics { contentDescription = description },
+                    .semantics {
+                        paneTitle = description
+                        isTraversalGroup = true
+                    },
         ) {
             Box(Modifier.fillMaxWidth().height(RusuhSpacing.borderHeavy).background(RusuhColors.BrandInk))
             Column(
@@ -122,22 +139,9 @@ fun SignInSheet(
             ) {
                 when (state) {
                     is SignInUiState.Email -> EmailStep(state, actions)
-                    is SignInUiState.Code ->
-                        CodeStep(
-                            email = state.email,
-                            code = state.code,
-                            resendInSeconds = state.resendInSeconds,
-                            attemptsLeft = null,
-                            actions = actions,
-                        )
-                    is SignInUiState.WrongCode ->
-                        CodeStep(
-                            email = state.email,
-                            code = state.code,
-                            resendInSeconds = state.resendInSeconds,
-                            attemptsLeft = state.attemptsLeft,
-                            actions = actions,
-                        )
+                    // One call site for both, so the input (and its focus and keyboard) is kept
+                    // when a wrong code arrives.
+                    is SignInUiState.Code, is SignInUiState.WrongCode -> CodeStep(state, actions)
                     is SignInUiState.CodeExpired -> ExpiredStep(actions)
                     is SignInUiState.NewAccount -> NewAccountStep(state, actions)
                 }
@@ -150,6 +154,7 @@ fun SignInSheet(
 private fun SheetHeader(
     headline: String,
     body: String,
+    announce: Boolean = true,
 ) {
     StampChip(text = stringResource(Res.string.sign_in_badge))
     Spacer(Modifier.height(RusuhSpacing.xl))
@@ -157,7 +162,12 @@ private fun SheetHeader(
         text = headline,
         style = RusuhBrandTextStyles.sheetHeadline.display(),
         color = RusuhColors.BrandInk,
-        modifier = Modifier.semantics { heading() },
+        modifier =
+            Modifier.semantics {
+                heading()
+                // Announces the step change (the sheet content is swapped in place).
+                if (announce) liveRegion = LiveRegionMode.Polite
+            },
     )
     Spacer(Modifier.height(RusuhSpacing.lg))
     Text(
@@ -174,6 +184,12 @@ private fun EmailStep(
     actions: SignInActions,
 ) {
     val canSend = isPlausibleEmail(state.email)
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboard?.show()
+    }
     SheetHeader(
         headline = stringResource(Res.string.sign_in_email_headline),
         body = stringResource(Res.string.sign_in_email_body),
@@ -185,6 +201,7 @@ private fun EmailStep(
         label = stringResource(Res.string.sign_in_email_label),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Send),
         keyboardActions = KeyboardActions(onSend = { if (canSend) actions.onSendCode() }),
+        modifier = Modifier.focusRequester(focusRequester),
     )
     Spacer(Modifier.height(RusuhSpacing.lg))
     Text(
@@ -204,12 +221,28 @@ private fun EmailStep(
 
 @Composable
 private fun CodeStep(
-    email: String,
-    code: String,
-    resendInSeconds: Int,
-    attemptsLeft: Int?,
+    state: SignInUiState,
     actions: SignInActions,
 ) {
+    val email: String
+    val code: String
+    val resendInSeconds: Int
+    val attemptsLeft: Int?
+    when (state) {
+        is SignInUiState.Code -> {
+            email = state.email
+            code = state.code
+            resendInSeconds = state.resendInSeconds
+            attemptsLeft = null
+        }
+        is SignInUiState.WrongCode -> {
+            email = state.email
+            code = state.code
+            resendInSeconds = state.resendInSeconds
+            attemptsLeft = state.attemptsLeft
+        }
+        else -> return
+    }
     val wrong = attemptsLeft != null
     SheetHeader(
         headline =
@@ -217,6 +250,8 @@ private fun CodeStep(
                 if (wrong) Res.string.sign_in_wrong_headline else Res.string.sign_in_code_headline,
             ),
         body = stringResource(Res.string.sign_in_code_body, email),
+        // The attempts message below is the live announcement for a wrong code.
+        announce = !wrong,
     )
     val attemptsMessage =
         attemptsLeft?.let { pluralStringResource(Res.plurals.sign_in_wrong_attempts, it, it) }
@@ -225,7 +260,7 @@ private fun CodeStep(
         onValueChange = actions.onCodeChange,
         onComplete = actions.onCodeComplete,
         state = if (wrong) OtpCodeState.Error else OtpCodeState.Default,
-        errorMessage = attemptsMessage,
+        autoFocus = true,
     )
     if (attemptsMessage != null) {
         Spacer(Modifier.height(RusuhSpacing.lg))
@@ -275,7 +310,13 @@ private fun ExpiredStep(actions: SignInActions) {
         headline = stringResource(Res.string.sign_in_expired_headline),
         body = stringResource(Res.string.sign_in_expired_body),
     )
-    OtpCodeInput(value = "", onValueChange = {}, state = OtpCodeState.Disabled)
+    // Empty and disabled: nothing useful for a screen reader.
+    OtpCodeInput(
+        value = "",
+        onValueChange = {},
+        state = OtpCodeState.Disabled,
+        modifier = Modifier.clearAndSetSemantics {},
+    )
     Spacer(Modifier.height(RusuhSpacing.xxl))
     ActionRow(
         primaryText = stringResource(Res.string.sign_in_resend),
