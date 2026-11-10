@@ -9,6 +9,9 @@ import com.rusuh.app.ui.components.RusuhTab
 /** Load phase of the My Queues tab. */
 enum class MyQueuesPhase { Loading, Ready, Empty, Error }
 
+/** Transient messages the host resolves to localized text (the ViewModel holds no raw text). */
+enum class MyQueuesMessage { RefreshFailed, }
+
 /**
  * MVI state for the My Queues tab. Carries no user-facing text; the host resolves
  * error copy from string resources when mapping to [MyQueuesUiState].
@@ -51,6 +54,9 @@ sealed interface MyQueuesEffect : MviEffect {
 
     /** Go to the Events tab. */
     data object GoToEvents : MyQueuesEffect
+
+    /** Show a transient [message] (snackbar); the rows on screen stay as they are. */
+    data class ShowError(val message: MyQueuesMessage) : MyQueuesEffect
 }
 
 /** Maps the MVI state onto what the stateless [MyQueuesScreen] renders. */

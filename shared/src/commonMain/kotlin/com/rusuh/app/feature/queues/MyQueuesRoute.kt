@@ -1,14 +1,19 @@
 package com.rusuh.app.feature.queues
 
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import com.rusuh.app.ui.components.RusuhTab
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.my_queues_error_body
+import rusuh_app.shared.generated.resources.my_queues_refresh_failed
 
 /**
  * Stateful host for [MyQueuesScreen]: collects [viewModel] state, forwards screen
@@ -26,6 +31,8 @@ fun MyQueuesRoute(
     val switchTab by rememberUpdatedState(onSwitchTab)
     val browseEvents by rememberUpdatedState(onBrowseEvents)
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
     LaunchedEffect(viewModel) { viewModel.dispatch(MyQueuesIntent.Load) }
     LaunchedEffect(viewModel) {
         viewModel.effect.collect { effect ->
@@ -33,11 +40,14 @@ fun MyQueuesRoute(
                 is MyQueuesEffect.NavigateToWaitingRoom -> openWaitingRoom(effect.eventId)
                 is MyQueuesEffect.SwitchTab -> switchTab(effect.tab)
                 MyQueuesEffect.GoToEvents -> browseEvents()
+                is MyQueuesEffect.ShowError ->
+                    snackbarHostState.showSnackbar(getString(effect.message.toStringResource()))
             }
         }
     }
 
     MyQueuesScreen(
+        snackbarHostState = snackbarHostState,
         state = state.toUiState(errorMessage = stringResource(Res.string.my_queues_error_body)),
         actions =
             MyQueuesActions(
@@ -48,3 +58,8 @@ fun MyQueuesRoute(
             ),
     )
 }
+
+private fun MyQueuesMessage.toStringResource(): StringResource =
+    when (this) {
+        MyQueuesMessage.RefreshFailed -> Res.string.my_queues_refresh_failed
+    }

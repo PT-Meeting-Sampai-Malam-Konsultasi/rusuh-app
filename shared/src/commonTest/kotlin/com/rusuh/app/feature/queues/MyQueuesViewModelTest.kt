@@ -6,18 +6,22 @@ import com.rusuh.app.domain.repository.MyQueuesRepository
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
 import com.rusuh.app.ui.components.QueueListPhase
 import com.rusuh.app.ui.components.RusuhTab
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MyQueuesViewModelTest {
@@ -39,6 +43,13 @@ class MyQueuesViewModelTest {
             @Suppress("UNCHECKED_CAST")
             return result as List<MyQueue>
         }
+    }
+
+    /** Each call suspends on the next deferred, so tests control response order. */
+    private class GatedRepository(private val gates: List<CompletableDeferred<List<MyQueue>>>) : MyQueuesRepository {
+        private var calls = 0
+
+        override suspend fun getMyQueues(): List<MyQueue> = gates[calls++].await()
     }
 
     private fun queue(
@@ -99,7 +110,7 @@ class MyQueuesViewModelTest {
         }
 
     @Test
-    fun refreshFailureAfterContentShowsError() =
+    fun refreshFailureFromReadyKeepsRowsAndEmitsShowError() =
         runTest(dispatcher) {
             val vm = viewModel(listOf(queue("a")), IllegalStateException("boom"))
             vm.dispatch(MyQueuesIntent.Load)
@@ -107,8 +118,70 @@ class MyQueuesViewModelTest {
             vm.dispatch(MyQueuesIntent.Refresh)
             testScheduler.advanceUntilIdle()
 
-            assertEquals(MyQueuesPhase.Error, vm.state.value.phase)
-            assertEquals(emptyList(), vm.state.value.queues)
+            assertEquals(MyQueuesPhase.Ready, vm.state.value.phase)
+            assertEquals(listOf("a"), vm.state.value.queues.map { it.eventId })
+            assertEquals(MyQueuesEffect.ShowError(MyQueuesMessage.RefreshFailed), vm.effect.first())
+        }
+
+    @Test
+    fun refreshFromReadyStaysReadyWhileLoadingThenReplacesRows() =
+        runTest(dispatcher) {
+            val gate = CompletableDeferred<List<MyQueue>>()
+            val repo = GatedRepository(listOf(CompletableDeferred(listOf(queue("a"))), gate))
+            val vm = MyQueuesViewModel(GetMyQueuesUseCase(repo))
+            vm.dispatch(MyQueuesIntent.Load)
+            testScheduler.advanceUntilIdle()
+            vm.dispatch(MyQueuesIntent.Refresh)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(MyQueuesPhase.Ready, vm.state.value.phase)
+            assertEquals(listOf("a"), vm.state.value.queues.map { it.eventId })
+
+            gate.complete(listOf(queue("b"), queue("c")))
+            testScheduler.advanceUntilIdle()
+            assertEquals(listOf("b", "c"), vm.state.value.queues.map { it.eventId })
+        }
+
+    @Test
+    fun lastRequestWinsWhenLoadsOverlap() =
+        runTest(dispatcher) {
+            val first = CompletableDeferred<List<MyQueue>>()
+            val second = CompletableDeferred<List<MyQueue>>()
+            val vm = MyQueuesViewModel(GetMyQueuesUseCase(GatedRepository(listOf(first, second))))
+            vm.dispatch(MyQueuesIntent.Load)
+            testScheduler.advanceUntilIdle()
+            vm.dispatch(MyQueuesIntent.Retry)
+            testScheduler.advanceUntilIdle()
+
+            second.complete(listOf(queue("new")))
+            testScheduler.advanceUntilIdle()
+            first.complete(listOf(queue("old")))
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(listOf("new"), vm.state.value.queues.map { it.eventId })
+        }
+
+    @Test
+    fun cancellationIsNotTurnedIntoError() =
+        runTest(dispatcher) {
+            val vm = viewModel(CancellationException("cancelled"))
+            vm.dispatch(MyQueuesIntent.Load)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(MyQueuesPhase.Loading, vm.state.value.phase)
+        }
+
+    @Test
+    fun loadEmitsNoEffect() =
+        runTest(dispatcher) {
+            val vm = viewModel(listOf(queue("a")))
+            vm.dispatch(MyQueuesIntent.Load)
+            testScheduler.advanceUntilIdle()
+
+            val pending = vm.effect.produceIn(this)
+            testScheduler.advanceUntilIdle()
+            assertNull(pending.tryReceive().getOrNull())
+            pending.cancel()
         }
 
     @Test
@@ -123,6 +196,10 @@ class MyQueuesViewModelTest {
             assertEquals(MyQueuesEffect.NavigateToWaitingRoom("evt-1"), vm.effect.first())
             assertEquals(MyQueuesEffect.SwitchTab(RusuhTab.Tiket), vm.effect.first())
             assertEquals(MyQueuesEffect.GoToEvents, vm.effect.first())
+            val rest = vm.effect.produceIn(this)
+            testScheduler.advanceUntilIdle()
+            assertNull(rest.tryReceive().getOrNull(), "each effect is delivered exactly once")
+            rest.cancel()
         }
 
     @Test
@@ -148,6 +225,9 @@ class MyQueuesViewModelTest {
         assertIs<MyQueuesUiState.Loading>(MyQueuesState().toUiState("e"))
         assertEquals(MyQueuesUiState.Empty, MyQueuesState(MyQueuesPhase.Empty).toUiState("e"))
         assertEquals(MyQueuesUiState.Error("e"), MyQueuesState(MyQueuesPhase.Error).toUiState("e"))
-        assertIs<MyQueuesUiState.Content>(MyQueuesState(MyQueuesPhase.Ready, placeholderQueues()).toUiState("e"))
+        assertEquals(
+            MyQueuesUiState.Content(placeholderQueues()),
+            MyQueuesState(MyQueuesPhase.Ready, placeholderQueues()).toUiState("e"),
+        )
     }
 }
