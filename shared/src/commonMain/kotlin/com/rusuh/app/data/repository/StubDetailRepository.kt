@@ -62,10 +62,13 @@ class StubDetailRepository(
     // will own it. TODO(FR-17-M1 #82): server-provided expiresAt, kept across process death.
     private val windows = mutableMapOf<String, Long>()
 
-    override suspend fun getDetail(eventId: String): DetailOffering =
-        StubDetailData.offering(
-            expiresAtMillis = windows.getOrPut(eventId) { clock.nowMillis() + ORDER_WINDOW_MILLIS },
-        )
+    override suspend fun getDetail(eventId: String): DetailOffering {
+        // An expired window is dropped so re-entering after "Antre lagi" starts a fresh one.
+        val existing = windows[eventId]?.takeIf { it > clock.nowMillis() }
+        val expiresAt = existing ?: (clock.nowMillis() + ORDER_WINDOW_MILLIS)
+        windows[eventId] = expiresAt
+        return StubDetailData.offering(expiresAtMillis = expiresAt)
+    }
 
     override suspend fun isNikAccepted(nik: String): Boolean = true
 

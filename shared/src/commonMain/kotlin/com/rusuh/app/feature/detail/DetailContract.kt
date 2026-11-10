@@ -147,7 +147,11 @@ data class AttendeeForm(
     val nik: String = "",
 )
 
-/** Form state: quantities per category plus one [AttendeeForm] per ticket. */
+/**
+ * Form state: quantities per category plus one [AttendeeForm] per ticket. "Tiket N" is the
+ * position in [attendees], i.e. insertion order; it renumbers when a middle ticket is removed
+ * (the typed data stays with its person).
+ */
 @Immutable
 data class DetailFormState(
     val quantities: Map<String, Int> = emptyMap(),

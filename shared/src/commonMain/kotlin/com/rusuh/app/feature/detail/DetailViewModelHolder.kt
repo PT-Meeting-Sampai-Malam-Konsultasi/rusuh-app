@@ -8,5 +8,7 @@ import androidx.lifecycle.ViewModel
  *
  * Until FR-17-M1 #82 the order window lives in the stub repository only (process-local): after
  * process death the hold restarts.
+ *
+ * TODO(FR-16-M1 #81): cancel the ViewModel's scope (and any in-flight booking) in onCleared.
  */
 class DetailViewModelHolder(val viewModel: DetailViewModel) : ViewModel()

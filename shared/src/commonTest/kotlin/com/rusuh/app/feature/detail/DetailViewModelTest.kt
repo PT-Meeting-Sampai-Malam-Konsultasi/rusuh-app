@@ -141,7 +141,7 @@ class DetailViewModelTest {
         }
 
     @Test
-    fun loadFailureShowsErrorStateAndEffect() =
+    fun loadFailureShowsErrorState() =
         runTest(dispatcher) {
             val vm = viewModel(FakeRepository(offering(), loadError = IllegalStateException("boom")))
             assertEquals(DetailPhase.Failed(DetailError.LoadFailed), vm.state.value.phase)
@@ -606,6 +606,7 @@ class DetailViewModelTest {
             fillAttendees(vm, nikA)
             send(vm, DetailIntent.Proceed)
             assertEquals(DetailPhase.Expired, vm.state.value.phase)
+            assertTrue(base.bookings.isEmpty())
             send(vm, DetailIntent.Back)
             // The first (and only) effect is Back: no payment navigation or error was emitted.
             assertEquals(DetailEffect.NavigateBack, vm.effect.first())
