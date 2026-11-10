@@ -197,4 +197,32 @@
     <string name="tab_tickets">Tiket</string>
     <string name="tab_account">Akun</string>
     <string name="tab_coming_soon">%1$s — segera hadir</string>
+    <string name="tickets_title">Tiket Saya.</string>
+    <string name="tickets_subtitle">Semua pesanan sudah lunas. Di pintu masuk, tunjukkan QR-nya bersama KTP asli pemegang.</string>
+    <string name="tickets_upcoming_title">Akan datang</string>
+    <string name="tickets_past_title">Sudah lewat</string>
+    <string name="tickets_loading_description">Memuat tiket Anda</string>
+    <string name="tickets_empty_title">Belum ada tiket.</string>
+    <string name="tickets_empty_body">Tiket muncul di sini begitu pembayaran lunas — lengkap dengan QR untuk tiap pemegang. E-tiket juga kami kirim ke email Anda.</string>
+    <string name="tickets_empty_action">Lihat event →</string>
+    <string name="tickets_signed_out_title">Masuk untuk melihat tiket.</string>
+    <string name="tickets_signed_out_body">Tiket tersimpan di akun Anda. Masuk dengan email yang dipakai saat memesan.</string>
+    <string name="tickets_signed_out_action">Masuk →</string>
+    <string name="ticket_order_paid_badge">✓ LUNAS</string>
+    <string name="ticket_order_done_badge">SELESAI</string>
+    <string name="ticket_order_view_eticket">Lihat e-tiket</string>
+    <string name="ticket_order_view_eticket_primary">Lihat e-tiket →</string>
+    <string name="ticket_order_view_eticket_for">Lihat e-tiket %1$s</string>
+    <string name="ticket_order_paid_description">Lunas</string>
+    <string name="ticket_order_summary">Pesanan %1$s · %2$s</string>
+    <string name="tickets_count_summary">%1$s · %2$s</string>
+    <plurals name="tickets_orders_count">
+        <item quantity="other">%1$d pesanan</item>
+    </plurals>
+    <plurals name="tickets_tickets_count">
+        <item quantity="other">%1$d tiket</item>
+    </plurals>
+    <string name="tickets_error_title">Tiket tidak bisa dimuat</string>
+    <string name="tickets_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="tickets_error_action">Coba lagi</string>
 </resources>
