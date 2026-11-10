@@ -10,6 +10,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +25,11 @@ import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesActions
 import com.rusuh.app.feature.queues.MyQueuesScreen
+import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
+import com.rusuh.app.feature.tickets.TicketsActions
+import com.rusuh.app.feature.tickets.TicketsScreen
+import com.rusuh.app.feature.tickets.TicketsUiState
+import com.rusuh.app.feature.tickets.toUiState
 import com.rusuh.app.feature.waitingroom.WaitingRoomAction
 import com.rusuh.app.feature.waitingroom.WaitingRoomEventUi
 import com.rusuh.app.feature.waitingroom.WaitingRoomPhase
@@ -117,7 +124,19 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
     }
 
     composable(Screen.Tickets.route) {
-        StubTabScreen(tab = RusuhTab.Tiket, onTabSelected = onTabSelected)
+        val getMyTickets = koinInject<GetMyTicketsUseCase>()
+        // shortcut: loaded inline until TICKET-00-M3 adds the ViewModel.
+        val state by produceState<TicketsUiState>(TicketsUiState.Loading) {
+            value = getMyTickets().toUiState()
+        }
+        TicketsScreen(
+            state = state,
+            actions =
+                TicketsActions(
+                    onTabSelected = onTabSelected,
+                    onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
+                ),
+        )
     }
 
     composable(Screen.Account.route) {
