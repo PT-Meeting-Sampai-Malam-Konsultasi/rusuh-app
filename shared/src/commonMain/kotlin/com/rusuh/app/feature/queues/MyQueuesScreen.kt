@@ -22,9 +22,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,6 +44,8 @@ import com.rusuh.app.ui.theme.RusuhBrandColors
 import com.rusuh.app.ui.theme.RusuhBrandMetrics
 import com.rusuh.app.ui.theme.RusuhShapes
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.action_retry
@@ -111,10 +116,12 @@ fun MyQueuesScreen(
     modifier: Modifier = Modifier,
     state: MyQueuesUiState = MyQueuesUiState.Content(placeholderQueues()),
     actions: MyQueuesActions = MyQueuesActions(),
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = RusuhBrandColors.Paper,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         // The header pads the status bar itself and the bottom bar pads the
         // navigation bar itself, so the Scaffold's own insets are never added on top.
         topBar = { MyQueuesHeader(language = AppLanguageOption.Indonesian) },
@@ -175,6 +182,7 @@ private fun QueueList(
 }
 
 /** Page title (display face) with the active-queue count beneath. */
+@OptIn(ExperimentalResourceApi::class)
 @Composable
 private fun PageHeading(queueCount: Int?) {
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = RusuhSpacing.md)) {
@@ -186,7 +194,7 @@ private fun PageHeading(queueCount: Int?) {
         )
         if (queueCount != null) {
             Text(
-                text = stringResource(Res.string.my_queues_count, queueCount),
+                text = pluralStringResource(Res.plurals.my_queues_count, queueCount, queueCount),
                 style = MaterialTheme.typography.bodyMedium,
                 color = RusuhBrandColors.Ink3,
             )

@@ -164,7 +164,9 @@
 
     <!-- My Queues (Antrian) screen + queue list item -->
     <string name="my_queues_title">Antrian saya</string>
-    <string name="my_queues_count">%1$d antrian aktif</string>
+    <plurals name="my_queues_count">
+        <item quantity="other">%1$d antrian aktif</item>
+    </plurals>
     <string name="my_queues_logo_description">Rusuh</string>
     <string name="my_queues_language_group">Bahasa</string>
     <string name="my_queues_language_id">ID</string>
@@ -174,6 +176,7 @@
     <string name="my_queues_empty_body">Pilih event lalu masuk antriannya. Posisi Anda akan muncul di sini.</string>
     <string name="my_queues_empty_action">Lihat event</string>
     <string name="my_queues_error_title">Gagal memuat antrian</string>
+    <string name="my_queues_refresh_failed">Gagal memperbarui antrian.</string>
     <string name="my_queues_error_body">Periksa koneksi Anda lalu coba lagi.</string>
     <string name="queue_list_item_phase_open">Antrian dibuka</string>
     <string name="queue_list_item_phase_live">Berlangsung</string>
