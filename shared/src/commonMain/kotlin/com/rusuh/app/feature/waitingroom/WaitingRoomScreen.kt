@@ -66,7 +66,7 @@ import rusuh_app.shared.generated.resources.waiting_turn_title
 /**
  * Waiting Room screen (FR-04-M2). Pure `state -> UI`; interactions go out through [dispatch].
  *
- * TODO(M3): wire WaitingRoomViewModel state/effects onto [WaitingRoomUiState] / [WaitingRoomAction].
+ * State and effects come from [WaitingRoomViewModel] via [WaitingRoomRoute] (FR-04-M3).
  * No ViewModel, repository or API here.
  */
 @Composable

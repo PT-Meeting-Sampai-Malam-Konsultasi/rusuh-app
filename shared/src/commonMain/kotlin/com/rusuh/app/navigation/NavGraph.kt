@@ -33,17 +33,14 @@ import com.rusuh.app.feature.tickets.TicketsActions
 import com.rusuh.app.feature.tickets.TicketsScreen
 import com.rusuh.app.feature.tickets.TicketsUiState
 import com.rusuh.app.feature.tickets.loadUiState
-import com.rusuh.app.feature.waitingroom.WaitingRoomAction
-import com.rusuh.app.feature.waitingroom.WaitingRoomEventUi
-import com.rusuh.app.feature.waitingroom.WaitingRoomPhase
-import com.rusuh.app.feature.waitingroom.WaitingRoomScreen
-import com.rusuh.app.feature.waitingroom.WaitingRoomUiState
-import com.rusuh.app.ui.components.QueuePositionUi
+import com.rusuh.app.feature.waitingroom.WaitingRoomRoute
+import com.rusuh.app.feature.waitingroom.WaitingRoomViewModel
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import org.koin.core.parameter.parametersOf
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.tab_coming_soon
 
@@ -75,12 +72,12 @@ fun RusuhNavGraph(navController: NavHostController) {
             route = Screen.WaitingRoom.route,
             arguments = listOf(navArgument(Screen.WaitingRoom.ARG_EVENT_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
-            val eventId = backStackEntry.arguments?.getString(Screen.WaitingRoom.ARG_EVENT_ID)
-            WaitingRoomScreen(
-                state = placeholderWaitingRoomState(eventTitle = eventId.orEmpty()),
-                dispatch = { action ->
-                    if (action == WaitingRoomAction.Back) navController.popBackStack()
-                },
+            val eventId = backStackEntry.arguments?.getString(Screen.WaitingRoom.ARG_EVENT_ID).orEmpty()
+            val viewModel = koinInject<WaitingRoomViewModel>(parameters = { parametersOf(eventId) })
+            WaitingRoomRoute(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
             )
         }
     }
@@ -230,22 +227,3 @@ private fun SplashPlaceholder() {
         Text("Splash Screen")
     }
 }
-
-/**
- * Placeholder Waiting Room content for a row tap, until M3 feeds the real queue
- * position. shortcut: fixed "waiting" position; swap for live state in M3/M4.
- */
-private fun placeholderWaitingRoomState(eventTitle: String): WaitingRoomUiState =
-    WaitingRoomUiState.Active(
-        event =
-            WaitingRoomEventUi(
-                title = eventTitle,
-                subtitle = "",
-                dateTimeLine = "",
-                venueLine = "",
-            ),
-        phase =
-            WaitingRoomPhase.Waiting(
-                QueuePositionUi(position = 128, estimatedWaitMinutes = 8, ratePerMinute = 310, updatedSecondsAgo = 2),
-            ),
-    )
