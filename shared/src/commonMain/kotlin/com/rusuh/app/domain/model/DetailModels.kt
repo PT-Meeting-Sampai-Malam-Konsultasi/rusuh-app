@@ -13,7 +13,7 @@ data class SeatCategory(
     val id: String,
     val name: String,
     val description: String?,
-    val priceRupiah: Int,
+    val priceRupiah: Long,
     val stock: Int,
     val entryGate: String? = null,
 )
@@ -35,7 +35,7 @@ data class DetailOffering(
     val event: EventDetail,
     val categories: List<SeatCategory>,
     val profile: AccountProfile,
-    val adminFeeRupiah: Int,
+    val adminFeeRupiah: Long,
     val reservedUnits: Int,
     val expiresAtMillis: Long,
 )

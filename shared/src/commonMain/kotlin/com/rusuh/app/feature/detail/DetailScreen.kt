@@ -30,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -212,10 +213,7 @@ private fun DetailContentBody(
     val focusManager = LocalFocusManager.current
     val maxTickets = detail.maxTickets
     val total = form.totalTickets
-    val subtotal = subtotalRupiah(detail.categories, form.quantities)
-    val orderTotal = orderTotalRupiah(subtotal, detail.adminFeeRupiah, total)
     val capReached = isCapReached(total, maxTickets)
-    val tickets = ticketCategories(detail.categories, form.quantities)
 
     Column(
         modifier =
@@ -269,18 +267,20 @@ private fun DetailContentBody(
                 title = stringResource(Res.string.detail_section_holders),
                 note = stringResource(Res.string.detail_holders_hint),
             )
-            tickets.forEachIndexed { index, category ->
-                val attendee = form.attendees.getOrNull(index) ?: AttendeeForm()
-                AttendeeBlock(
-                    ticketNumber = index + 1,
-                    categoryName = category.name,
-                    attendee = attendee,
-                    duplicateOf = form.duplicateOf(index),
-                    isLast = index == tickets.lastIndex,
-                    onKindChange = { dispatch(DetailIntent.AttendeeKindChanged(index, it)) },
-                    onNameChange = { dispatch(DetailIntent.AttendeeNameChanged(index, it)) },
-                    onNikChange = { dispatch(DetailIntent.AttendeeNikChanged(index, it)) },
-                )
+            form.attendees.forEachIndexed { index, attendee ->
+                // Keyed by the stable ticket id so per-ticket UI state (touched/focused) stays put.
+                key(attendee.id) {
+                    AttendeeBlock(
+                        ticketNumber = index + 1,
+                        categoryName = detail.categories.firstOrNull { it.id == attendee.categoryId }?.name.orEmpty(),
+                        attendee = attendee,
+                        duplicateOf = form.duplicateOf(index),
+                        isLast = index == form.attendees.lastIndex,
+                        onKindChange = { dispatch(DetailIntent.AttendeeKindChanged(index, it)) },
+                        onNameChange = { dispatch(DetailIntent.AttendeeNameChanged(index, it)) },
+                        onNikChange = { dispatch(DetailIntent.AttendeeNikChanged(index, it)) },
+                    )
+                }
             }
             Spacer(Modifier.height(RusuhSpacing.xxxl))
 
@@ -291,16 +291,16 @@ private fun DetailContentBody(
             if (total > 0) {
                 Spacer(Modifier.height(RusuhSpacing.xxl))
                 PriceSummary(
-                    subtotal = subtotal,
+                    subtotal = state.subtotalRupiah,
                     adminFee = detail.adminFeeRupiah,
-                    total = orderTotal,
+                    total = state.totalRupiah,
                 )
             }
         }
         BottomBar(
             tickets = total,
-            total = orderTotal,
-            enabled = !state.isSubmitting && canProceed(form, maxTickets, detail.categories),
+            total = state.totalRupiah,
+            enabled = state.canProceed,
             onProceed = { dispatch(DetailIntent.Proceed) },
         )
     }
@@ -440,9 +440,9 @@ private fun EmailBlock(
 /** Ticket subtotal, ONE "Biaya layanan" line per order, and the total (ADR-0010). */
 @Composable
 private fun PriceSummary(
-    subtotal: Int,
-    adminFee: Int,
-    total: Int,
+    subtotal: Long,
+    adminFee: Long,
+    total: Long,
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
@@ -483,7 +483,7 @@ private fun SummaryRow(
 @Composable
 private fun BottomBar(
     tickets: Int,
-    total: Int,
+    total: Long,
     enabled: Boolean,
     onProceed: () -> Unit,
 ) {

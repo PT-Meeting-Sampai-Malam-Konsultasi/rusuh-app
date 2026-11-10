@@ -58,8 +58,14 @@ object StubDetailData {
 class StubDetailRepository(
     private val clock: ServerClock,
 ) : DetailRepository {
+    // The window is fixed on first load per event and never re-derived on reload, as the server
+    // will own it. TODO(FR-17-M1 #82): server-provided expiresAt, kept across process death.
+    private val windows = mutableMapOf<String, Long>()
+
     override suspend fun getDetail(eventId: String): DetailOffering =
-        StubDetailData.offering(expiresAtMillis = clock.nowMillis() + ORDER_WINDOW_MILLIS)
+        StubDetailData.offering(
+            expiresAtMillis = windows.getOrPut(eventId) { clock.nowMillis() + ORDER_WINDOW_MILLIS },
+        )
 
     override suspend fun isNikAccepted(nik: String): Boolean = true
 

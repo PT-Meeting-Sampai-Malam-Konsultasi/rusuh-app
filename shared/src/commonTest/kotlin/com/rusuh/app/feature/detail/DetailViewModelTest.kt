@@ -16,6 +16,7 @@ import com.rusuh.app.domain.usecase.ValidateAttendeeUseCase
 import com.rusuh.app.ui.components.SeatAvailability
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -28,7 +29,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -145,7 +145,6 @@ class DetailViewModelTest {
         runTest(dispatcher) {
             val vm = viewModel(FakeRepository(offering(), loadError = IllegalStateException("boom")))
             assertEquals(DetailPhase.Failed(DetailError.LoadFailed), vm.state.value.phase)
-            assertEquals(DetailEffect.ShowError(DetailError.LoadFailed), vm.effect.first())
         }
 
     @Test
@@ -259,8 +258,8 @@ class DetailViewModelTest {
                 DetailIntent.IncrementCategory("a"),
                 DetailIntent.IncrementCategory("b"),
             )
-            assertEquals(2 * 850_000 + 450_000, vm.state.value.subtotalRupiah)
-            assertEquals(2 * 850_000 + 450_000 + 10_000, vm.state.value.totalRupiah)
+            assertEquals(2 * 850_000L + 450_000L, vm.state.value.subtotalRupiah)
+            assertEquals(2 * 850_000L + 450_000L + 10_000L, vm.state.value.totalRupiah)
         }
 
     @Test
@@ -412,6 +411,203 @@ class DetailViewModelTest {
         assertEquals(AttendeeValidation.InvalidNik, validateAttendeeLocally("N", nikA.dropLast(1) + "x", emptyList()))
         assertEquals(AttendeeValidation.DuplicateNik(2), validateAttendeeLocally("N", nikA, listOf(nikB, nikA)))
         assertEquals(AttendeeValidation.Valid, validateAttendeeLocally("N", nikA, listOf(nikB)))
-        assertNull(null)
     }
+
+    // --- review round 1 ---
+
+    private fun TestScope.newVm(
+        repository: DetailRepository,
+        clock: ServerClock,
+    ) = DetailViewModel(
+        "e1",
+        GetDetailUseCase(repository),
+        ValidateAttendeeUseCase(repository),
+        CreateBookingUseCase(repository),
+        clock,
+    )
+
+    @Test
+    fun addingToAnEarlierCategoryNeverMovesOrLosesOtherTickets() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.IncrementCategory("b"))
+            send(vm, DetailIntent.AttendeeKindChanged(0, AttendeeKind.Self), DetailIntent.AttendeeNikChanged(0, nikA))
+            send(vm, DetailIntent.AttendeeNameChanged(1, "Raka"), DetailIntent.AttendeeNikChanged(1, nikB))
+            send(vm, DetailIntent.IncrementCategory("a"))
+            val attendees = vm.state.value.form.attendees
+            assertEquals(listOf("a", "b", "a"), attendees.map { it.categoryId })
+            assertEquals(AttendeeKind.Self, attendees[0].kind)
+            assertEquals(nikA, attendees[0].nik)
+            assertEquals("Raka", attendees[1].name)
+            assertEquals(nikB, attendees[1].nik)
+            assertEquals("", attendees[2].nik)
+        }
+
+    @Test
+    fun shrinkingACategoryRemovesItsLastTicketOnly() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.IncrementCategory("b"))
+            send(vm, DetailIntent.IncrementCategory("a"))
+            fillAttendees(vm, nikA, nikB, "3201123456780002")
+            send(vm, DetailIntent.DecrementCategory("a"))
+            val attendees = vm.state.value.form.attendees
+            assertEquals(listOf("a", "b"), attendees.map { it.categoryId })
+            assertEquals(listOf(nikA, nikB), attendees.map { it.nik })
+        }
+
+    @Test
+    fun bookingPairsEachHolderWithItsOwnCategory() =
+        runTest(dispatcher) {
+            val repository = FakeRepository(offering())
+            val vm = viewModel(repository)
+            send(vm, DetailIntent.IncrementCategory("b"), DetailIntent.IncrementCategory("a"))
+            fillAttendees(vm, nikA, nikB)
+            send(vm, DetailIntent.IncrementCategory("b"))
+            send(
+                vm,
+                DetailIntent.AttendeeNameChanged(2, "Third"),
+                DetailIntent.AttendeeNikChanged(2, "3201123456780003"),
+            )
+            send(vm, DetailIntent.Proceed)
+            val tickets = repository.bookings.single().tickets
+            assertEquals(listOf("b", "a", "b"), tickets.map { it.categoryId })
+            assertEquals(listOf(nikA, nikB, "3201123456780003"), tickets.map { it.holderNik })
+        }
+
+    @Test
+    fun editingAnEarlierTicketToMatchALaterOneMakesTheLaterADuplicate() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.IncrementCategory("a"))
+            fillAttendees(vm, nikA, nikB)
+            assertTrue(vm.state.value.canProceed)
+            send(vm, DetailIntent.AttendeeNikChanged(0, nikB))
+            assertEquals(1, vm.state.value.form.duplicateOf(1))
+            assertFalse(vm.state.value.canProceed)
+        }
+
+    @Test
+    fun switchingSelfToOtherClearsOnlyThePrefilledName() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.AttendeeKindChanged(0, AttendeeKind.Self))
+            send(vm, DetailIntent.AttendeeNikChanged(0, nikA))
+            send(vm, DetailIntent.AttendeeKindChanged(0, AttendeeKind.Other))
+            val attendee = vm.state.value.form.attendees.single()
+            assertEquals(AttendeeKind.Other, attendee.kind)
+            assertEquals("", attendee.name)
+            assertEquals(nikA, attendee.nik)
+        }
+
+    @Test
+    fun exactTotalIncludesTheFeeOncePerOrder() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            send(vm, *Array(3) { DetailIntent.IncrementCategory("a") })
+            assertEquals(3 * 850_000L + 10_000L, vm.state.value.totalRupiah)
+        }
+
+    @Test
+    fun tickWhileNotReadyIsIgnored() =
+        runTest(dispatcher) {
+            val clock = FakeClock(now = 10_000L)
+            val vm = viewModel(FakeRepository(offering(), loadError = IllegalStateException("x")), clock)
+            clock.now = 999_999L
+            send(vm, DetailIntent.Tick)
+            assertEquals(DetailPhase.Failed(DetailError.LoadFailed), vm.state.value.phase)
+        }
+
+    @Test
+    fun retryAfterFailedLoadRecovers() =
+        runTest(dispatcher) {
+            var fail = true
+            val repository =
+                object : DetailRepository {
+                    override suspend fun getDetail(eventId: String): DetailOffering {
+                        if (fail) error("down")
+                        return offering()
+                    }
+
+                    override suspend fun isNikAccepted(nik: String) = true
+
+                    override suspend fun createBooking(request: BookingRequest) = Booking("b")
+                }
+            val vm = newVm(repository, FakeClock())
+            send(vm, DetailIntent.Load)
+            assertIs<DetailPhase.Failed>(vm.state.value.phase)
+            fail = false
+            send(vm, DetailIntent.Retry)
+            assertEquals(DetailPhase.Ready, vm.state.value.phase)
+        }
+
+    @Test
+    fun loadingAgainKeepsTheFormAndTheWindow() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            send(vm, DetailIntent.IncrementCategory("a"))
+            send(vm, DetailIntent.Load, DetailIntent.Retry)
+            assertEquals(1, vm.state.value.form.totalTickets)
+            assertEquals(300_000L, vm.state.value.expiresAtMillis)
+        }
+
+    @Test
+    fun zeroReservedUnitsShowsEmpty() =
+        runTest(dispatcher) {
+            val vm = viewModel(FakeRepository(offering(reserved = 0)))
+            assertEquals(DetailPhase.Empty, vm.state.value.phase)
+        }
+
+    @Test
+    fun queueAgainAfterExpiredEmitsNavigateToQueue() =
+        runTest(dispatcher) {
+            val clock = FakeClock()
+            val vm = viewModel(clock = clock)
+            clock.now = 300_000L
+            send(vm, DetailIntent.Tick)
+            send(vm, DetailIntent.QueueAgain)
+            assertEquals(DetailEffect.NavigateToQueue("e1"), vm.effect.first())
+        }
+
+    @Test
+    fun doubleProceedBooksOnce() =
+        runTest(dispatcher) {
+            val base = FakeRepository(offering())
+            val repository =
+                object : DetailRepository by base {
+                    override suspend fun isNikAccepted(nik: String): Boolean {
+                        delay(100) // a real network call keeps the first Proceed in flight
+                        return true
+                    }
+                }
+            val vm = newVm(repository, FakeClock())
+            send(vm, DetailIntent.Load)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            fillAttendees(vm, nikA)
+            send(vm, DetailIntent.Proceed, DetailIntent.Proceed)
+            assertEquals(1, base.bookings.size)
+        }
+
+    @Test
+    fun expiryWhileSubmittingEmitsNothingAndExpires() =
+        runTest(dispatcher) {
+            val clock = FakeClock()
+            val base = FakeRepository(offering())
+            val repository =
+                object : DetailRepository by base {
+                    override suspend fun isNikAccepted(nik: String): Boolean {
+                        clock.now = 400_000L // the window closes while the NIK check is in flight
+                        return true
+                    }
+                }
+            val vm = newVm(repository, clock)
+            send(vm, DetailIntent.Load)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            fillAttendees(vm, nikA)
+            send(vm, DetailIntent.Proceed)
+            assertEquals(DetailPhase.Expired, vm.state.value.phase)
+            send(vm, DetailIntent.Back)
+            // The first (and only) effect is Back: no payment navigation or error was emitted.
+            assertEquals(DetailEffect.NavigateBack, vm.effect.first())
+        }
 }

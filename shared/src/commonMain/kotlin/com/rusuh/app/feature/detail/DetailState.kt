@@ -56,11 +56,11 @@ data class DetailState(
 ) : MviState {
     private val content: DetailContent? get() = detail?.takeIf { phase == DetailPhase.Ready }
 
-    val subtotalRupiah: Int get() = content?.let { subtotalRupiah(it.categories, form.quantities) } ?: 0
+    val subtotalRupiah: Long get() = content?.let { subtotalRupiah(it.categories, form.quantities) } ?: 0L
 
     /** Subtotal plus ONE service fee per order (ADR-0010); 0 with no tickets. */
-    val totalRupiah: Int
-        get() = content?.let { orderTotalRupiah(subtotalRupiah, it.adminFeeRupiah, form.totalTickets) } ?: 0
+    val totalRupiah: Long
+        get() = content?.let { orderTotalRupiah(subtotalRupiah, it.adminFeeRupiah, form.totalTickets) } ?: 0L
 
     /** "Lanjut bayar" is enabled: >=1 ticket, every attendee valid, no sold-out category. */
     val canProceed: Boolean
@@ -102,7 +102,9 @@ fun DetailState.toUiState(errorMessage: (DetailError) -> String): DetailUiState 
         DetailPhase.Empty -> DetailUiState.Empty
         is DetailPhase.Failed -> DetailUiState.Error(errorMessage(p.error))
         DetailPhase.Ready ->
-            detail?.let { DetailUiState.Content(it, remainingSeconds, form, isSubmitting) }
+            detail?.let {
+                DetailUiState.Content(it, remainingSeconds, form, isSubmitting, subtotalRupiah, totalRupiah, canProceed)
+            }
                 ?: DetailUiState.Loading
         DetailPhase.Expired -> detail?.let { DetailUiState.Expired(it) } ?: DetailUiState.Loading
     }
@@ -138,15 +140,10 @@ internal fun availabilityOf(stock: Int): SeatAvailability =
         else -> SeatAvailability.Available
     }
 
-/** Booking request for the current selection; attendees follow [ticketCategories] order. */
-internal fun DetailFormState.toBookingRequest(
-    eventId: String,
-    categories: List<SeatCategoryUi>,
-): BookingRequest =
+/** Booking request for the current selection; each holder is paired with its own category. */
+internal fun DetailFormState.toBookingRequest(eventId: String): BookingRequest =
     BookingRequest(
         eventId = eventId,
         tickets =
-            ticketCategories(categories, quantities).mapIndexed { i, category ->
-                BookingTicket(category.id, attendees[i].name.trim(), attendees[i].nik)
-            },
+            attendees.map { BookingTicket(it.categoryId, it.name.trim(), it.nik) },
     )
