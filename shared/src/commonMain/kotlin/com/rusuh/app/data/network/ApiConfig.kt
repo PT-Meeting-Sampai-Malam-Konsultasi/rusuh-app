@@ -19,16 +19,19 @@ class ApiConfig(
 
     companion object {
         // shortcut: the real hosts are not known yet (the API spec has no `servers`); replace these
-        // placeholders when the backend publishes them. Each host is configured independently.
-        internal const val PLACEHOLDER_PROD_API_URL = "https://api.rusuh.id"
-        internal const val PLACEHOLDER_PROD_QUEUE_URL = "https://q.rusuh.id"
-        internal const val PLACEHOLDER_PROD_PAY_URL = "https://pay.rusuh.id"
+        // placeholders when the backend publishes them. They use the reserved `.invalid` TLD (RFC 2606), which
+        // never resolves, so a build shipped with them fails with a network error instead of reaching a
+        // host nobody confirmed. Each host is configured independently.
+        internal const val PLACEHOLDER_PROD_API_URL = "https://api.rusuh.invalid"
+        internal const val PLACEHOLDER_PROD_QUEUE_URL = "https://q.rusuh.invalid"
+        internal const val PLACEHOLDER_PROD_PAY_URL = "https://pay.rusuh.invalid"
 
         // shortcut: placeholder staging hosts, same caveat as production.
-        internal const val PLACEHOLDER_STAGING_API_URL = "https://api.staging.rusuh.id"
-        internal const val PLACEHOLDER_STAGING_QUEUE_URL = "https://q.staging.rusuh.id"
-        internal const val PLACEHOLDER_STAGING_PAY_URL = "https://pay.staging.rusuh.id"
+        internal const val PLACEHOLDER_STAGING_API_URL = "https://api.staging.rusuh.invalid"
+        internal const val PLACEHOLDER_STAGING_QUEUE_URL = "https://q.staging.rusuh.invalid"
+        internal const val PLACEHOLDER_STAGING_PAY_URL = "https://pay.staging.rusuh.invalid"
 
+        private const val MAX_PORT = 65535
         private val URL_PATTERN =
             Regex(
                 """^https?://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:\d{1,5})?(/[^\s?#]*)?$""",
@@ -65,7 +68,11 @@ class ApiConfig(
             require(
                 SCHEME_PATTERN.containsMatchIn(url),
             ) { "ApiConfig.$name must start with http:// or https://: '$raw'" }
-            require(URL_PATTERN.matches(url)) { "ApiConfig.$name is not a well-formed http(s) URL: '$raw'" }
+            require(URL_PATTERN.matches(url) && !url.contains("..")) {
+                "ApiConfig.$name is not a well-formed http(s) URL: '$raw'"
+            }
+            val port = Regex(""":(\d+)(/|$)""").find(url.substringAfter("://"))?.groupValues?.get(1)?.toInt()
+            require(port == null || port in 1..MAX_PORT) { "ApiConfig.$name has an invalid port (1-65535): '$raw'" }
             return url.trimEnd('/')
         }
     }
