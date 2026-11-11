@@ -53,6 +53,14 @@ sealed interface WaitingRoomPhase {
     data object SoldOut : WaitingRoomPhase
 }
 
+/** Why the Waiting Room is in its error state. */
+enum class WaitingRoomErrorKind {
+    Generic,
+
+    /** The turn came but claiming needs a signed-in account. TODO(AUTH-00 #77): show the sign-in sheet for it. */
+    SignInRequired,
+}
+
 /** What the screen renders. */
 @Immutable
 sealed interface WaitingRoomUiState {
@@ -62,8 +70,11 @@ sealed interface WaitingRoomUiState {
     /** No queue for this event. */
     data object Empty : WaitingRoomUiState
 
-    /** Failed to load; [message] is pre-formatted caller copy. */
-    data class Error(val message: String) : WaitingRoomUiState
+    /** Failed to load; [message] is pre-formatted caller copy, [kind] says what failed (the visuals are the same). */
+    data class Error(
+        val message: String,
+        val kind: WaitingRoomErrorKind = WaitingRoomErrorKind.Generic,
+    ) : WaitingRoomUiState
 
     /** A queue exists: [event] poster + [phase]; [isGuest] shows the "Masuk" banner. */
     data class Active(

@@ -66,10 +66,21 @@ sealed interface HomeIntent : MviIntent {
     data class EventClicked(val id: String) : HomeIntent
 }
 
+/**
+ * True when a tap on an event with this status opens its queue: the waiting room is open or sales are running, also
+ * almost gone and temporarily full (a place is kept while stock frees up). Coming soon, sold out and ended cards do
+ * nothing.
+ */
+fun EventStatus.canQueue(): Boolean =
+    when (this) {
+        EventStatus.WaitingRoomOpen, EventStatus.OnSale, EventStatus.AlmostGone, EventStatus.TemporarilyFull -> true
+        is EventStatus.ComingSoon, is EventStatus.SoldOut, is EventStatus.Ended -> false
+    }
+
 /** One-time side effects for the Home screen. */
 sealed interface HomeEffect : MviEffect {
-    /** Navigate to the detail screen for the event with the given [id]. */
-    data class NavigateToEvent(val id: String) : HomeEffect
+    /** Open the Waiting Room of the event with the given [id]; the Waiting Room joins the queue. */
+    data class NavigateToQueue(val id: String) : HomeEffect
 
     /** Show a transient error [message] (snackbar/toast). */
     data class ShowError(val message: String) : HomeEffect

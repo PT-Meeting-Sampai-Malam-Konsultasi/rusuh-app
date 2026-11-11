@@ -19,10 +19,15 @@ struct ContentView: View {
 @main
 struct iOSApp: App {
     init() {
+        // Mock or real host: NetworkConfig.MOCK_API in the shared module (debug only; release is always real).
         #if DEBUG
-        KoinIosKt.doInitKoin(environmentName: "Mock")
+        // Optional offline demo: set BACKEND_MODE=Stub in the Xcode scheme environment.
+        KoinIosKt.doInitKoin(
+            isDebug: true,
+            backendModeName: ProcessInfo.processInfo.environment["BACKEND_MODE"]
+        )
         #else
-        KoinIosKt.doInitKoin(environmentName: "Production")
+        KoinIosKt.doInitKoin(isDebug: false, backendModeName: nil)
         #endif
     }
 

@@ -35,17 +35,16 @@ android {
     }
 
     buildTypes {
-        // Environment per build type, parsed by AppEnvironment.fromName (see docs/data-layer.md).
+        // Mock or real host: NetworkConfig.MOCK_API in :shared, debug builds only (see docs/data-layer.md).
         getByName("debug") {
-            buildConfigField("String", "APP_ENVIRONMENT", "\"Mock\"")
-            // Optional backend mode override, e.g. ./gradlew assembleDebug -PbackendMode=Real (Mockoon over HTTP).
-            // Empty keeps the default for the environment (see BackendMode and docs/data-layer.md).
+            // Optional debug-only backend mode override, e.g. ./gradlew assembleDebug -PbackendMode=Stub for the
+            // offline demo. Empty keeps the default, real HTTP (see BackendMode and docs/data-layer.md).
             val backendMode = providers.gradleProperty("backendMode").getOrElse("")
             buildConfigField("String", "BACKEND_MODE", "\"$backendMode\"")
         }
         getByName("release") {
             isMinifyEnabled = false
-            buildConfigField("String", "APP_ENVIRONMENT", "\"Production\"")
+            // Never overridable: a release build is always Production on real HTTP (NetworkConfig.startup).
             buildConfigField("String", "BACKEND_MODE", "\"\"")
         }
     }
@@ -90,3 +89,45 @@ val verifyNoCleartextOutsideDebug by tasks.registering {
     }
 }
 tasks.named("check") { dependsOn(verifyNoCleartextOutsideDebug) }
+
+// Guard: a release build can never select the mock API or stub data (see NetworkConfig and docs/data-layer.md).
+// NetworkConfig.startup already ignores the flag unless BuildConfig.DEBUG; this also checks the generated release
+// constants, so a changed build type cannot turn them on unnoticed. It runs before assembleRelease and in check.
+val verifyReleaseNeverUsesMockApi by tasks.registering {
+    dependsOn("generateReleaseBuildConfig")
+    val releaseBuildConfig =
+        layout.buildDirectory.file("generated/source/buildConfig/release/com/rusuh/app/android/BuildConfig.java")
+    doLast {
+        val generated = releaseBuildConfig.get().asFile.readText()
+        check(Regex("""boolean\s+DEBUG\s*=\s*false\s*;""").containsMatchIn(generated)) {
+            "The release build must have BuildConfig.DEBUG = false"
+        }
+        check(Regex("""String\s+BACKEND_MODE\s*=\s*"";""").containsMatchIn(generated)) {
+            "The release build must not override the backend mode: BuildConfig.BACKEND_MODE must be \"\""
+        }
+    }
+}
+tasks.named("check") { dependsOn(verifyReleaseNeverUsesMockApi) }
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+    dependsOn(verifyReleaseNeverUsesMockApi)
+}
+
+// Guard: the MERGED debug and release manifests must declare INTERNET, or every HTTP call fails with EPERM.
+val verifyMergedManifestsHaveInternet by tasks.registering {
+    dependsOn("processDebugManifest", "processReleaseManifest")
+    val manifests =
+        listOf("debug", "release").map { variant ->
+            val task = "process${variant.replaceFirstChar { it.uppercase() }}Manifest"
+            variant to layout.buildDirectory.file("intermediates/merged_manifests/$variant/$task/AndroidManifest.xml")
+        }
+    doLast {
+        manifests.forEach { (variant, file) ->
+            val merged = file.get().asFile.readText()
+            val internet = Regex("""<uses-permission[^>]*android:name="android\.permission\.INTERNET"""")
+            check(internet.containsMatchIn(merged)) {
+                "The merged $variant manifest must declare android.permission.INTERNET"
+            }
+        }
+    }
+}
+tasks.named("check") { dependsOn(verifyMergedManifestsHaveInternet) }

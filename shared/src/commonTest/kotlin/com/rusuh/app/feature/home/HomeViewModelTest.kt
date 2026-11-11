@@ -1,9 +1,11 @@
 package com.rusuh.app.feature.home
 
+import com.rusuh.app.ui.components.EventStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -66,17 +68,76 @@ class HomeViewModelTest {
             assertEquals(events, viewModel.state.value.events)
         }
 
-    @Test
-    fun eventClickedEmitsNavigateToEventEffect() =
-        runTest(dispatcher) {
-            val viewModel = HomeViewModel(FakeHomeRepository())
+    private val statuses: Map<String, EventStatus> =
+        mapOf(
+            "waiting" to EventStatus.WaitingRoomOpen,
+            "onSale" to EventStatus.OnSale,
+            "almost" to EventStatus.AlmostGone,
+            "full" to EventStatus.TemporarilyFull,
+            "coming" to EventStatus.ComingSoon("3 hari lagi"),
+            "soldOut" to EventStatus.SoldOut(41, 12_000),
+            "ended" to EventStatus.Ended("30 Okt"),
+        )
 
-            viewModel.dispatch(HomeIntent.EventClicked(id = "42"))
+    private fun TestScope.loadedViewModel(): HomeViewModel {
+        val events = statuses.map { (id, status) -> HomeEventItem(id = id, title = id, status = status) }
+        val viewModel = HomeViewModel(FakeHomeRepository(events))
+        viewModel.dispatch(HomeIntent.LoadEvents)
+        testScheduler.advanceUntilIdle()
+        return viewModel
+    }
+
+    @Test
+    fun tappingAQueueableEventOpensItsWaitingRoom() =
+        runTest(dispatcher) {
+            listOf("waiting", "onSale", "almost", "full").forEach { id ->
+                val viewModel = loadedViewModel()
+
+                viewModel.dispatch(HomeIntent.EventClicked(id))
+                testScheduler.advanceUntilIdle()
+
+                assertEquals(HomeEffect.NavigateToQueue(id), viewModel.effect.first(), id)
+            }
+        }
+
+    @Test
+    fun tappingAComingSoonSoldOutOrEndedEventDoesNothing() =
+        runTest(dispatcher) {
+            listOf("coming", "soldOut", "ended", "unknown-id").forEach { id ->
+                val viewModel = loadedViewModel()
+
+                viewModel.dispatch(HomeIntent.EventClicked(id))
+                testScheduler.advanceUntilIdle()
+                // The queueable tap afterwards is the first effect, so nothing came before it.
+                viewModel.dispatch(HomeIntent.EventClicked("onSale"))
+                testScheduler.advanceUntilIdle()
+
+                assertEquals(HomeEffect.NavigateToQueue("onSale"), viewModel.effect.first(), "after $id")
+            }
+        }
+
+    @Test
+    fun tappingBeforeTheEventsLoadedDoesNothing() =
+        runTest(dispatcher) {
+            val viewModel = HomeViewModel(FakeHomeRepository(listOf(HomeEventItem(id = "a", title = "a"))))
+
+            viewModel.dispatch(HomeIntent.EventClicked("a"))
+            testScheduler.advanceUntilIdle()
+            viewModel.dispatch(HomeIntent.LoadEvents)
+            testScheduler.advanceUntilIdle()
+            viewModel.dispatch(HomeIntent.EventClicked("a"))
             testScheduler.advanceUntilIdle()
 
-            val effect = viewModel.effect.first()
-            assertEquals(HomeEffect.NavigateToEvent(id = "42"), effect)
+            assertEquals(HomeEffect.NavigateToQueue("a"), viewModel.effect.first())
         }
+
+    @Test
+    fun onlyTheQueueableStatusesCanQueue() {
+        assertEquals(
+            setOf("waiting", "onSale", "almost", "full"),
+            statuses.filterValues { it.canQueue() }.keys,
+        )
+    }
 
     @Test
     fun loadEventsErrorSetsErrorStateAndEmitsShowError() =

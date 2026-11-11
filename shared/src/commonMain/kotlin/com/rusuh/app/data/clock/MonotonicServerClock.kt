@@ -45,7 +45,7 @@ class MonotonicServerClock(
     private var anchor = Anchor(serverEpochMillisAtStart, timeSource.markNow(), sentAt = null)
 
     @Volatile
-    var isSynced: Boolean = false
+    override var isSynced: Boolean = false
         private set
 
     override fun nowMillis(): Long {

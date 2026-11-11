@@ -44,6 +44,8 @@ class SecureTokenStore(
 
     override suspend fun setAdmissionToken(token: String) = putGuarded(KEY_ADMISSION, token, session)
 
+    override suspend fun clearAdmissionToken() = sessionLock.withLock { store.remove(KEY_ADMISSION) }
+
     override suspend fun clearSession() {
         accessToken = null
         withContext(NonCancellable) {
