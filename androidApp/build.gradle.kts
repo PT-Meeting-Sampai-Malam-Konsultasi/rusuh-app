@@ -111,3 +111,24 @@ tasks.named("check") { dependsOn(verifyReleaseNeverUsesMockApi) }
 tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
     dependsOn(verifyReleaseNeverUsesMockApi)
 }
+
+// Guard: the MERGED debug and release manifests must declare INTERNET, or every HTTP call fails with EPERM.
+val verifyMergedManifestsHaveInternet by tasks.registering {
+    dependsOn("processDebugManifest", "processReleaseManifest")
+    val manifests =
+        listOf("debug", "release").map { variant ->
+            variant to
+                layout.buildDirectory.file(
+                    "intermediates/merged_manifests/$variant/process${variant.replaceFirstChar { it.uppercase() }}Manifest/AndroidManifest.xml",
+                )
+        }
+    doLast {
+        manifests.forEach { (variant, file) ->
+            val merged = file.get().asFile.readText()
+            check(Regex("""<uses-permission[^>]*android:name="android\.permission\.INTERNET"""").containsMatchIn(merged)) {
+                "The merged $variant manifest must declare android.permission.INTERNET"
+            }
+        }
+    }
+}
+tasks.named("check") { dependsOn(verifyMergedManifestsHaveInternet) }
