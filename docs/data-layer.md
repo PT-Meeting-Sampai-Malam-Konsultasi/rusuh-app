@@ -152,9 +152,77 @@ and each test needs a fresh one.
    line to `coreModule()`.
 3. Extend `ApiConfigTest` and `CoreModuleTest`. For a non-local mock host, also extend the debug cleartext config.
 
-Wiring of ApiServices, Repositories and Caches (`single`) and UseCases (`factory`) arrives with the feature tickets.
+Wiring of ApiServices and Caches (`single`) and UseCases (`factory`) arrives with the feature tickets; repositories are bound per backend mode in `dataModule` (see below).
 
 In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `CoreModuleTest`.
+
+## Backend modes: Stub, Mockoon, Real
+
+`AppEnvironment` says which hosts exist; `BackendMode { Stub, Real }` (`di/BackendMode.kt`, the `useStubs` switch) says
+whether repositories talk to them. Three ways to run the app, and what each does TODAY (no real repository exists yet):
+
+| Mode | Environment + mode | Network | Repositories today | Needs |
+|---|---|---|---|---|
+| Stub (in process) | `Mock` + `Stub` (the default for Mock) | None: the HTTP client runs on `StubEngine` | Stub repositories | Nothing |
+| Mockoon over HTTP | `Mock` + `Real` | HTTP to the Mockoon mock at `platformMockBaseUrl` | Stub repositories, with one WARNING per repository (temporary fallback below) | `mockoon-cli start --data rusuh-api.json -X` |
+| Staging / Production | `Staging` / `Production` + `Real` (their default) | HTTP to the real hosts of `ApiConfig` (placeholders until published) | Stub repositories, with one WARNING per repository (temporary fallback below) | The backend |
+
+- Defaults: `BackendMode.defaultFor(env)`, Mock = Stub, everything else = Real. So a debug build runs end to end with no
+  backend. An explicit `Stub` request for `Production` is rejected (`IllegalArgumentException`).
+- Switch: `initKoin(environment, backendMode)`. Android debug builds read `-PbackendMode=Real` (Gradle property, empty keeps
+  the default; release ignores it) into `BuildConfig.BACKEND_MODE`; iOS calls `KoinIosKt.doInitKoinWithBackend(environmentName:
+  backendModeName:)` (null keeps the default; `doInitKoin(environmentName:)` is unchanged).
+- `dataModule(mode)` (`di/DataModule.kt`) binds every repository interface and the `ServerClock` per mode. In `Stub` it
+  replaces the shared `HttpClient` with one on the in-process `StubEngine` (closed with Koin), so the three named
+  `ApiClient`s and any ApiService built on them run with zero network, and the `ServerClock` is the demo's ticking
+  `StubClock`, so countdowns run.
+- Temporary fallback (`shortcut:`): until the real repositories exist, `Real` would have nothing to resolve, so each
+  repository resolves to its stub and logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)`
+  once. A Staging or Production build therefore shows fake repository data (and its `ApiClient`s still hit the real hosts).
+  The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES` (`DataModule.kt`, default `true`) controls it; set it to
+  `false`, or pass `dataModule(mode, allowStubFallback = false)`, for the strict behaviour: resolving a repository throws
+  `RealRepositoryNotAvailableException`. Remove the constant and fallback when the real repositories land (Home, Waiting
+  Room FR-04-M4 #30, Tickets TICKET-00-M4, Detail #80 #81 #82, My Queues #50): a feature ticket then binds its real
+  repository in place of that repository's `notYetReal(...)` line.
+- Mockoon bodies are schema-generated (blank ids), not the spec examples; the Stub mode payloads are the spec examples.
+
+### Stub payloads and the test harness (`data/stub`)
+
+- `StubJson`: one JSON constant per endpoint, copied from the `example`s of the OpenAPI contract (synthetic data only,
+  masked NIKs, example.com emails; `check-status` has no example in the contract, so it reuses the paid `Booking`).
+  Keep them in sync by hand when the contract changes. `StubJsonTest` catches part of the drift: every body parses,
+  problem bodies decode through `ProblemDetails`, key members are present and state/status values are inside the
+  spec's enum lists. It is a safety net, not proof of conformance: success bodies are not decoded through DTOs until
+  those exist, so each new DTO adds its decode check to the test.
+- `StubResponses`: registry of `StubRoute(method, "/queue/{eventId}/frontier", response)`. `{param}` segments match any
+  value (percent-decoded in `pathParams`); among scripted and default routes the one with the most fixed segments wins,
+  a script wins a tie (`/bookings/active` stays served when `/bookings/{bookingId}` is scripted). Query strings are
+  ignored: a filter such as `?status=` never changes the answer.
+- `StubError`: named error responses for scenarios: 409 with problem+json and extras (`QuantityOverReservation` has
+  `categoryId`, `WrongCode` has `attemptsLeft`), 410 queue errors, 422, 429 with `Retry-After: 30`, 503 with
+  `Retry-After: 10`.
+- `StubClock` (also a `ServerClock`): time-dependent members are placeholders (`@{now}`, `@{now+300}`, `@{epoch}`)
+  rendered against the clock when served. Frozen by default (tests: `clock.advanceBy(2.minutes)` makes the next
+  `expiresAt` later, no sleeping), starting at the spec's `serverNow`, 2026-11-14T10:40:00Z; `StubClock.ticking()` (the
+  demo) also advances with a monotonic source.
+- `StubEngine(clock, recordRequests = false)`: serves the routes and lets a scenario script a route:
+  `stub.script(HttpMethod.Get, "/queue/{eventId}/frontier", responses)` serves them in order and repeats the last.
+  Requests are recorded (`requests`: method, path, query, headers, body, path params; last 200) only with
+  `recordRequests = true`, which tests opt into. Parallel requests are safe (one lock). A request no route serves
+  answers a problem body with `code: STUB_NO_ROUTE` and the header `X-Stub-Miss: true` (404, or 405 when the path
+  exists under another method), so "not stubbed" differs from a real NOT_FOUND.
+- All client construction for both the real client and the stub goes through `buildHttpClient` / `buildHostClient`
+  (`data/network/ClientBuilder.kt`): the one place to change when plugins or per-host defaults change.
+- Tests (`commonTest/.../data/stub/StubTestSupport.kt`):
+
+```kotlin
+val stub = StubEngine(recordRequests = true)
+val api = stub.apiClient()                                  // the real ApiClient on the stub engine
+stub.script(HttpMethod.Get, "/queue/{eventId}/frontier", frontierSequence(stub.clock, 100, 140, 190))
+stub.script(HttpMethod.Post, "/bookings", StubError.QuantityOverReservation)
+// ... call the ApiService / repository under test ...
+stub.assertRequest(0, HttpMethod.Get, "/queue/evt_1/frontier", mapOf("Accept" to "application/json"))
+```
 
 ## Storage
 
@@ -294,3 +362,11 @@ One clock, `MonotonicServerClock` (bound as `ServerClock` and `ServerTimeSink` i
 `testHttp(...)` in `commonTest/.../data/network/plugin/HttpPluginTestSupport.kt` builds an `ApiClient` on a `MockEngine`
 with any of the language provider, clock sink, `HostAuth` and a log level; see `HeaderPluginsTest`,
 `SessionRefreshTest`, `ServerClockTest`.
+
+### Building clients (`ClientBuilder`)
+
+`buildHttpClient(engine, localeProvider, serverTime, logLevel)` and `buildHostClient(shared, baseUrl, hostAuth)` in
+`data/network/ClientBuilder.kt` are the only places that assemble the plugin chain. `coreModule()` passes the real
+locale provider, the `MonotonicServerClock` as `ServerTimeSink` and a `HostAuth`; the `StubEngine` calls them without
+auth or clock sink (stub mode has no session, and its `ServerClock` is the ticking `StubClock`). In `BackendMode.Real`
+the `ServerClock` consumers read the same `MonotonicServerClock` instance the response plugin updates.

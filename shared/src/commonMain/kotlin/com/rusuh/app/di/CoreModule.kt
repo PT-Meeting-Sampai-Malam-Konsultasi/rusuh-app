@@ -3,13 +3,13 @@ package com.rusuh.app.di
 import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.clock.ServerTimeSink
 import com.rusuh.app.data.network.ApiClient
-import com.rusuh.app.data.network.ApiClient.Companion.configurePlugins
 import com.rusuh.app.data.network.ApiConfig
 import com.rusuh.app.data.network.AppEnvironment
 import com.rusuh.app.data.network.HostAuth
-import com.rusuh.app.data.network.HttpClientFactory
 import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.network.SystemLocaleProvider
+import com.rusuh.app.data.network.buildHostClient
+import com.rusuh.app.data.network.buildHttpClient
 import com.rusuh.app.data.network.session.ApiTokenRefresher
 import com.rusuh.app.data.network.session.SessionEvents
 import com.rusuh.app.data.network.session.SessionRefreshCoordinator
@@ -28,8 +28,10 @@ import org.koin.dsl.onClose
  * binding, which [initKoin] provides, and a `TokenStore` (storageModule). A function rather than a `val`: Koin
  * keeps singleton instances inside the module object, so each Koin start (and each test) needs a fresh one.
  *
- * Plugins: the shared client sends `Accept-Language` and records `serverNow` into the one [ServerClock]; each host
- * client adds the token headers and the single-flight 401 refresh (see [HostAuth]).
+ * Plugins: the shared client sends `Accept-Language` and records `serverNow` into the one [ServerClock] (the
+ * [MonotonicServerClock] bound here; `dataModule` replaces both the clock and the client in stub mode); each host
+ * client adds the token headers and the single-flight 401 refresh (see [HostAuth]). Everything is built through
+ * `ClientBuilder`.
  */
 fun coreModule(): Module =
     module {
@@ -55,7 +57,7 @@ fun coreModule(): Module =
         }
         single<TokenRefresher> { ApiTokenRefresher(get(ApiClientQualifier.Api)) }
         single<HttpClient> {
-            HttpClientFactory.create { configurePlugins(localeProvider = get(), serverTime = get()) }
+            buildHttpClient(localeProvider = get(), serverTime = get())
         } onClose { it?.close() }
         single(ApiClientQualifier.Api) { hostClient { baseUrl } }
         single(ApiClientQualifier.Queue) { hostClient { queueBaseUrl } }
@@ -63,7 +65,7 @@ fun coreModule(): Module =
     }
 
 private fun Scope.hostClient(baseUrl: ApiConfig.() -> String): ApiClient =
-    ApiClient.forHost(
+    buildHostClient(
         shared = get(),
         baseUrl = get<ApiConfig>().baseUrl(),
         hostAuth = HostAuth(tokenStore = get(), refreshCoordinator = get()),

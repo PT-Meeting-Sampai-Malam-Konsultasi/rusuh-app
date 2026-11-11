@@ -43,6 +43,7 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.client.logging)
+            implementation(libs.ktor.client.mock) // StubEngine: the in-process stub backend (demo mode and tests)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.navigation.compose)
         }
@@ -58,7 +59,6 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
-            implementation(libs.ktor.client.mock)
         }
     }
 }
