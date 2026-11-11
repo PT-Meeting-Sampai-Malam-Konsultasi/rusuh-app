@@ -1,6 +1,8 @@
 package com.rusuh.app.data.repository
 
+import com.rusuh.app.data.cache.AdmissionInfo
 import com.rusuh.app.data.cache.QueueCache
+import com.rusuh.app.data.clock.parseRfc3339Millis
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
@@ -25,6 +27,9 @@ internal sealed interface MeResult {
 
     data object Closed : MeResult
 
+    /** 404: no place yet (the pre-sale draw has not given a number). Not an error for the poll. */
+    data object NotFound : MeResult
+
     /** The call failed and the caller did not need it (lenient mode). */
     data object Unavailable : MeResult
 }
@@ -39,6 +44,9 @@ internal sealed interface ClaimStep {
     /** `NO_STOCK`: every unit is held, go back to the waiting room. */
     data object BackToWaiting : ClaimStep
 
+    /** 401 with a code other than `UNAUTHORIZED`: the device token was rejected, register again. */
+    data class DeviceRejected(val error: DomainException) : ClaimStep
+
     data object Missed : ClaimStep
 
     data object Closed : ClaimStep
@@ -49,6 +57,7 @@ internal sealed interface ClaimStep {
  * re-registration on a rejected join, `MISSED` vs `QUEUE_CLOSED`, sign-in required on a claim), and which failures
  * throw [DomainException]. Holds no polling state.
  */
+@Suppress("TooManyFunctions") // one function per endpoint plus its error policy
 internal class QueueCalls(
     private val queueApi: QueueApiService,
     private val eventApi: EventApiService,
@@ -96,6 +105,7 @@ internal class QueueCalls(
                 when {
                     result.code == HTTP_GONE && result.errorCode() == ErrorCode.QUEUE_CLOSED -> MeResult.Closed
                     result.code == HTTP_GONE -> MeResult.Missed
+                    result.code == HTTP_NOT_FOUND -> MeResult.NotFound
                     lenient -> MeResult.Unavailable
                     else -> throw result.toException()
                 }
@@ -112,6 +122,15 @@ internal class QueueCalls(
         return when (val result = queueApi.claim(eventId, token)) {
             is ApiResult.Success -> {
                 tokens.setAdmissionToken(result.data.admissionToken)
+                // Non-secret facts for the Detail screen; the Waiting Room keeps its own 60 s turn countdown.
+                cache.setAdmission(
+                    AdmissionInfo(
+                        eventId = eventId,
+                        slotId = result.data.slotId,
+                        maxTickets = result.data.maxTickets,
+                        expiresAtEpochMillis = result.data.expiresAt?.let(::parseRfc3339Millis),
+                    ),
+                )
                 ClaimStep.Admitted(result.data)
             }
             is ApiResult.Error -> claimError(result)
@@ -122,7 +141,9 @@ internal class QueueCalls(
     private fun claimError(result: ApiResult.Error): ClaimStep {
         val code = result.errorCode()
         return when {
-            result.code == HTTP_UNAUTHORIZED -> throw SignInRequiredException()
+            // Only an account-session problem asks the user to sign in; any other 401 is the device token.
+            result.code == HTTP_UNAUTHORIZED && code == ErrorCode.UNAUTHORIZED -> throw SignInRequiredException()
+            result.code == HTTP_UNAUTHORIZED -> ClaimStep.DeviceRejected(result.toException())
             result.code == HTTP_CONFLICT && code == ErrorCode.NO_STOCK -> ClaimStep.BackToWaiting
             result.code == HTTP_CONFLICT && (code == ErrorCode.NOT_YET || code == ErrorCode.FULL) ->
                 ClaimStep.Retry(code, result.retryAfterSeconds)
@@ -142,11 +163,22 @@ internal class QueueCalls(
     suspend fun event(eventId: String): EventDto? =
         (eventApi.getEvents() as? ApiResult.Success)?.data?.items?.firstOrNull { it.eventId == eventId }
 
+    /** Drops the admission token and its details when they belong to [eventId] (the user left that queue). */
+    suspend fun forgetAdmissionOf(eventId: String) {
+        if (cache.getAdmission()?.eventId == eventId) {
+            tokens.clearAdmissionToken()
+            cache.clearAdmission()
+        }
+    }
+
     /** Drops the stored queue token and the remembered event id. */
     suspend fun forget(eventId: String) {
         tokens.clearQueueToken(eventId)
         cache.removeJoinedEvent(eventId)
     }
+
+    /** Registers the device again (after a rejected device token). Concurrent callers register once. */
+    suspend fun reRegisterDevice() = ensureDevice(forceRefresh = true)
 
     private suspend fun ensureDevice(forceRefresh: Boolean) {
         val registered = devices.ensureRegistered(forceRefresh)
@@ -159,5 +191,6 @@ internal class QueueCalls(
         const val HTTP_UNAUTHORIZED = 401
         const val HTTP_CONFLICT = 409
         const val HTTP_GONE = 410
+        const val HTTP_NOT_FOUND = 404
     }
 }

@@ -51,6 +51,9 @@ class Seen(
  */
 class FakeBackend {
     val seen = mutableListOf<Seen>()
+
+    /** Runs when a request arrives, before it is answered (to hold requests open in concurrency tests). */
+    var onRequest: (suspend (String) -> Unit)? = null
     private val scripts = mutableMapOf<String, MutableList<Reply>>()
     private val counters = mutableMapOf<String, Int>()
 
@@ -74,6 +77,7 @@ class FakeBackend {
                     headers = request.headers.entries().associate { (name, values) -> name to values.joinToString() },
                     body = (request.body as? OutgoingContent.ByteArrayContent)?.bytes()?.decodeToString().orEmpty(),
                 )
+            onRequest?.invoke(line)
             val script = scripts[line]
             val reply =
                 if (script.isNullOrEmpty()) {

@@ -4,12 +4,16 @@ import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.MyQueue
 import com.rusuh.app.domain.model.MyQueuePhase
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class RealMyQueuesRepositoryTest {
     private suspend fun QueueHarness.joined(vararg ids: String) {
@@ -194,6 +198,100 @@ class RealMyQueuesRepositoryTest {
             assertEquals(emptyList(), h.myQueues.getMyQueues())
             assertEquals(emptyList(), h.queueCache.getJoinedEventIds())
             assertEquals(0, h.backend.callsTo("GET /queue/evt_samudra/me"))
+        }
+
+    @Test
+    fun aRejectedTokenDropsAndForgetsTheEntryWhileTheOthersStay() =
+        runTest {
+            val h = QueueHarness()
+            h.joined("good", "stale")
+            h.at("good", served = 100)
+            h.place("stale", Reply.problem(401, "UNAUTHORIZED"), Reply.ok(frontierJson(100)))
+
+            val queues = h.myQueues.getMyQueues()
+
+            assertEquals(listOf("good"), queues.map { it.eventId })
+            assertEquals(listOf("good"), h.queueCache.getJoinedEventIds())
+            assertNull(h.tokens.getQueueToken("stale"))
+        }
+
+    @Test
+    fun oneEntryWithATransientFailureDoesNotBreakTheListAndStaysStored() =
+        runTest {
+            val h = QueueHarness()
+            h.joined("good", "flaky")
+            h.at("good", served = 100)
+            h.place("flaky", Reply.problem(503, "SERVICE_UNAVAILABLE"), Reply.ok(frontierJson(100)))
+
+            val queues = h.myQueues.getMyQueues()
+
+            assertEquals(listOf("good"), queues.map { it.eventId })
+            assertEquals(listOf("good", "flaky"), h.queueCache.getJoinedEventIds())
+            assertEquals("token-flaky", h.tokens.getQueueToken("flaky"))
+        }
+
+    @Test
+    fun anOfflineEntryAndANotFoundEntryDoNotBreakTheListEither() =
+        runTest {
+            val h = QueueHarness()
+            h.joined("good", "offline", "gone")
+            h.at("good", served = 100)
+            h.place("offline", Reply.offline(), Reply.ok(frontierJson(100)))
+            // "gone" is unscripted: 404 everywhere
+
+            assertEquals(listOf("good"), h.myQueues.getMyQueues().map { it.eventId })
+        }
+
+    @Test
+    fun theLoadThrowsOnlyWhenEveryEntryFailed() =
+        runTest {
+            val h = QueueHarness()
+            h.joined("a", "b", "c")
+            listOf(
+                "a",
+                "b",
+                "c",
+            ).forEach { h.place(it, Reply.problem(503, "SERVICE_UNAVAILABLE"), Reply.ok(frontierJson(1))) }
+
+            val failure = assertFailsWith<DomainException> { h.myQueues.getMyQueues() }
+
+            assertEquals(503, assertIs<DomainResult.Error>(failure.result).code)
+        }
+
+    @Test
+    fun entriesNotFoundEverywhereAreAnEmptyListNotAnError() =
+        runTest {
+            val h = QueueHarness()
+            h.joined("a", "b")
+
+            assertEquals(emptyList(), h.myQueues.getMyQueues())
+        }
+
+    @Test
+    fun entriesAreReadInParallelUpToTheCapAndKeepTheirOrder() =
+        runTest {
+            val ids = (1..10).map { "evt$it" }
+            val h = QueueHarness()
+            h.joined(*ids.toTypedArray())
+            ids.forEach { h.at(it, served = 100) }
+            val gate = Mutex()
+            var running = 0
+            var peak = 0
+            h.backend.onRequest = { line ->
+                if (line.endsWith("/me")) {
+                    gate.withLock {
+                        running++
+                        peak = maxOf(peak, running)
+                    }
+                    delay(40)
+                    gate.withLock { running-- }
+                }
+            }
+
+            val queues = h.myQueues.getMyQueues()
+
+            assertEquals(ids, queues.map { it.eventId })
+            assertTrue(peak in 2..RealMyQueuesRepository.DEFAULT_PARALLEL, "peak parallel reads: $peak")
         }
 
     @Test

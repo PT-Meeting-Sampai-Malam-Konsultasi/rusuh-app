@@ -121,6 +121,22 @@ class RealHomeRepositoryTest {
         }
 
     @Test
+    fun anUnsyncedClockWithoutServerNowShowsNoCountdown() =
+        runTest {
+            val body = """{"items": [${EVENT_FIXTURES.first()}]}"""
+            // An unsynced clock counts from a small arbitrary start: reading it would give a ~20,000 day countdown.
+            val unsynced =
+                RealHomeRepository(EventApiService(backendWith(Reply.ok(body)).api), {
+                    AppLanguage.Indonesian
+                }, TestServerClock(5_000L, synced = false))
+
+            val status = assertIs<EventStatus.ComingSoon>(unsynced.getEvents().single().status)
+
+            assertEquals("12 Des 2026", status.countdown)
+            assertTrue("hari" !in status.countdown)
+        }
+
+    @Test
     fun soldOutShowsCapacityAndTheMinutesBetweenOpeningAndSelloutWhenKnown() =
         runTest {
             val soldOut = assertIs<EventStatus.SoldOut>(events().single { it.id == "evt_soldout" }.status)

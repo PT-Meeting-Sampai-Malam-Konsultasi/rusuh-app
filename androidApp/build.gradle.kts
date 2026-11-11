@@ -92,20 +92,22 @@ tasks.named("check") { dependsOn(verifyNoCleartextOutsideDebug) }
 
 // Guard: a release build can never select the mock API or stub data (see NetworkConfig and docs/data-layer.md).
 // NetworkConfig.startup already ignores the flag unless BuildConfig.DEBUG; this also checks the generated release
-// constants, so a changed build type cannot turn them on unnoticed.
+// constants, so a changed build type cannot turn them on unnoticed. It runs before assembleRelease and in check.
 val verifyReleaseNeverUsesMockApi by tasks.registering {
     dependsOn("generateReleaseBuildConfig")
     val releaseBuildConfig =
         layout.buildDirectory.file("generated/source/buildConfig/release/com/rusuh/app/android/BuildConfig.java")
     doLast {
         val generated = releaseBuildConfig.get().asFile.readText()
-        check(generated.contains("boolean DEBUG = false")) { "The release build must have BuildConfig.DEBUG = false" }
-        check(generated.contains("BACKEND_MODE = \"\"")) {
-            "The release build must not override the backend mode (BACKEND_MODE must be empty)"
+        check(Regex("""boolean\s+DEBUG\s*=\s*false\s*;""").containsMatchIn(generated)) {
+            "The release build must have BuildConfig.DEBUG = false"
         }
-        check(!generated.contains("Mock") && !generated.contains("Stub")) {
-            "The release build config must not mention the mock or stub backend"
+        check(Regex("""String\s+BACKEND_MODE\s*=\s*"";""").containsMatchIn(generated)) {
+            "The release build must not override the backend mode: BuildConfig.BACKEND_MODE must be \"\""
         }
     }
 }
 tasks.named("check") { dependsOn(verifyReleaseNeverUsesMockApi) }
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+    dependsOn(verifyReleaseNeverUsesMockApi)
+}

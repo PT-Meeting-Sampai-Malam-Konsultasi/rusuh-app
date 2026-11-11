@@ -1,5 +1,9 @@
 package com.rusuh.app.feature.waitingroom
 
+import com.rusuh.app.domain.model.DomainResult
+import com.rusuh.app.domain.model.SignInRequiredException
+import com.rusuh.app.domain.repository.QueueRepository
+import com.rusuh.app.domain.usecase.LeaveQueueUseCase
 import com.rusuh.app.feature.waitingroom.data.repository.StubWaitingRoomRepository
 import com.rusuh.app.feature.waitingroom.domain.model.QueueEventInfo
 import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
@@ -45,8 +49,21 @@ class WaitingRoomViewModelTest {
 
     private var now = 0L
 
+    private var leaveResult: DomainResult<Unit> = DomainResult.Success(Unit)
+    private val leaves = mutableListOf<String>()
+
+    private val queueRepository =
+        object : QueueRepository {
+            override fun observePlace(eventId: String): Flow<QueuePlace> = emptyFlow()
+
+            override suspend fun leave(eventId: String): DomainResult<Unit> {
+                leaves += eventId
+                return leaveResult
+            }
+        }
+
     private fun viewModel(repository: WaitingRoomRepository = StubWaitingRoomRepository(STEP)) =
-        WaitingRoomViewModel("evt", ObserveQueuePlaceUseCase(repository)) { now }
+        WaitingRoomViewModel("evt", ObserveQueuePlaceUseCase(repository), LeaveQueueUseCase(queueRepository)) { now }
 
     private fun place(
         state: QueueState,
@@ -214,6 +231,75 @@ class WaitingRoomViewModelTest {
             vm.dispatch(WaitingRoomIntent.Retry)
             runCurrent()
             assertIs<WaitingRoomPhase.Paused>(vm.phase())
+        }
+
+    @Test
+    fun leavingTheQueueCallsTheServerStopsObservingAndGoesBack() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Open)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+
+            vm.dispatch(WaitingRoomIntent.LeaveQueue)
+            runCurrent()
+
+            assertEquals(listOf("evt"), leaves)
+            assertEquals(WaitingRoomEffect.NavigateBack, vm.effect.first())
+        }
+
+    @Test
+    fun aFailedLeaveKeepsThePlaceAndShowsTheRefreshError() =
+        runTest(dispatcher) {
+            leaveResult = DomainResult.NetworkError
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Open)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+
+            vm.dispatch(WaitingRoomIntent.LeaveQueue)
+            runCurrent()
+
+            assertEquals(WaitingRoomEffect.ShowRefreshError, vm.effect.first())
+            assertIs<WaitingRoomPhase.Waiting>(vm.phase())
+        }
+
+    @Test
+    fun aSignInRequiredFailureIsADistinctErrorKindWithTheSameScreen() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { throw SignInRequiredException() }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+
+            val error = assertIs<WaitingRoomUiState.Error>(vm.state.value.ui)
+            assertEquals(WaitingRoomErrorKind.SignInRequired, error.kind)
+            val screen = assertIs<WaitingRoomUiState.Error>(vm.state.value.toScreenState("msg"))
+            assertEquals("msg", screen.message)
+            assertEquals(WaitingRoomErrorKind.SignInRequired, screen.kind)
+        }
+
+    @Test
+    fun anOtherFailureIsTheGenericKind() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { error("boom") }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+
+            assertEquals(WaitingRoomErrorKind.Generic, assertIs<WaitingRoomUiState.Error>(vm.state.value.ui).kind)
+        }
+
+    @Test
+    fun aSignInRequiredFailureAfterThePlaceKeepsItAndSaysSo() =
+        runTest(dispatcher) {
+            val first =
+                flow {
+                    emit(place(QueueState.Open))
+                    throw SignInRequiredException()
+                }
+            val vm = viewModel(repoOf(first))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+
+            assertEquals(WaitingRoomEffect.SignInRequired, vm.effect.first())
+            assertIs<WaitingRoomPhase.Waiting>(vm.phase())
         }
 
     @Test

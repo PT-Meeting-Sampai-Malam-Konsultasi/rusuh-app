@@ -16,14 +16,20 @@ import kotlin.random.Random
 /** A settable server clock; the harness advances it by every pacing delay, like real time would. */
 class TestServerClock(
     var now: Long = FIXTURE_NOW_MILLIS,
+    private val synced: Boolean = true,
 ) : ServerClock {
     override fun nowMillis(): Long = now
+
+    override val isSynced: Boolean get() = synced
 }
 
 /** Everything the real repositories need, on one [FakeBackend], with recorded pacing delays and no real waiting. */
 class QueueHarness(
     language: AppLanguage = AppLanguage.Indonesian,
     seed: Int = 7,
+    synced: Boolean = true,
+    clockStart: Long = FIXTURE_NOW_MILLIS,
+    wallClock: () -> Long = { FIXTURE_NOW_MILLIS },
 ) {
     val backend = FakeBackend()
     val secure = FakeSecureStore()
@@ -31,7 +37,7 @@ class QueueHarness(
     val tokens = SecureTokenStore(secure)
     val queueCache = QueueCache(prefs)
     val deviceCache = DeviceCache(prefs)
-    val clock = TestServerClock()
+    val clock = TestServerClock(clockStart, synced)
     val locale = LocaleProvider { language }
     val delays = mutableListOf<Long>()
 
@@ -42,6 +48,7 @@ class QueueHarness(
                 clock.now += millis
             },
             random = Random(seed),
+            nowMillis = { clock.now },
         )
 
     val devices =
@@ -53,6 +60,7 @@ class QueueHarness(
             serverClock = clock,
             platform = "android",
             newInstallId = { "install-1" },
+            wallClock = wallClock,
         )
 
     val queue =

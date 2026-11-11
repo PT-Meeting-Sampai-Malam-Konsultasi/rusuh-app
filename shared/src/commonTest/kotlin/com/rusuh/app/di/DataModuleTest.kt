@@ -155,8 +155,13 @@ class DataModuleTest {
                 "$name: $messages",
             )
         }
-        realRepositories.forEach { (name, type) -> assertTrue(koin.get<Any>(type) != null, name) }
+        realRepositories.values.forEach { type -> koin.get<Any>(type) } // resolves without the strict failure
         assertTrue(warnings.isEmpty())
+    }
+
+    @Test
+    fun theDocumentedListOfStubRepositoriesMatchesTheFallbackBindings() {
+        assertEquals(stubOnlyRepositories.keys, REPOSITORIES_STILL_ON_STUBS.toSet())
     }
 
     @Test

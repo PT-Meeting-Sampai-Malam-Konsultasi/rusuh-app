@@ -199,6 +199,26 @@ whether repositories talk to them. Four ways to run the app:
   repository throws `RealRepositoryNotAvailableException`. Remove the constant and fallback when Tickets
   (TICKET-00-M4) and Detail (#80 #81 #82) land: a feature ticket then binds its real repository in place of that
   repository's `notYetReal(...)` line.
+- Queue polling resilience: a transient failure inside the wait (network, 408, 429, 5xx) is retried with capped
+  exponential backoff (2, 4, 8, 16, 30 s, `QueuePacing.backoffMillis`) that honours `Retry-After` (capped at 2 min); the
+  flow fails after 5 failures in a row, or at once on a failure waiting cannot fix (401/403/404). Any success resets the
+  count. The claim retries inside its 60 s window on the monotonic clock; a wait that would pass the window is cut to it
+  and one last attempt follows before the place counts as missed. A claim 401 with problem code `UNAUTHORIZED` is
+  "sign in required" (`SignInRequiredException`, `WaitingRoomErrorKind.SignInRequired`; `TODO(AUTH-00 #77)`), any other
+  401 registers the device again once. After the pre-sale draw the number comes from `/me`: 410 ends the run, a 404 or a
+  missing `seq` means "not drawn yet" (asked again at the next poll), and the random 0-30 s wait happens once.
+- Claimed admission: the token goes to the `TokenStore`; its non-secret details (`slotId`, `maxTickets`, `expiresAt`)
+  go to `QueueCache` as `AdmissionInfo` for the Detail screen. The Waiting Room keeps its own 60 s YourTurn countdown
+  (the admission's longer order window is Detail's business), so the turn is not re-emitted after the claim. Leaving
+  the queue clears the queue token and, when it belongs to that event, the admission token and details.
+- Server time: `ServerClock.isSynced` is false until the first response carrying `serverNow`; then the clock counts from
+  an arbitrary start. Unsynced, the queue uses the frontier's own `ts`, Home shows no countdown, and the device-token
+  expiry is judged against the device wall clock with a one day margin (`wallClockMillis`, used for nothing else).
+- My Queues reads entries in parallel (at most 4). An entry is dropped on 401/410/closed (and forgotten), left out but
+  kept on 404 or a transient failure; the load fails only when every entry failed.
+- Release builds still show FAKE Detail and Tickets data through the fallback above (one WARNING each). The list is
+  `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`, checked against the bindings by `DataModuleTest`): currently
+  `TicketsRepository` and `DetailRepository`. `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
 - Mockoon (`workspace-local/mockoon`) simulates a moving queue: the frontier is SEQUENTIAL (served 100, 130, ..., two
   paused polls, then `served >= seq`), claim answers 409 `NOT_YET` once and then 200. Restart it to replay the sequence.
 - TODO(FR-04-M4 #30): the last 2,000 places also get SSE (ADR-0015); only polling is implemented.

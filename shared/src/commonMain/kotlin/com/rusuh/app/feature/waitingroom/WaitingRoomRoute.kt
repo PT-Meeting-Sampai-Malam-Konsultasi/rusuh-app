@@ -62,7 +62,8 @@ fun WaitingRoomRoute(
             when (effect) {
                 WaitingRoomEffect.NavigateBack -> currentOnBack()
                 WaitingRoomEffect.NavigateToEvents -> currentOnBrowseEvents()
-                WaitingRoomEffect.ShowRefreshError ->
+                // TODO(AUTH-00 #77): SignInRequired opens the sign-in sheet; until then it shows the same message.
+                WaitingRoomEffect.ShowRefreshError, WaitingRoomEffect.SignInRequired ->
                     scope.launch {
                         val result = snackbarHostState.showSnackbar(refreshMessage, actionLabel = retryLabel)
                         if (result == SnackbarResult.ActionPerformed) viewModel.dispatch(WaitingRoomIntent.Retry)
@@ -88,4 +89,4 @@ fun WaitingRoomRoute(
 
 /** The state the stateless screen renders: a blank error message is filled with [errorMessage]. */
 internal fun WaitingRoomState.toScreenState(errorMessage: String): WaitingRoomUiState =
-    if (ui is WaitingRoomUiState.Error && ui.message.isBlank()) WaitingRoomUiState.Error(errorMessage) else ui
+    if (ui is WaitingRoomUiState.Error && ui.message.isBlank()) ui.copy(message = errorMessage) else ui

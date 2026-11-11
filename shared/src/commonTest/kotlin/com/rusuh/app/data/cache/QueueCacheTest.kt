@@ -54,6 +54,31 @@ class QueueCacheTest {
         }
 
     @Test
+    fun theAdmissionDetailsRoundTripWithoutAnyToken() =
+        runTest {
+            val prefs = FakeAppPreferences()
+            val cache = QueueCache(prefs)
+            val info = AdmissionInfo("evt_1", "s_01", 3, 123L)
+            assertEquals(null, cache.getAdmission())
+
+            cache.setAdmission(info)
+
+            assertEquals(info, cache.getAdmission())
+            assertEquals(listOf("queue_admission_json"), prefs.entries.keys.toList())
+            cache.clearAdmission()
+            assertEquals(null, cache.getAdmission())
+        }
+
+    @Test
+    fun aCorruptAdmissionReadsAsNone() =
+        runTest {
+            val prefs = FakeAppPreferences()
+            prefs.entries["queue_admission_json"] = "oops"
+
+            assertEquals(null, QueueCache(prefs).getAdmission())
+        }
+
+    @Test
     fun theDeviceCacheKeepsTheTokenExpiry() =
         runTest {
             val cache = DeviceCache(FakeAppPreferences())

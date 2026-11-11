@@ -1,5 +1,6 @@
 package com.rusuh.app.data.repository
 
+import com.rusuh.app.data.cache.AdmissionInfo
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
 import com.rusuh.app.domain.model.DomainException
@@ -65,7 +66,7 @@ class RealQueueRepositoryTest {
 
             val places = h.places()
 
-            val waiting = places.dropLast(2)
+            val waiting = places.dropLast(1)
             assertEquals(
                 listOf(100, 130, 160, 190, 190, 190, 220, 250, 280, 310, 340, 370),
                 waiting.map { it.served },
@@ -83,16 +84,20 @@ class RealQueueRepositoryTest {
             assertEquals("Samudra", waiting.first().event.title)
             assertEquals("Stadion Utama GBK, Jakarta", waiting.first().event.venueLine)
 
-            val (turn, claimed) = places.takeLast(2)
+            val turn = places.last()
             assertEquals(QueueState.Turn, turn.state)
             assertEquals(
                 turn.serverNowEpochMillis + 60_000L,
                 turn.turnExpiresAtEpochMillis,
                 "60 s window on server time",
             )
-            assertEquals(QueueState.Turn, claimed.state)
-            assertEquals(FIXTURE_NOW_MILLIS + 300_000L, claimed.turnExpiresAtEpochMillis, "the admission's deadline")
+            assertEquals(1, places.count { it.state == QueueState.Turn }, "the 60 s countdown is not re-emitted")
             assertEquals("mock-admission-token", h.tokens.getAdmissionToken())
+            assertEquals(
+                AdmissionInfo(EVT, "s_mock_01", 3, FIXTURE_NOW_MILLIS + 300_000L),
+                h.queueCache.getAdmission(),
+                "details for Detail are kept without the secret",
+            )
             assertEquals(2, h.backend.callsTo(claimLine))
         }
 
@@ -243,8 +248,8 @@ class RealQueueRepositoryTest {
             val places = h.places()
 
             assertEquals(listOf(QueueState.Turn, QueueState.Missed), places.map { it.state })
-            val waited = h.delays.sum()
-            assertTrue(waited in 40_000L..60_000L, "retried for about the 60 s window: $waited")
+            assertEquals(60_000L, h.delays.sum(), "waits are cut to exactly the 60 s window")
+            assertTrue(h.backend.callsTo(claimLine) > 40, "retried about every second")
             assertNull(h.tokens.getQueueToken(EVT), "a missed place drops its token")
             assertNull(h.tokens.getAdmissionToken())
             assertEquals(emptyList(), h.queueCache.getJoinedEventIds())

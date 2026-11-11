@@ -4,6 +4,7 @@ package com.rusuh.app.data.storage
  * Session credentials. The access token lives in memory only and is gone after process death;
  * every other token is persisted through [SecureStore].
  */
+@Suppress("TooManyFunctions") // one accessor per kind of token
 interface TokenStore {
     var accessToken: String?
 
@@ -27,6 +28,8 @@ interface TokenStore {
     suspend fun getAdmissionToken(): String?
 
     suspend fun setAdmissionToken(token: String)
+
+    suspend fun clearAdmissionToken()
 
     /** Logout: drops the access, refresh, queue and admission tokens. The device token survives. */
     suspend fun clearSession()

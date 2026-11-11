@@ -1,5 +1,8 @@
 package com.rusuh.app.feature.waitingroom
 
+import com.rusuh.app.domain.model.DomainResult
+import com.rusuh.app.domain.model.SignInRequiredException
+import com.rusuh.app.domain.usecase.LeaveQueueUseCase
 import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
 import com.rusuh.app.feature.waitingroom.domain.usecase.ObserveQueuePlaceUseCase
 import com.rusuh.app.mvi.MviViewModel
@@ -24,6 +27,7 @@ import kotlin.time.TimeSource
 class WaitingRoomViewModel(
     private val eventId: String,
     private val observeQueuePlace: ObserveQueuePlaceUseCase,
+    private val leaveQueue: LeaveQueueUseCase,
     private val monotonicMillis: () -> Long = defaultMonotonicMillis(),
 ) : MviViewModel<WaitingRoomState, WaitingRoomIntent, WaitingRoomEffect>(WaitingRoomState()) {
     private var observeJob: Job? = null
@@ -41,8 +45,19 @@ class WaitingRoomViewModel(
             WaitingRoomIntent.Back -> sendBackOnce()
             WaitingRoomIntent.ChooseTicketsNow -> sendEffect(WaitingRoomEffect.NavigateToDetail(eventId))
             WaitingRoomIntent.BrowseOtherEvents -> sendEffect(WaitingRoomEffect.NavigateToEvents)
-            // TODO(AUTH-00): sign-in, TODO(FR-04-M4 #30): leave-queue and notify-me need the real API.
-            WaitingRoomIntent.SignIn, WaitingRoomIntent.LeaveQueue, WaitingRoomIntent.NotifyMe -> Unit
+            WaitingRoomIntent.LeaveQueue -> leave()
+            // TODO(AUTH-00 #77): sign-in; notify-me needs its own API.
+            WaitingRoomIntent.SignIn, WaitingRoomIntent.NotifyMe -> Unit
+        }
+    }
+
+    /** Leaves the queue on the server, then goes back; a failed call keeps the place and shows the refresh error. */
+    private suspend fun leave() {
+        if (leaveQueue(eventId) is DomainResult.Success) {
+            observeJob?.cancel()
+            sendBackOnce()
+        } else {
+            sendEffect(WaitingRoomEffect.ShowRefreshError)
         }
     }
 
@@ -80,7 +95,7 @@ class WaitingRoomViewModel(
                             setState { copy(ui = WaitingRoomUiState.Empty) }
                         }
                     }
-                    .catch { onStreamFailed() }
+                    .catch { cause -> onStreamFailed(cause) }
                     .collect { place -> onPlace(place) }
             }
     }
@@ -91,12 +106,14 @@ class WaitingRoomViewModel(
         setState { copy(ui = place.toUiState()) }
     }
 
-    private fun onStreamFailed() {
+    private fun onStreamFailed(cause: Throwable) {
+        val signIn = cause is SignInRequiredException
         if (currentState.ui is WaitingRoomUiState.Active) {
             // Keep the last good place; the host offers a retry.
-            sendEffect(WaitingRoomEffect.ShowRefreshError)
+            sendEffect(if (signIn) WaitingRoomEffect.SignInRequired else WaitingRoomEffect.ShowRefreshError)
         } else {
-            setState { copy(ui = WaitingRoomUiState.Error("")) }
+            val kind = if (signIn) WaitingRoomErrorKind.SignInRequired else WaitingRoomErrorKind.Generic
+            setState { copy(ui = WaitingRoomUiState.Error("", kind)) }
         }
     }
 }
