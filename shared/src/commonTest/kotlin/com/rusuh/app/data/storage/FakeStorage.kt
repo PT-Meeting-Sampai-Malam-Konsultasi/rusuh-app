@@ -1,5 +1,6 @@
 package com.rusuh.app.data.storage
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.yield
 
 class FakeSecureStore : SecureStore {
@@ -11,12 +12,16 @@ class FakeSecureStore : SecureStore {
     /** Yield inside writes so concurrency tests can interleave coroutines. */
     var yieldOnWrite = false
 
+    /** When set, every write waits for it to complete. */
+    var writeGate: CompletableDeferred<Unit>? = null
+
     override suspend fun getString(key: String): String? = entries[key]
 
     override suspend fun putString(
         key: String,
         value: String,
     ) {
+        writeGate?.await()
         if (yieldOnWrite) yield()
         entries[key] = value
     }

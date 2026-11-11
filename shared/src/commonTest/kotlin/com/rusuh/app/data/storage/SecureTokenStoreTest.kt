@@ -1,5 +1,6 @@
 package com.rusuh.app.data.storage
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -111,17 +112,53 @@ class SecureTokenStoreTest {
         }
 
     @Test
-    fun deviceTokenSetConcurrentlyWithClearSessionIsNotLost() =
+    fun refreshTokenSetWhileLoggingOutEndsFullyAbsent() =
         runTest {
             secure.yieldOnWrite = true
-            repeat(RACE_RUNS) { i ->
-                val device = "d$i"
-                val writer = launch { tokens.setDeviceToken(device) }
+            repeat(RACE_RUNS) {
+                val writer = launch { tokens.setRefreshToken("r1") }
                 val logout = launch { tokens.clearSession() }
                 writer.join()
                 logout.join()
-                assertEquals(device, tokens.getDeviceToken())
+                // Without the shared lock the write would land after the removal and survive the logout.
+                assertNull(tokens.getRefreshToken())
+                assertEquals(0, secure.entries.size)
             }
+        }
+
+    @Test
+    fun setterInFlightBeforeLogoutIsDiscarded() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            secure.writeGate = gate
+            val blocker = launch { tokens.setDeviceToken("d1") }
+            testScheduler.runCurrent()
+            val logout = launch { tokens.clearSession() }
+            val lateSet = launch { tokens.setRefreshToken("late") }
+            testScheduler.runCurrent()
+
+            gate.complete(Unit)
+            blocker.join()
+            logout.join()
+            lateSet.join()
+
+            assertNull(tokens.getRefreshToken())
+            assertEquals("d1", tokens.getDeviceToken())
+
+            tokens.setRefreshToken("fresh")
+            assertEquals("fresh", tokens.getRefreshToken())
+        }
+
+    @Test
+    fun clearSessionKeepsEveryRemovalFailure() =
+        runTest {
+            secure.failingRemovals += setOf("auth_refresh_token", "book_admission_token")
+
+            val failure = assertFailsWith<IllegalStateException> { tokens.clearSession() }
+
+            // Coroutine stack-trace recovery may rethrow a copy whose cause is the original exception.
+            val original = failure.cause ?: failure
+            assertEquals(1, original.suppressedExceptions.size)
         }
 
     @Test

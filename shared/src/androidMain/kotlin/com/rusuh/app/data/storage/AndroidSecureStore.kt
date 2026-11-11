@@ -18,7 +18,8 @@ import javax.crypto.spec.GCMParameterSpec
 /**
  * AES-256-GCM key in the AndroidKeyStore (never exportable); each value is stored as base64(iv + ciphertext)
  * in a private SharedPreferences file. The entry name is bound as AAD so values cannot be swapped between keys.
- * An undecryptable entry (key lost after a restore or reset) reads as null and is dropped.
+ * A corrupt entry (bad tag, invalidated key, malformed data) reads as null and is dropped; any other failure
+ * is treated as transient: null, entry kept.
  */
 class AndroidSecureStore(
     context: Context,
@@ -44,10 +45,16 @@ class AndroidSecureStore(
                 // Possibly transient (KeyStore busy or unavailable): report a miss, keep the entry.
                 null
             } catch (
+                @Suppress("SwallowedException") e: IllegalArgumentException,
+            ) {
+                // Bad base64, entry too short or malformed GCM parameters: corrupt, never recoverable.
+                dropCorrupt(key)
+            } catch (
                 @Suppress("TooGenericExceptionCaught", "SwallowedException") e: RuntimeException,
             ) {
-                // Bad base64, truncated data or a malformed entry: corrupt, never recoverable.
-                dropCorrupt(key)
+                // Provider or KeyStore runtime failures (ProviderException, IllegalStateException, ...) can be
+                // transient: report a miss but keep the entry.
+                null
             }
         }
 

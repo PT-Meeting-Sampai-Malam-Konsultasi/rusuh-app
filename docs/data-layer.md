@@ -134,8 +134,13 @@ config (EPIC-01-M2).
 - iOS fresh install: the Keychain survives an uninstall but NSUserDefaults does not. `KeychainSecureStore` keeps a
   first-launch flag in NSUserDefaults and wipes this service's Keychain items once when the flag is missing.
   Keychain errors other than "not found" throw `KeychainException` (status only) instead of reading as a miss.
-- Android read failures: a bad tag, invalidated key or corrupt entry is deleted and reads as null; other
-  `GeneralSecurityException`s are treated as transient (null, entry kept). Failed writes throw.
+- Android read failures: a bad tag, invalidated key or structurally corrupt entry (`IllegalArgumentException`: bad
+  base64, too short, malformed parameters) is deleted and reads as null; every other failure
+  (`GeneralSecurityException`, `ProviderException`, `IllegalStateException`, ...) is treated as transient: null, entry
+  kept. Failed writes throw.
+- Logout is cancellation-proof (`NonCancellable`), attempts every removal and rethrows the first failure with the
+  others as suppressed. `SecureTokenStore` keeps a session generation bumped by `clearSession`: a refresh, admission
+  or queue token write that started before a logout and runs after it is discarded, so it cannot resurrect a token.
 - Never persisted: the access token, passwords, OTPs, NIK and payment data. Never log token values.
 - Threat model: tokens are protected against other apps and against reading a device backup or file dump (private
   app storage and a Keystore key that is non-exportable and, on devices that support it, hardware-backed). A rooted or jailbroken device with a live
