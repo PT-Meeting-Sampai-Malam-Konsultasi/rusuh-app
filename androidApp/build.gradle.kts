@@ -117,15 +117,14 @@ val verifyMergedManifestsHaveInternet by tasks.registering {
     dependsOn("processDebugManifest", "processReleaseManifest")
     val manifests =
         listOf("debug", "release").map { variant ->
-            variant to
-                layout.buildDirectory.file(
-                    "intermediates/merged_manifests/$variant/process${variant.replaceFirstChar { it.uppercase() }}Manifest/AndroidManifest.xml",
-                )
+            val task = "process${variant.replaceFirstChar { it.uppercase() }}Manifest"
+            variant to layout.buildDirectory.file("intermediates/merged_manifests/$variant/$task/AndroidManifest.xml")
         }
     doLast {
         manifests.forEach { (variant, file) ->
             val merged = file.get().asFile.readText()
-            check(Regex("""<uses-permission[^>]*android:name="android\.permission\.INTERNET"""").containsMatchIn(merged)) {
+            val internet = Regex("""<uses-permission[^>]*android:name="android\.permission\.INTERNET"""")
+            check(internet.containsMatchIn(merged)) {
                 "The merged $variant manifest must declare android.permission.INTERNET"
             }
         }
