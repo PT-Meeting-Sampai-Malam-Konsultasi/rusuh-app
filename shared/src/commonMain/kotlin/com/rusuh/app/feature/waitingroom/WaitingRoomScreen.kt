@@ -36,6 +36,7 @@ import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.rusuhDisplayFontFamily
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.action_retry
 import rusuh_app.shared.generated.resources.waiting_back_description
 import rusuh_app.shared.generated.resources.waiting_empty_body
 import rusuh_app.shared.generated.resources.waiting_empty_title
@@ -66,7 +67,7 @@ import rusuh_app.shared.generated.resources.waiting_turn_title
 /**
  * Waiting Room screen (FR-04-M2). Pure `state -> UI`; interactions go out through [dispatch].
  *
- * TODO(M3): wire WaitingRoomViewModel state/effects onto [WaitingRoomUiState] / [WaitingRoomAction].
+ * State and effects come from [WaitingRoomViewModel] via [WaitingRoomRoute] (FR-04-M3).
  * No ViewModel, repository or API here.
  */
 @Composable
@@ -93,11 +94,18 @@ fun WaitingRoomScreen(
                     }
                 is WaitingRoomUiState.Error ->
                     CenteredBox {
-                        CenteredMessage(
-                            title = stringResource(Res.string.waiting_error_title),
-                            body = state.message,
-                            titleColor = RusuhColors.Pink,
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CenteredMessage(
+                                title = stringResource(Res.string.waiting_error_title),
+                                body = state.message,
+                                titleColor = RusuhColors.Pink,
+                            )
+                            Spacer(Modifier.height(RusuhSpacing.xxl))
+                            PrimaryButton(
+                                text = stringResource(Res.string.action_retry),
+                                onClick = { dispatch(WaitingRoomAction.Retry) },
+                            )
+                        }
                     }
                 is WaitingRoomUiState.Active -> ActiveContent(state, dispatch)
             }

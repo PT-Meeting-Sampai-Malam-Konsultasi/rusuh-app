@@ -88,6 +88,9 @@ sealed interface WaitingRoomAction {
     data object SeeOtherEvents : WaitingRoomAction
 
     data object NotifyMe : WaitingRoomAction
+
+    /** Reload after a failed load (Error state). */
+    data object Retry : WaitingRoomAction
 }
 
 /** Poster tag resource for a phase (LIVE / opens at / paused / closed). */
