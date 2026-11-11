@@ -101,8 +101,60 @@ ApiClient(baseUrl, client = HttpClient(MockEngine { respond(...) }) { configure(
 ```
 
 See `ApiClientTest` for success, 204, problem+json, 5xx, timeout, malformed body and cancellation examples.
-Koin wiring (ApiService/Repository/Cache = `single`, UseCases = `factory`) arrives with the environment and base URL
-config (EPIC-01-M2).
+
+## Environments and hosts
+
+`AppEnvironment { Mock, Staging, Production }` picks the backend. The platform entry point chooses it from its
+build type and passes it to `initKoin(environment)` (there is no default, so release never falls back to the mock):
+
+| Platform | Debug | Release |
+|---|---|---|
+| Android | `BuildConfig.APP_ENVIRONMENT = "Mock"` | `"Production"` (androidApp/build.gradle.kts) |
+| iOS | `#if DEBUG` in `iOSApp.swift` passes `"Mock"` | `"Production"` |
+
+`ApiConfig.forEnvironment(env)` returns three independently configured hosts: `baseUrl` (api), `queueBaseUrl`
+(`q.`) and `payBaseUrl` (`pay.`). Every URL is validated at construction (blank, malformed or non-http(s) throws
+`IllegalArgumentException` naming the property) and stored without a trailing slash.
+
+- Mock: all three hosts share one Mockoon instance; the address differs per platform because of how the
+  emulator reaches the host machine: Android emulator `http://10.0.2.2:3000`, iOS simulator
+  `http://localhost:3000` (`platformMockBaseUrl`, `expect`/`actual`). A physical Android device can use
+  `adb reverse tcp:3000 tcp:3000` (the debug config allows `localhost`) or the machine's LAN IP (add it to the debug
+  `network_security_config.xml`). A physical iOS device cannot reach `localhost`: point it at another environment or
+  a LAN URL.
+- Staging and Production use `PLACEHOLDER_*` constants in `ApiConfig`, marked `shortcut:` because the real hosts
+  are not known yet (the spec has no `servers`). They use the reserved `.invalid` TLD, which never resolves, so a
+  build shipped without real hosts fails with a network error. To replace them, edit the constants in `ApiConfig`
+  once the backend publishes the hosts and update `ApiConfigTest`. No secrets live in the repo.
+- Cleartext HTTP to the mock is allowed in debug only: Android `androidApp/src/debug` (manifest overlay plus
+  `network_security_config.xml` for `10.0.2.2` and `localhost`; the release manifest has none), iOS an ATS exception
+  for `localhost` in `iosApp/iosApp/Info-Debug.plist`, used only by the Debug configuration (keep it in sync
+  with `Info.plist`; `scripts/check-info-plist.sh` runs in the Lint workflow and fails when they drift).
+  `./gradlew :androidApp:verifyNoCleartextOutsideDebug` guards the Android side (part of `:androidApp:check`).
+
+`coreModule()` (`di/CoreModule.kt`) owns the infrastructure: `ApiConfig`, one shared `HttpClient` (engine plus the
+common plugins) and three `ApiClient`s qualified with `ApiClientQualifier.Api`, `.Queue` and `.Pay`, each pointing
+at its host. Feature modules inject them and never build their own:
+
+```kotlin
+single { EventApiService(get(ApiClientQualifier.Api)) }
+single { PaymentApiService(get(ApiClientQualifier.Pay)) }
+```
+
+`coreModule()` is a function, not a `val`: Koin keeps singleton instances in the module object, so each Koin start
+and each test needs a fresh one.
+
+### Adding a host
+
+1. Add a `fooBaseUrl` property to `ApiConfig` (with `normalise`) and a value per environment in `forEnvironment`
+   (Mock may reuse the mock URL).
+2. Add `ApiClientQualifier.Foo = named("foo")` and a `single(ApiClientQualifier.Foo) { ApiClient.forHost(get(), get<ApiConfig>().fooBaseUrl) }`
+   line to `coreModule()`.
+3. Extend `ApiConfigTest` and `CoreModuleTest`. For a non-local mock host, also extend the debug cleartext config.
+
+Wiring of ApiServices, Repositories and Caches (`single`) and UseCases (`factory`) arrives with the feature tickets.
+
+In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `CoreModuleTest`.
 
 ## Storage
 

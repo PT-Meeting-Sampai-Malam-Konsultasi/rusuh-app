@@ -17,3 +17,5 @@ jobs:
         run: ./gradlew ktlintCheck --stacktrace
       - name: detekt
         run: ./gradlew detekt --stacktrace
+      - name: iOS debug plist in sync
+        run: sh scripts/check-info-plist.sh

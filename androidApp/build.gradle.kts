@@ -30,9 +30,18 @@ android {
         versionName = "1.0"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
+        // Environment per build type, parsed by AppEnvironment.fromName (see docs/data-layer.md).
+        getByName("debug") {
+            buildConfigField("String", "APP_ENVIRONMENT", "\"Mock\"")
+        }
         getByName("release") {
             isMinifyEnabled = false
+            buildConfigField("String", "APP_ENVIRONMENT", "\"Production\"")
         }
     }
 
@@ -51,3 +60,28 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)
 }
+
+// Guard: cleartext HTTP may only be configured in the debug source set (see docs/data-layer.md).
+val verifyNoCleartextOutsideDebug by tasks.registering {
+    val srcDir = layout.projectDirectory.dir("src")
+    // The merged release manifest must be clean too, whatever a library or flavour might contribute.
+    dependsOn("processReleaseManifest")
+    val releaseManifest =
+        layout.buildDirectory.file("intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml")
+    doLast {
+        val merged = releaseManifest.get().asFile.readText()
+        check(!merged.contains("usesCleartextTraffic") && !merged.contains("networkSecurityConfig")) {
+            "The merged release manifest must not allow cleartext or set a network security config"
+        }
+        val root = srcDir.asFile
+        val manifest = root.resolve("main/AndroidManifest.xml").readText()
+        check(!manifest.contains("usesCleartextTraffic") && !manifest.contains("networkSecurityConfig")) {
+            "src/main/AndroidManifest.xml must not allow cleartext or set a network security config"
+        }
+        val configs = root.walkTopDown().filter { it.name == "network_security_config.xml" }.toList()
+        check(configs.all { it.relativeTo(root).path.startsWith("debug/") }) {
+            "network_security_config.xml is only allowed under src/debug: $configs"
+        }
+    }
+}
+tasks.named("check") { dependsOn(verifyNoCleartextOutsideDebug) }

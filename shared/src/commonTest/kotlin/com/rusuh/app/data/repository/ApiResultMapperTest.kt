@@ -30,7 +30,7 @@ class ApiResultMapperTest {
     }
 
     @Test
-    fun `error carries status, machine code and server message`() {
+    fun `error carries status machine code and server message`() {
         val problem = ProblemDetails(title = "Judul", detail = "Rincian", status = 409, code = ErrorCode.NIK_SEAT_TAKEN)
 
         val result = ApiResult.Error(409, problem).toDomainResult()
@@ -39,7 +39,7 @@ class ApiResultMapperTest {
     }
 
     @Test
-    fun `error carries extras, trace id and retry after`() {
+    fun `error carries extras trace id and retry after`() {
         val extras = mapOf("categoryId" to JsonPrimitive("cat-7"), "attemptsLeft" to JsonPrimitive(2))
         val problem =
             ProblemDetails(code = ErrorCode.CATEGORY_SOLD_OUT, detail = "d", traceId = "trace-1", extras = extras)

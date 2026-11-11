@@ -6,6 +6,7 @@ import org.koin.core.module.Module
 val sharedModules: List<Module>
     get() =
         listOf(
+            coreModule(),
             appModule,
             platformModule,
             storageModule,
