@@ -22,9 +22,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,6 +44,8 @@ import com.rusuh.app.ui.theme.RusuhBrandColors
 import com.rusuh.app.ui.theme.RusuhBrandMetrics
 import com.rusuh.app.ui.theme.RusuhShapes
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.action_retry
@@ -57,8 +62,8 @@ import rusuh_app.shared.generated.resources.my_queues_title
  *
  * NOT an MVI state: a presentation-only discriminator so the stateless screen
  * can render each visual placeholder the design calls for (loading / content /
- * empty / error). FR-APP-01-M3 introduces the real MyQueuesViewModel and maps
- * its MVI state onto these cases.
+ * empty / error). [MyQueuesState.toUiState] maps the ViewModel's MVI state onto
+ * these cases.
  */
 @Immutable
 sealed interface MyQueuesUiState {
@@ -98,9 +103,8 @@ internal enum class AppLanguageOption(val code: String) {
  * NO ViewModel, NO repository and NO API here. The header's ID|EN toggle is
  * visual only until locale switching exists.
  *
- * TODO(M3): wire MyQueuesViewModel, collect the MVI state/effects and map them
- *  onto [MyQueuesUiState], replacing the caller-supplied [state].
- * TODO(M4): feed [QueueListItemUi] from the live my-queues API (FR-07/FR-10).
+ * State comes from [MyQueuesViewModel] via [MyQueuesRoute].
+ * TODO(FR-APP-01-M4 #50): feed [QueueListItemUi] from the live my-queues API (FR-07/FR-10).
  *
  * @param state what to render.
  * @param actions the callbacks the screen raises (row tap, tab switch, browse,
@@ -112,10 +116,12 @@ fun MyQueuesScreen(
     modifier: Modifier = Modifier,
     state: MyQueuesUiState = MyQueuesUiState.Content(placeholderQueues()),
     actions: MyQueuesActions = MyQueuesActions(),
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = RusuhBrandColors.Paper,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         // The header pads the status bar itself and the bottom bar pads the
         // navigation bar itself, so the Scaffold's own insets are never added on top.
         topBar = { MyQueuesHeader(language = AppLanguageOption.Indonesian) },
@@ -176,6 +182,7 @@ private fun QueueList(
 }
 
 /** Page title (display face) with the active-queue count beneath. */
+@OptIn(ExperimentalResourceApi::class)
 @Composable
 private fun PageHeading(queueCount: Int?) {
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = RusuhSpacing.md)) {
@@ -187,7 +194,7 @@ private fun PageHeading(queueCount: Int?) {
         )
         if (queueCount != null) {
             Text(
-                text = stringResource(Res.string.my_queues_count, queueCount),
+                text = pluralStringResource(Res.plurals.my_queues_count, queueCount, queueCount),
                 style = MaterialTheme.typography.bodyMedium,
                 color = RusuhBrandColors.Ink3,
             )
