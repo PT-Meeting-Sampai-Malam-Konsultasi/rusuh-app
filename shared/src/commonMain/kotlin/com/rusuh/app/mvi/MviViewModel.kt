@@ -3,6 +3,7 @@ package com.rusuh.app.mvi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,6 +69,11 @@ abstract class MviViewModel<S : MviState, I : MviIntent, E : MviEffect>(
         viewModelScope.launch {
             reduce(intent)
         }
+    }
+
+    /** Cancel all work started by this ViewModel; call when its owner leaves composition. */
+    fun clear() {
+        viewModelScope.cancel()
     }
 
     /** Process the intent and update state accordingly. */
