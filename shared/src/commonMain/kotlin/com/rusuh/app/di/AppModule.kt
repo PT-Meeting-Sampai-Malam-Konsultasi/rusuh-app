@@ -10,6 +10,7 @@ import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
 import com.rusuh.app.feature.tickets.StubTicketsRepository
 import com.rusuh.app.feature.tickets.TicketsRepository
+import com.rusuh.app.feature.tickets.TicketsViewModel
 import org.koin.dsl.module
 
 /** Main app module. Register shared (common) dependencies here. */
@@ -30,4 +31,5 @@ val appModule =
         single<MyQueuesRepository> { StubMyQueuesRepository() }
         factory { GetMyQueuesUseCase(get()) }
         factory { MyQueuesViewModel(get()) }
+        factory { TicketsViewModel(get()) }
     }
