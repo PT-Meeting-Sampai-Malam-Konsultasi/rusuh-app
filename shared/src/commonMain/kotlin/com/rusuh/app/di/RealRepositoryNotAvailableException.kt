@@ -1,6 +1,9 @@
 package com.rusuh.app.di
 
-/** Thrown when [BackendMode.Real] resolves a repository whose network implementation does not exist yet. */
+/**
+ * Thrown in strict mode (no stub fallback) when [BackendMode.Real] resolves a repository that has no network
+ * implementation yet.
+ */
 class RealRepositoryNotAvailableException(
     repository: String,
 ) : IllegalStateException(

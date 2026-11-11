@@ -77,6 +77,30 @@ enum class StubError(
             "Tickets are sold out; the queue is closed.",
         ),
     ),
+    NotCancellable(
+        problem(
+            409,
+            "Pesanan tidak bisa dibatalkan",
+            "NOT_CANCELLABLE",
+            "The booking is already paid, expired or has a payment pending.",
+        ),
+    ),
+    BookingNotHeld(
+        problem(
+            409,
+            "Pesanan tidak lagi aktif",
+            "BOOKING_NOT_HELD",
+            "The booking is paid, expired or cancelled.",
+        ),
+    ),
+    PaymentProviderBusy(
+        problem(
+            503,
+            "Layanan pembayaran sedang sibuk",
+            "PAYMENT_PROVIDER_BUSY",
+            "The payment provider is unavailable; the countdown keeps running.",
+        ),
+    ),
     NikInvalid(
         problem(
             422,

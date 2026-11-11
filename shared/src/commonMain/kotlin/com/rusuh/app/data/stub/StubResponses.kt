@@ -1,6 +1,7 @@
 package com.rusuh.app.data.stub
 
 import io.ktor.http.HttpMethod
+import io.ktor.http.decodeURLPart
 
 /**
  * One canned HTTP response. [body] may hold `@{now}` placeholders, resolved by [StubClock.render] when the
@@ -35,14 +36,17 @@ data class StubRoute(
     /** Number of fixed segments, so `/bookings/active` wins over `/bookings/{bookingId}`. */
     internal val literalSegments: Int = segments(template).count { !it.isParam() }
 
-    /** The values of the `{param}` segments when [path] matches this route, otherwise null. */
+    /**
+     * The percent-decoded values of the `{param}` segments when [path] matches this route, otherwise null. The
+     * query string is ignored: filters such as `?status=` never change which stub answers.
+     */
     fun match(path: String): Map<String, String>? {
         val pairs = segments(template).zip(segments(path))
         val sameLength = segments(template).size == segments(path).size
         val fits = pairs.all { (expected, actual) -> expected.isParam() || expected == actual }
         return if (sameLength && fits) {
             pairs.filter { (expected, _) -> expected.isParam() }
-                .associate { (expected, actual) -> expected.removeSurrounding("{", "}") to actual }
+                .associate { (expected, actual) -> expected.removeSurrounding("{", "}") to actual.decodeURLPart() }
         } else {
             null
         }
@@ -87,7 +91,23 @@ object StubResponses {
             StubRoute(HttpMethod.Post, "/auth/otp/verify", StubResponse.ok(StubJson.AUTH_VERIFY)),
             StubRoute(HttpMethod.Post, "/auth/refresh", StubResponse.ok(StubJson.AUTH_REFRESH)),
             StubRoute(HttpMethod.Get, "/me", StubResponse.ok(StubJson.ME)),
+            StubRoute(HttpMethod.Post, "/auth/otp/request", StubResponse(202, StubJson.AUTH_OTP)),
+            StubRoute(HttpMethod.Post, "/auth/logout", StubResponse(204, contentType = null)),
+            StubRoute(HttpMethod.Post, "/devices", StubResponse(201, StubJson.DEVICE)),
+            StubRoute(HttpMethod.Post, "/bookings/{bookingId}/cancel", StubResponse.ok(StubJson.BOOKING_CANCELLED)),
+            StubRoute(HttpMethod.Post, "/bookings/{bookingId}/payment", StubResponse.ok(StubJson.BOOKING_PAYMENT)),
+            StubRoute(HttpMethod.Post, "/bookings/{bookingId}/check-status", StubResponse.ok(StubJson.CHECK_STATUS)),
+            StubRoute(HttpMethod.Delete, "/queue/{eventId}/me", StubResponse(204, contentType = null)),
+            StubRoute(HttpMethod.Post, "/payment-sessions", StubResponse(201, StubJson.PAYMENT_SESSION)),
+            StubRoute(HttpMethod.Get, "/payments/{bookingId}", StubResponse.ok(StubJson.PAYMENT_SUMMARY)),
+            StubRoute(HttpMethod.Post, "/payments/{bookingId}/snap", StubResponse(201, StubJson.PAYMENT_SNAP)),
         )
+
+    /** True when some route serves [path] under another method (a request here is a 405, not a 404). */
+    fun pathExists(
+        path: String,
+        candidates: List<StubRoute> = routes,
+    ): Boolean = candidates.any { it.match(path) != null }
 
     /** The best route for [method] and [path] among [candidates] (most fixed segments wins), or null. */
     fun find(

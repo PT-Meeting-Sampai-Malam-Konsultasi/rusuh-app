@@ -4,6 +4,7 @@ import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.network.ApiClient
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.AppEnvironment
+import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.repository.DetailRepository
@@ -12,9 +13,12 @@ import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.StubHomeRepository
 import com.rusuh.app.feature.tickets.TicketsRepository
 import com.rusuh.app.feature.waitingroom.domain.repository.WaitingRoomRepository
+import io.ktor.client.HttpClient
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import org.koin.core.Koin
+import org.koin.core.KoinApplication
 import org.koin.core.context.stopKoin
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
@@ -27,21 +31,27 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class DataModuleTest {
-    private fun koin(
+    private val warnings = mutableListOf<String>()
+
+    private fun app(
         environment: AppEnvironment,
         mode: BackendMode,
-    ): Koin =
+        allowFallback: Boolean = true,
+    ): KoinApplication =
         koinApplication {
             allowOverride(true)
             modules(
-                module {
-                    single { environment }
-                    single<ServerClock> { MonotonicServerClock() }
-                },
+                module { single { environment } },
                 coreModule(),
-                dataModule(mode),
+                dataModule(mode, allowFallback) { warnings += it },
             )
-        }.koin
+        }
+
+    private fun koin(
+        environment: AppEnvironment,
+        mode: BackendMode,
+        allowFallback: Boolean = true,
+    ): Koin = app(environment, mode, allowFallback).koin
 
     private val repositories: Map<String, KClass<*>> =
         mapOf(
@@ -90,8 +100,8 @@ class DataModuleTest {
     }
 
     @Test
-    fun realModeFailsLoudlyForEveryRepositoryWithoutANetworkImplementation() {
-        val koin = koin(AppEnvironment.Mock, BackendMode.Real)
+    fun strictRealModeFailsLoudlyForEveryRepositoryWithoutANetworkImplementation() {
+        val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
 
         repositories.forEach { (name, type) ->
             val failure = assertFailsWith<Exception>(name) { koin.get<Any>(type) }
@@ -101,14 +111,54 @@ class DataModuleTest {
                 "$name: $messages",
             )
         }
+        assertTrue(warnings.isEmpty())
     }
 
     @Test
-    fun realModeDoesNotFallBackToAStub() {
-        val koin = koin(AppEnvironment.Mock, BackendMode.Real)
+    fun strictRealModeKeepsFailingOnASecondResolution() {
+        val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
 
         assertFailsWith<Exception> { koin.get<HomeRepository>() }
-        assertFailsWith<Exception> { koin.get<HomeRepository>() } // still failing on a second resolution
+        assertFailsWith<Exception> { koin.get<HomeRepository>() }
+    }
+
+    @Test
+    fun realModeFallsBackToTheStubAndWarnsOncePerRepository() {
+        val koin = koin(AppEnvironment.Staging, BackendMode.Real)
+
+        repositories.values.forEach { type -> koin.get<Any>(type) }
+        repositories.values.forEach { type -> koin.get<Any>(type) } // singletons: no second warning
+
+        assertIs<StubHomeRepository>(koin.get<HomeRepository>())
+        assertEquals(repositories.size, warnings.size, "$warnings")
+        repositories.keys.forEach { name ->
+            assertTrue(warnings.count { it.startsWith("WARNING: $name ") && "STUB" in it } == 1, "$name: $warnings")
+        }
+    }
+
+    @Test
+    fun theFallbackIsOnByDefaultUntilTheRealRepositoriesLand() {
+        assertTrue(ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES)
+    }
+
+    @Test
+    fun theStubDemoUsesATickingServerClockSharedWithTheEngine() {
+        val koin = koin(AppEnvironment.Mock, BackendMode.Stub)
+
+        assertSame(koin.get<StubClock>(), koin.get<ServerClock>())
+        assertSame(koin.get<StubClock>(), koin.get<StubEngine>().clock)
+        assertIs<MonotonicServerClock>(koin(AppEnvironment.Staging, BackendMode.Real).get<ServerClock>())
+    }
+
+    @Test
+    fun theStubHttpClientIsClosedWhenKoinStops() {
+        val app = app(AppEnvironment.Mock, BackendMode.Stub)
+        val client = app.koin.get<HttpClient>()
+        assertTrue(client.coroutineContext.job.isActive)
+
+        app.close()
+
+        assertTrue(!client.coroutineContext.job.isActive)
     }
 
     @Test
@@ -121,10 +171,6 @@ class DataModuleTest {
 
             assertIs<ApiResult.Success<JsonObject>>(events)
             assertIs<ApiResult.Success<JsonObject>>(queue)
-            assertEquals(
-                listOf("/events", "/queue/evt_2026_gbk/frontier"),
-                koin.get<StubEngine>().requests.map { it.path },
-            )
         }
 
     @Test
@@ -132,6 +178,7 @@ class DataModuleTest {
         val koin = koin(AppEnvironment.Mock, BackendMode.Real)
 
         assertTrue(koin.getOrNull<StubEngine>() == null)
+        assertTrue(koin.getOrNull<StubClock>() == null)
     }
 
     @Test

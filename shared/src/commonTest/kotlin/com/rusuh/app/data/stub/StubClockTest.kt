@@ -2,6 +2,7 @@ package com.rusuh.app.data.stub
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -41,5 +42,27 @@ class StubClockTest {
         assertEquals(StubClock.DEFAULT_START_MILLIS + 150_000, clock.nowMillis())
         clock.setTo(0L)
         assertEquals("1970-01-01T00:00:00Z", clock.render("@{now}"))
+    }
+
+    @Test
+    fun aFrozenClockNeverMovesOnItsOwn() {
+        val clock = StubClock()
+
+        assertEquals(clock.nowMillis(), clock.nowMillis())
+        assertEquals(StubClock.DEFAULT_START_MILLIS, clock.nowMillis())
+    }
+
+    @Test
+    fun aTickingClockStartsAtTheSpecTimeAndRuns() {
+        val clock = StubClock.ticking()
+        val first = clock.nowMillis()
+
+        var later = first
+        while (later == first) later = clock.nowMillis()
+
+        assertTrue(first >= StubClock.DEFAULT_START_MILLIS)
+        assertTrue(later > first)
+        clock.setTo(0L)
+        assertTrue(clock.nowMillis() < StubClock.DEFAULT_START_MILLIS)
     }
 }

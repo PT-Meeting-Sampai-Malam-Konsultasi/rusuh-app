@@ -172,4 +172,53 @@ object StubJson {
 
     /** `GET /me`. */
     const val ME = USER
+
+    /** `POST /devices` (a 30-day device token). */
+    const val DEVICE =
+        """
+        {"deviceToken":"eyJhbGciOiJFZERTQSIsImtpZCI6InEtMjAyNi0xMSJ9.eyJldnQiOiJldnRfMjAyNl9nYmsifQ.c2lnbmF0dXJl",
+         "expiresAt":"@{now+2592000}"}
+        """
+
+    /** `POST /bookings/{bookingId}/cancel`. */
+    const val BOOKING_CANCELLED =
+        """
+        {"bookingId":"bk_01JB2Y6Z8Q","eventId":"evt_2026_gbk","status":"CANCELLED","price":$PRICE,
+         "orderCode":"RSH-26-084731","attendees":$ATTENDEES,"expiresAt":null,"refundRequired":false,
+         "tickets":[],"paidAt":null,"paymentMethod":null,"createdAt":"@{now-120}","serverNow":"@{now}"}
+        """
+
+    /** `POST /bookings/{bookingId}/payment`. */
+    const val BOOKING_PAYMENT =
+        """
+        {"bookingId":"bk_01JB2Y6Z8Q","snapToken":"66e4fa55-fdac-4ef9-91b5-733b97d1b862",
+         "paymentExpiresAt":"@{now+600}",
+         "redirectUrl":"https://app.sandbox.midtrans.com/snap/v4/redirection/66e4fa55-fdac-4ef9-91b5-733b97d1b862",
+         "serverNow":"@{now}"}
+        """
+
+    /** `POST /bookings/{bookingId}/check-status`: the contract only references the `Booking` schema (no example). */
+    const val CHECK_STATUS = BOOKING_PAID
+
+    /** `POST /payment-sessions`. */
+    const val PAYMENT_SESSION =
+        """{"handoffCode":"hc_9fK2mQ7xVb","expiresAt":"@{now+60}","payUrl":"https://pay.rusuh.id/start"}"""
+
+    /** `GET /payments/{bookingId}` (the pay host's checkout summary). */
+    const val PAYMENT_SUMMARY =
+        """
+        {"bookingId":"bk_01JB2Y6Z8Q","orderCode":"RSH-26-084731","eventName":"Samudra",
+         "eventStartsAt":"2026-12-12T12:00:00Z","venueShort":"GBK","timezone":"Asia/Jakarta",
+         "attendees":$ATTENDEES,"customerEmail":"rina.wulandari@example.com","price":$PRICE,
+         "currentSnap":null,"expiresAt":"@{now+600}","serverNow":"@{now}","csrfToken":"csrf_Jx8Kq2Lm5Np9",
+         "snapClientKey":"SB-Mid-client-rusuhDemoKey"}
+        """
+
+    /** `POST /payments/{bookingId}/snap`. */
+    const val PAYMENT_SNAP =
+        """
+        {"attemptId":1,"orderId":"bk_01JB2Y6Z8Q-1","method":"qris","snapToken":"66e4fa55-fdac-4ef9-91b5-733b97d1b862",
+         "redirectUrl":"https://app.sandbox.midtrans.com/snap/v4/redirection/66e4fa55-fdac-4ef9-91b5-733b97d1b862",
+         "gatewayExpiresAt":"@{now+600}"}
+        """
 }

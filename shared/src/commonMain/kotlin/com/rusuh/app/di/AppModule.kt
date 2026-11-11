@@ -1,7 +1,5 @@
 package com.rusuh.app.di
 
-import com.rusuh.app.data.clock.MonotonicServerClock
-import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.usecase.CreateBookingUseCase
 import com.rusuh.app.domain.usecase.GetDetailUseCase
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
@@ -16,7 +14,7 @@ import com.rusuh.app.feature.waitingroom.domain.usecase.ObserveQueuePlaceUseCase
 import org.koin.dsl.module
 
 /**
- * Main app module: use cases and view models. Repositories are bound per backend mode in [dataModule].
+ * Main app module: use cases and view models. Repositories and the ServerClock are bound per mode in [dataModule].
  */
 val appModule =
     module {
@@ -30,9 +28,7 @@ val appModule =
         // Tickets (Tiket tab).
         factory { GetMyTicketsUseCase(get()) }
 
-        // Detail ticket page.
-        // shortcut: monotonic clock until FR-15/16/17-M1 (#80, #81, #82) land.
-        single<ServerClock> { MonotonicServerClock() }
+        // Detail ticket page (the ServerClock is bound per backend mode in dataModule).
         factory { GetDetailUseCase(get()) }
         factory { ValidateAttendeeUseCase(get()) }
         factory { CreateBookingUseCase(get()) }

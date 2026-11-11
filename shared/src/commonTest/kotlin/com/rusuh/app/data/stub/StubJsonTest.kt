@@ -31,7 +31,11 @@ class StubJsonTest {
         StubResponses.routes.forEach { route ->
             val rendered = clock.render(route.response.body)
             assertTrue("@{" !in rendered, "unresolved placeholder in ${route.template}")
-            Json.parseToJsonElement(rendered)
+            if (route.response.status == 204) {
+                assertTrue(rendered.isEmpty(), "a 204 has no body: ${route.template}")
+            } else {
+                Json.parseToJsonElement(rendered)
+            }
         }
     }
 
@@ -105,6 +109,53 @@ class StubJsonTest {
         obj(StubJson.AUTH_REFRESH).keys("accessToken", "refreshToken")
         obj(StubJson.ME).keys("userId", "email", "fullName", "locale")
         assertEquals(900, obj(StubJson.AUTH_VERIFY).getValue("expiresIn").jsonPrimitive.int)
+    }
+
+    @Test
+    fun paymentPayloadsAndActions() {
+        obj(StubJson.DEVICE).keys("deviceToken", "expiresAt")
+        obj(StubJson.PAYMENT_SESSION).keys("handoffCode", "expiresAt", "payUrl")
+        obj(StubJson.BOOKING_PAYMENT).keys("bookingId", "snapToken", "paymentExpiresAt", "redirectUrl", "serverNow")
+        obj(StubJson.PAYMENT_SUMMARY).keys("bookingId", "orderCode", "price", "expiresAt", "csrfToken")
+        obj(StubJson.PAYMENT_SNAP).keys("attemptId", "orderId", "method", "snapToken", "gatewayExpiresAt")
+        assertEquals("CANCELLED", obj(StubJson.BOOKING_CANCELLED).getValue("status").jsonPrimitive.content)
+    }
+
+    @Test
+    fun enumValuesStayInsideTheSpecLists() {
+        // Lists copied from the contract's EventState, QueueState, BookingStatus, PaymentStatus and PaymentMethod.
+        val eventStates =
+            setOf("coming_soon", "waiting_room_open", "on_sale", "almost_gone", "temporarily_full", "sold_out", "ended")
+        val queueStates = setOf("preopen", "open", "paused", "closed")
+        val bookingStatuses = setOf("SELECTION", "PAYMENT_PENDING", "HELD", "PAID", "EXPIRED", "CANCELLED")
+        val paymentStatuses =
+            setOf("none", "pending", "settled", "denied", "expired", "cancelled", "failed", "paid_after_expiry")
+        val paymentMethods =
+            setOf(
+                "qris", "gopay", "shopeepay", "bca_va", "mandiri_va",
+                "bni_va", "bri_va", "permata_va", "cimb_va", "card",
+            )
+
+        fun JsonObject.text(name: String) = getValue(name).jsonPrimitive.content
+
+        obj(StubJson.EVENTS).getValue("items").jsonArray.forEach {
+            assertTrue(it.jsonObject.text("state") in eventStates)
+        }
+        listOf(StubJson.QUEUE_JOIN, StubJson.QUEUE_ME, StubJson.QUEUE_FRONTIER).forEach {
+            assertTrue(obj(it).text("state") in queueStates)
+        }
+        listOf(
+            StubJson.BOOKING_HELD,
+            StubJson.BOOKING_PAID,
+            StubJson.BOOKING_CANCELLED,
+            StubJson.CHECK_STATUS,
+        ).forEach {
+            assertTrue(obj(it).text("status") in bookingStatuses)
+        }
+        assertTrue(obj(StubJson.PAYMENT_STATUS).text("bookingStatus") in bookingStatuses)
+        assertTrue(obj(StubJson.PAYMENT_STATUS).text("paymentStatus") in paymentStatuses)
+        assertTrue(obj(StubJson.BOOKING_PAID).text("paymentMethod") in paymentMethods)
+        assertTrue(obj(StubJson.PAYMENT_SNAP).text("method") in paymentMethods)
     }
 
     @Test

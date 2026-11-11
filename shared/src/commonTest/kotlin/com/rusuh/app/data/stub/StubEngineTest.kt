@@ -1,11 +1,18 @@
 package com.rusuh.app.data.stub
 
+import com.rusuh.app.data.network.ApiClient
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.idempotencyKey
 import com.rusuh.app.data.network.jsonBody
 import com.rusuh.app.domain.model.ErrorCode
+import io.ktor.client.request.get
+import io.ktor.client.request.request
 import io.ktor.http.HttpMethod
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -16,7 +23,7 @@ import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.minutes
 
 class StubEngineTest {
-    private val stub = StubEngine()
+    private val stub = StubEngine(recordRequests = true)
     private val api = stub.apiClient()
 
     @Serializable
@@ -64,23 +71,129 @@ class StubEngineTest {
         }
 
     @Test
-    fun methodMustMatchToo() =
+    fun aKnownPathUnderAnotherMethodIsA405MissNotARealNotFound() =
         runTest {
-            val result = api.post<JsonObject>("/events")
+            val response = api.client.request("events") { method = HttpMethod.Post }
 
-            assertEquals(404, assertIs<ApiResult.Error>(result).code)
-            assertEquals(ErrorCode.NOT_FOUND, result.problem?.code)
+            assertEquals(405, response.status.value)
+            assertEquals("true", response.headers[StubEngine.MISS_HEADER])
+            val result = assertIs<ApiResult.Error>(api.post<JsonObject>("/events"))
+            assertEquals(StubEngine.MISS_CODE, result.problem?.rawCode)
         }
 
     @Test
-    fun anUnknownRouteIsA404ProblemNamingIt() =
+    fun anUnknownRouteIsA404MissNamingIt() =
         runTest {
             val result = assertIs<ApiResult.Error>(api.get<JsonObject>("/nope/1"))
 
             assertEquals(404, result.code)
+            assertEquals(StubEngine.MISS_CODE, result.problem?.rawCode)
             assertEquals(true, result.problem?.detail.orEmpty().contains("GET /nope/1"))
-            stub.assertRequestLine("GET /nope/1")
+            assertEquals("true", api.client.get("nope/1").headers[StubEngine.MISS_HEADER])
+            assertEquals(null, api.client.get("events").headers[StubEngine.MISS_HEADER])
+            stub.assertRequestLine("GET /nope/1", "GET /nope/1", "GET /events")
         }
+
+    @Test
+    fun aScriptedParameterRouteDoesNotShadowAMoreSpecificDefault() =
+        runTest {
+            stub.script(HttpMethod.Get, "/bookings/{bookingId}", StubError.NotFound)
+
+            val active = api.get<JsonObject>("/bookings/active")
+            val byId = api.get<JsonObject>("/bookings/bk_1")
+
+            assertIs<ApiResult.Success<JsonObject>>(active)
+            assertEquals(404, assertIs<ApiResult.Error>(byId).code)
+        }
+
+    @Test
+    fun aScriptWinsATieWithTheDefaultRoute() =
+        runTest {
+            stub.script(HttpMethod.Get, "/events", StubError.ServiceUnavailable)
+
+            assertEquals(503, assertIs<ApiResult.Error>(api.get<JsonObject>("/events")).code)
+        }
+
+    @Test
+    fun pathParametersArePercentDecodedAndQueriesIgnored() =
+        runTest {
+            val result = api.get<JsonObject>("/tickets/tk%20a%2Fb?status=used&page=2")
+
+            assertIs<ApiResult.Success<JsonObject>>(result)
+            val request = stub.requests.single()
+            assertEquals(mapOf("ticketId" to "tk a/b"), request.pathParams)
+            assertEquals("status=used&page=2", request.query)
+        }
+
+    @Test
+    fun deletesAndLogoutAnswer204WithNoBody() =
+        runTest {
+            assertEquals(204, assertIs<ApiResult.Success<Unit>>(api.delete<Unit>("/queue/evt_2026_gbk/me")).code)
+            assertEquals(204, assertIs<ApiResult.Success<Unit>>(api.post<Unit>("/auth/logout")).code)
+        }
+
+    @Test
+    fun paymentAndBookingActionsAreStubbed() =
+        runTest {
+            val cancel = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/bookings/bk_1/cancel"))
+            val snap = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/payments/bk_1/snap"))
+            val device = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/devices"))
+
+            assertEquals("CANCELLED", cancel.data.text("status"))
+            assertEquals(201, snap.code)
+            assertEquals(201, device.code)
+            assertEquals("2026-12-14T10:40:00Z", device.data.text("expiresAt"))
+        }
+
+    @Test
+    fun nothingIsRecordedUnlessRecordingIsOn() =
+        runTest {
+            val quiet = StubEngine()
+
+            quiet.apiClient().get<JsonObject>("/events")
+
+            assertEquals(emptyList(), quiet.requests)
+        }
+
+    @Test
+    fun theRequestLogKeepsOnlyTheLastEntries() =
+        runTest {
+            val bounded = StubEngine(recordRequests = true, maxRecordedRequests = 3)
+            val client = bounded.apiClient()
+
+            repeat(5) { client.get<JsonObject>("/tickets/tk_$it") }
+
+            assertEquals(listOf("tk_2", "tk_3", "tk_4"), bounded.requests.map { it.pathParams.getValue("ticketId") })
+        }
+
+    @Test
+    fun parallelRequestsConsumeEachScriptedResponseExactlyOnce() =
+        runTest {
+            val parallel = StubEngine(recordRequests = true, maxRecordedRequests = 50)
+            val client = parallel.apiClient()
+            val total = 200
+            parallel.script(
+                HttpMethod.Get,
+                "/queue/{eventId}/frontier",
+                frontierSequence(parallel.clock, *IntArray(total) { it }),
+            )
+
+            val served =
+                withContext(Dispatchers.Default) {
+                    (0 until total)
+                        .map { async { frontierOf(client) } }
+                        .awaitAll()
+                }
+
+            assertEquals((0 until total).toList(), served.sorted())
+            assertEquals(50, parallel.requests.size)
+            parallel.clock.advanceBy(1.minutes)
+        }
+
+    private suspend fun frontierOf(client: ApiClient): Int {
+        val result = assertIs<ApiResult.Success<JsonObject>>(client.get<JsonObject>("/queue/evt_2026_gbk/frontier"))
+        return (result.data.getValue("served") as JsonPrimitive).content.toInt()
+    }
 
     @Test
     fun timesAreRelativeToTheInjectedClock() =
