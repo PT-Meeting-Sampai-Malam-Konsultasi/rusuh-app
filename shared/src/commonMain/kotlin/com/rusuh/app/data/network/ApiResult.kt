@@ -10,9 +10,16 @@ sealed class ApiResult<out T> {
     /** 2xx response; [data] is the decoded body (the payload itself, no envelope). */
     data class Success<out T>(val code: Int, val data: T) : ApiResult<T>()
 
-    /** Non-2xx response; [problem] is null when the body was not a readable `application/problem+json`. */
-    data class Error(val code: Int, val problem: ProblemDetails? = null) : ApiResult<Nothing>()
+    /**
+     * Non-2xx response (3xx such as 304 included). [problem] is null when the body was not a readable
+     * `application/problem+json`. [retryAfterSeconds] comes from the `Retry-After` header (seconds form only).
+     */
+    data class Error(
+        val code: Int,
+        val problem: ProblemDetails? = null,
+        val retryAfterSeconds: Int? = null,
+    ) : ApiResult<Nothing>()
 
     /** The call failed before a usable response: timeout, I/O failure or unreadable success body. */
-    data class Exception(val throwable: Throwable) : ApiResult<Nothing>()
+    data class Failure(val throwable: Throwable) : ApiResult<Nothing>()
 }

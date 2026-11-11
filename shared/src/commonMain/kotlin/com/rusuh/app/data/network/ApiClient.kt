@@ -12,17 +12,22 @@ import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.accept
+import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.http.contentLength
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.CancellationException
+import kotlinx.io.readByteArray
 import kotlinx.serialization.json.Json
 
 /**
@@ -30,6 +35,7 @@ import kotlinx.serialization.json.Json
  * that keeps the HTTP status; success bodies are the payload itself (no envelope).
  * Use `ApiResult<Unit>` for endpoints that answer 204 No Content.
  */
+@Suppress("TooManyFunctions") // one helper per HTTP verb plus the raw-bytes helper
 class ApiClient(
     val baseUrl: String,
     private val enableLogging: Boolean = false,
@@ -89,21 +95,57 @@ class ApiClient(
             if (response.status.isSuccess()) {
                 ApiResult.Success(response.status.value, readBody(response))
             } else {
-                ApiResult.Error(response.status.value, readProblem(response))
+                ApiResult.Error(
+                    code = response.status.value,
+                    problem = readProblem(response),
+                    retryAfterSeconds = readRetryAfter(response),
+                )
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            ApiResult.Exception(failure)
+            ApiResult.Failure(failure)
         }
 
-    /** Reads an `application/problem+json` body; null when absent, of another type, or malformed. */
+    /**
+     * Raw bytes of a successful response, for downloads such as a ticket PDF. No JSON `Accept` is forced
+     * ([accept] defaults to any type). Server-sent event streams are not supported here: use [client] directly.
+     */
+    suspend fun getBytes(
+        path: String,
+        accept: ContentType = ContentType.Any,
+        block: HttpRequestBuilder.() -> Unit = {},
+    ): ApiResult<ByteArray> =
+        execute(
+            method = HttpMethod.Get,
+            path = path,
+            block = {
+                accept(accept)
+                block()
+            },
+            readBody = { response -> response.body<ByteArray>() },
+        )
+
+    /** Seconds form of `Retry-After` only; the HTTP-date form is ignored (null) as the API sends seconds. */
+    private fun readRetryAfter(response: HttpResponse): Int? =
+        response.headers[HttpHeaders.RetryAfter]?.trim()?.toIntOrNull()?.takeIf { it >= 0 }
+
+    /**
+     * Reads an `application/problem+json` body; null when absent, of another type, malformed,
+     * or larger than [MAX_PROBLEM_BYTES] (a problem body is tiny, so anything bigger is not one).
+     */
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
     private suspend fun readProblem(response: HttpResponse): ProblemDetails? {
         val isProblem = response.contentType()?.match(ContentType.Application.ProblemJson) == true
-        return if (isProblem) {
+        val declaredLength = response.contentLength()
+        return if (isProblem && (declaredLength == null || declaredLength <= MAX_PROBLEM_BYTES)) {
             try {
-                defaultJson.decodeFromString(ProblemDetails.serializer(), response.bodyAsText())
+                val bytes = response.bodyAsChannel().readRemaining(MAX_PROBLEM_BYTES + 1L).readByteArray()
+                if (bytes.size > MAX_PROBLEM_BYTES) {
+                    null
+                } else {
+                    defaultJson.decodeFromString(ProblemDetails.serializer(), bytes.decodeToString())
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (malformed: Exception) {
@@ -135,7 +177,7 @@ class ApiClient(
         ): HttpClient = HttpClientFactory.create { configure(baseUrl, enableLogging, logger) }
 
         /** Installs the shared plugins and defaults; also used to build test clients on a mock engine. */
-        fun HttpClientConfig<*>.configure(
+        internal fun HttpClientConfig<*>.configure(
             baseUrl: String,
             enableLogging: Boolean = false,
             logger: (String) -> Unit = {},
@@ -156,11 +198,12 @@ class ApiClient(
                     level = LogLevel.INFO
                 }
             }
-            defaultRequest {
-                url(baseUrl.trimEnd('/') + "/")
-                accept(ContentType.Application.Json)
-            }
+            // No default Accept: ContentNegotiation adds it for JSON calls, raw calls choose their own.
+            defaultRequest { url(baseUrl.trimEnd('/') + "/") }
         }
+
+        /** Upper bound for an error body that is still parsed as problem details. */
+        internal const val MAX_PROBLEM_BYTES = 64 * 1024
     }
 }
 
@@ -169,3 +212,10 @@ inline fun <reified B> HttpRequestBuilder.jsonBody(body: B) {
     contentType(ContentType.Application.Json)
     setBody(body)
 }
+
+/** Marks a mutating request as safe to retry: the server de-duplicates repeats carrying the same [key]. */
+fun HttpRequestBuilder.idempotencyKey(key: String) {
+    header(IDEMPOTENCY_KEY_HEADER, key)
+}
+
+private const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"

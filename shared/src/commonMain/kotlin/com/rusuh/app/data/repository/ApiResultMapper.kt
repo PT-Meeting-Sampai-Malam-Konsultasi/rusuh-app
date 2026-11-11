@@ -1,10 +1,9 @@
 package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.network.ApiResult
+import com.rusuh.app.data.network.isNetworkFailure
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.ErrorCode
-import io.ktor.client.plugins.HttpRequestTimeoutException
-import kotlinx.io.IOException
 
 /** Maps a transport result to a [DomainResult], keeping the payload as is. */
 fun <T> ApiResult<T>.toDomainResult(): DomainResult<T> = toDomainResult { it }
@@ -21,11 +20,10 @@ fun <T, R> ApiResult<T>.toDomainResult(transform: (T) -> R?): DomainResult<R> =
                 message = problem?.detail ?: problem?.title,
                 code = code,
                 errorCode = problem?.code ?: ErrorCode.UNKNOWN,
+                traceId = problem?.traceId,
+                extras = problem?.extras.orEmpty(),
+                retryAfterSeconds = retryAfterSeconds,
             )
-        is ApiResult.Exception ->
-            if (throwable is IOException || throwable is HttpRequestTimeoutException) {
-                DomainResult.NetworkError
-            } else {
-                DomainResult.TechnicalError
-            }
+        is ApiResult.Failure ->
+            if (isNetworkFailure(throwable)) DomainResult.NetworkError else DomainResult.TechnicalError
     }

@@ -9,7 +9,6 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
-import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -22,6 +21,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.IOException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
@@ -262,7 +262,7 @@ class ApiClientTest {
 
             val result = client.get<Pong>("/slow")
 
-            assertIs<HttpRequestTimeoutException>(assertIs<ApiResult.Exception>(result).throwable)
+            assertIs<HttpRequestTimeoutException>(assertIs<ApiResult.Failure>(result).throwable)
         }
 
     @Test
@@ -272,7 +272,7 @@ class ApiClientTest {
 
             val result = client.get<Pong>("/x")
 
-            assertIs<ApiResult.Exception>(result)
+            assertIs<ApiResult.Failure>(result)
         }
 
     @Test
@@ -280,7 +280,7 @@ class ApiClientTest {
         runTest {
             val client = apiClient { respond("""[1,2,3]""", HttpStatusCode.OK, jsonHeaders) }
 
-            assertIs<ApiResult.Exception>(client.get<Pong>("/x"))
+            assertIs<ApiResult.Failure>(client.get<Pong>("/x"))
         }
 
     @Test
@@ -317,6 +317,178 @@ class ApiClientTest {
             call.cancel()
 
             assertFailsWith<CancellationException> { call.await() }
+        }
+
+    @Test
+    fun `429 and 503 carry the Retry-After seconds header`() =
+        runTest {
+            listOf(
+                HttpStatusCode.TooManyRequests to "RATE_LIMITED",
+                HttpStatusCode.ServiceUnavailable to "SERVICE_UNAVAILABLE",
+            )
+                .forEach { (status, code) ->
+                    val client =
+                        apiClient {
+                            respond(
+                                problemBody(status.value, code),
+                                status,
+                                headersOf(
+                                    HttpHeaders.ContentType to listOf("application/problem+json"),
+                                    HttpHeaders.RetryAfter to listOf("30"),
+                                ),
+                            )
+                        }
+
+                    val error = assertIs<ApiResult.Error>(client.get<Pong>("/x"))
+
+                    assertEquals(30, error.retryAfterSeconds)
+                    assertEquals(status.value, error.code)
+                }
+        }
+
+    @Test
+    fun `Retry-After in HTTP-date form or absent is ignored`() =
+        runTest {
+            val dated =
+                apiClient {
+                    respond(
+                        "",
+                        HttpStatusCode.TooManyRequests,
+                        headersOf(HttpHeaders.RetryAfter, "Wed, 21 Oct 2026 07:28:00 GMT"),
+                    )
+                }
+            val absent = apiClient { respond("", HttpStatusCode.TooManyRequests) }
+
+            assertNull(assertIs<ApiResult.Error>(dated.get<Pong>("/x")).retryAfterSeconds)
+            assertNull(assertIs<ApiResult.Error>(absent.get<Pong>("/x")).retryAfterSeconds)
+        }
+
+    @Test
+    fun `engine io failure becomes a failure result`() =
+        runTest {
+            val client = apiClient { throw IOException("offline") }
+
+            val failure = assertIs<ApiResult.Failure>(client.get<Pong>("/x"))
+
+            assertIs<IOException>(failure.throwable)
+        }
+
+    @Test
+    fun `200 with an empty body for a non Unit type becomes a failure`() =
+        runTest {
+            val client = apiClient { respond("", HttpStatusCode.OK, jsonHeaders) }
+
+            assertIs<ApiResult.Failure>(client.get<Pong>("/x"))
+        }
+
+    @Test
+    fun `problem json content type with charset or upper case is still parsed`() =
+        runTest {
+            listOf("application/problem+json; charset=UTF-8", "Application/Problem+JSON").forEach { type ->
+                val client =
+                    apiClient {
+                        respond(
+                            problemBody(404, "NOT_FOUND"),
+                            HttpStatusCode.NotFound,
+                            headersOf(HttpHeaders.ContentType, type),
+                        )
+                    }
+
+                val error = assertIs<ApiResult.Error>(client.get<Pong>("/x"))
+
+                assertEquals(ErrorCode.NOT_FOUND, error.problem?.code, type)
+            }
+        }
+
+    @Test
+    fun `3xx and 304 responses are errors`() =
+        runTest {
+            listOf(HttpStatusCode.NotModified, HttpStatusCode.MultipleChoices).forEach { status ->
+                val client = apiClient { respond("", status) }
+
+                assertEquals(ApiResult.Error(status.value, null, null), client.get<Pong>("/x"))
+            }
+        }
+
+    @Test
+    fun `problem body that is not a json object has no problem`() =
+        runTest {
+            val client = apiClient { respond("[1,2]", HttpStatusCode.BadRequest, problemHeaders) }
+
+            assertEquals(ApiResult.Error(400, null, null), client.get<Pong>("/x"))
+        }
+
+    @Test
+    fun `oversized problem body is not parsed`() =
+        runTest {
+            val padding = "a".repeat(ApiClient.MAX_PROBLEM_BYTES + 10)
+            val client =
+                apiClient {
+                    respond(
+                        problemBody(409, "NO_STOCK", ",\"pad\":\"$padding\""),
+                        HttpStatusCode.Conflict,
+                        problemHeaders,
+                    )
+                }
+
+            assertEquals(ApiResult.Error(409, null, null), client.get<Pong>("/x"))
+        }
+
+    @Test
+    fun `null members are omitted from the request body`() =
+        runTest {
+            var sentBody = ""
+            val client =
+                apiClient { request ->
+                    sentBody = (request.body as TextContent).text
+                    respond("""{}""", HttpStatusCode.OK, jsonHeaders)
+                }
+
+            client.post<Pong>("x") { jsonBody(Pong(message = "m", note = null)) }
+
+            assertEquals("""{"message":"m","count":0}""", sentBody)
+        }
+
+    @Test
+    fun `getBytes returns raw bytes and forces no json accept`() =
+        runTest {
+            var accept: String? = null
+            val bytes = byteArrayOf(0x25, 0x50, 0x44, 0x46)
+            val client =
+                apiClient { request ->
+                    accept = request.headers[HttpHeaders.Accept]
+                    respond(bytes, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/pdf"))
+                }
+
+            val result = assertIs<ApiResult.Success<ByteArray>>(client.getBytes("/tickets/1/pdf"))
+
+            assertEquals(bytes.toList(), result.data.toList())
+            assertEquals("*/*", accept)
+        }
+
+    @Test
+    fun `getBytes maps an error status to Error`() =
+        runTest {
+            val client = apiClient { respond(problemBody(404, "NOT_FOUND"), HttpStatusCode.NotFound, problemHeaders) }
+
+            val error = assertIs<ApiResult.Error>(client.getBytes("/tickets/1/pdf"))
+
+            assertEquals(ErrorCode.NOT_FOUND, error.problem?.code)
+        }
+
+    @Test
+    fun `idempotencyKey sets the Idempotency-Key header`() =
+        runTest {
+            var key: String? = null
+            val client =
+                apiClient { request ->
+                    key = request.headers["Idempotency-Key"]
+                    respond("""{}""", HttpStatusCode.OK, jsonHeaders)
+                }
+
+            client.post<Pong>("bookings") { idempotencyKey("abc-123") }
+
+            assertEquals("abc-123", key)
         }
 
     private companion object {
