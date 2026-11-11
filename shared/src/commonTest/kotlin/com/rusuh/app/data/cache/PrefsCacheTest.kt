@@ -35,6 +35,13 @@ class PrefsCacheTest {
         }
 
     @Test
+    fun bareAndEmptyPrefixesAreRejected() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> { TestCache(prefs).put("tix_", "1") }
+            assertFailsWith<IllegalArgumentException> { EmptyPrefixCache(prefs) }
+        }
+
+    @Test
     fun booleansAreStoredAsStrings() =
         runTest {
             val cache = TestCache(prefs)
@@ -61,4 +68,8 @@ class PrefsCacheTest {
 
         suspend fun getBoolean(key: String): Boolean? = readBoolean(key)
     }
+
+    private class EmptyPrefixCache(
+        prefs: AppPreferences,
+    ) : PrefsCache(prefs, "")
 }

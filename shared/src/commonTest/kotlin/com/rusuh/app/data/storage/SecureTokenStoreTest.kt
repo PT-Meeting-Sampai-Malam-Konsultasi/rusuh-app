@@ -1,5 +1,6 @@
 package com.rusuh.app.data.storage
 
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -64,6 +65,8 @@ class SecureTokenStoreTest {
             tokens.setDeviceToken("d1")
             tokens.setAdmissionToken("a1")
             tokens.setQueueToken("evt-1", "q1")
+            tokens.setQueueToken("evt-2", "q2")
+            tokens.setQueueToken("evt-3", "q3")
 
             tokens.clearSession()
 
@@ -71,18 +74,65 @@ class SecureTokenStoreTest {
             assertNull(tokens.getRefreshToken())
             assertNull(tokens.getAdmissionToken())
             assertNull(tokens.getQueueToken("evt-1"))
+            assertNull(tokens.getQueueToken("evt-2"))
+            assertNull(tokens.getQueueToken("evt-3"))
+            assertEquals("d1", tokens.getDeviceToken())
+            assertEquals(setOf("auth_device_token"), secure.entries.keys)
+        }
+
+    @Test
+    fun clearSessionKeepsGoingWhenOneRemovalThrowsAndRethrowsTheFirstFailure() =
+        runTest {
+            tokens.accessToken = ACCESS
+            tokens.setRefreshToken("r1")
+            tokens.setDeviceToken("d1")
+            tokens.setAdmissionToken("a1")
+            tokens.setQueueToken("evt-1", "q1")
+            secure.failingRemovals += "auth_refresh_token"
+
+            val failure = assertFailsWith<IllegalStateException> { tokens.clearSession() }
+
+            assertEquals("remove failed", failure.message)
+            assertNull(tokens.accessToken)
+            assertNull(tokens.getAdmissionToken())
+            assertNull(tokens.getQueueToken("evt-1"))
             assertEquals("d1", tokens.getDeviceToken())
         }
 
     @Test
-    fun clearSessionWithoutDeviceTokenLeavesStoreEmpty() =
+    fun clearSessionStillClearsAccessTokenWhenEveryRemovalThrows() =
         runTest {
-            tokens.setRefreshToken("r1")
+            tokens.accessToken = ACCESS
+            secure.failingRemovals += setOf("auth_refresh_token", "book_admission_token", "queue_token_")
+
+            assertFailsWith<IllegalStateException> { tokens.clearSession() }
+
+            assertNull(tokens.accessToken)
+        }
+
+    @Test
+    fun deviceTokenSetConcurrentlyWithClearSessionIsNotLost() =
+        runTest {
+            secure.yieldOnWrite = true
+            repeat(RACE_RUNS) { i ->
+                val device = "d$i"
+                val writer = launch { tokens.setDeviceToken(device) }
+                val logout = launch { tokens.clearSession() }
+                writer.join()
+                logout.join()
+                assertEquals(device, tokens.getDeviceToken())
+            }
+        }
+
+    @Test
+    fun clearSessionWithoutAnyTokensLeavesStoreEmpty() =
+        runTest {
             tokens.clearSession()
             assertEquals(0, secure.entries.size)
         }
 
     private companion object {
         const val ACCESS = "access-secret"
+        const val RACE_RUNS = 20
     }
 }

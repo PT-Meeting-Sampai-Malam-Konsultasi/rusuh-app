@@ -2,12 +2,14 @@ package com.rusuh.app.data.storage
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.GeneralSecurityException
 import java.security.KeyStore
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -26,11 +28,27 @@ class AndroidSecureStore(
     override suspend fun getString(key: String): String? =
         withContext(Dispatchers.IO) {
             val stored = prefs.getString(key, null) ?: return@withContext null
-            runCatching { decrypt(key, Base64.decode(stored, Base64.NO_WRAP)) }
-                .onFailure { e ->
-                    if (e !is GeneralSecurityException && e !is IllegalArgumentException) throw e
-                    prefs.edit().remove(key).commit()
-                }.getOrNull()
+            try {
+                decrypt(key, Base64.decode(stored, Base64.NO_WRAP))
+            } catch (
+                @Suppress("SwallowedException") e: AEADBadTagException,
+            ) {
+                dropCorrupt(key)
+            } catch (
+                @Suppress("SwallowedException") e: KeyPermanentlyInvalidatedException,
+            ) {
+                dropCorrupt(key)
+            } catch (
+                @Suppress("SwallowedException") e: GeneralSecurityException,
+            ) {
+                // Possibly transient (KeyStore busy or unavailable): report a miss, keep the entry.
+                null
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") e: RuntimeException,
+            ) {
+                // Bad base64, truncated data or a malformed entry: corrupt, never recoverable.
+                dropCorrupt(key)
+            }
         }
 
     override suspend fun putString(
@@ -39,16 +57,29 @@ class AndroidSecureStore(
     ) {
         withContext(Dispatchers.IO) {
             val encoded = Base64.encodeToString(encrypt(key, value), Base64.NO_WRAP)
-            prefs.edit().putString(key, encoded).commit()
+            check(prefs.edit().putString(key, encoded).commit()) { WRITE_FAILED }
         }
     }
 
     override suspend fun remove(key: String) {
-        withContext(Dispatchers.IO) { prefs.edit().remove(key).commit() }
+        withContext(Dispatchers.IO) { check(prefs.edit().remove(key).commit()) { WRITE_FAILED } }
+    }
+
+    override suspend fun removeWhere(prefix: String) {
+        withContext(Dispatchers.IO) {
+            val editor = prefs.edit()
+            prefs.all.keys.filter { it.startsWith(prefix) }.forEach { editor.remove(it) }
+            check(editor.commit()) { WRITE_FAILED }
+        }
     }
 
     override suspend fun clear() {
-        withContext(Dispatchers.IO) { prefs.edit().clear().commit() }
+        withContext(Dispatchers.IO) { check(prefs.edit().clear().commit()) { WRITE_FAILED } }
+    }
+
+    private fun dropCorrupt(key: String): String? {
+        prefs.edit().remove(key).commit()
+        return null
     }
 
     private fun encrypt(
@@ -65,6 +96,7 @@ class AndroidSecureStore(
         key: String,
         data: ByteArray,
     ): String {
+        require(data.size > IV_BYTES + TAG_BITS / BITS_PER_BYTE) { "Entry too short" }
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(TAG_BITS, data, 0, IV_BYTES))
         cipher.updateAAD(key.toByteArray(Charsets.UTF_8))
@@ -89,6 +121,7 @@ class AndroidSecureStore(
     }
 
     private companion object {
+        const val WRITE_FAILED = "Secure store write failed"
         const val FILE_NAME = "rusuh_secure_store"
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val KEY_ALIAS = "rusuh_secure_store_key"
@@ -96,5 +129,6 @@ class AndroidSecureStore(
         const val KEY_BITS = 256
         const val TAG_BITS = 128
         const val IV_BYTES = 12
+        const val BITS_PER_BYTE = 8
     }
 }

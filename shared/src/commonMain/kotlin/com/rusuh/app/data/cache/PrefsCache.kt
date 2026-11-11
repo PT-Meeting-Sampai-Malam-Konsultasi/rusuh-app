@@ -10,6 +10,10 @@ abstract class PrefsCache(
     private val prefs: AppPreferences,
     private val prefix: String,
 ) {
+    init {
+        require(prefix.isNotEmpty()) { "Cache prefix must not be empty" }
+    }
+
     protected suspend fun read(key: String): String? = prefs.get(checked(key))
 
     protected suspend fun write(
@@ -27,7 +31,9 @@ abstract class PrefsCache(
     ) = write(key, value.toString())
 
     private fun checked(key: String): String {
-        require(key.startsWith(prefix)) { "Cache key must start with $prefix" }
+        require(
+            key.startsWith(prefix) && key.length > prefix.length,
+        ) { "Cache key must start with $prefix and name a value" }
         return key
     }
 }
