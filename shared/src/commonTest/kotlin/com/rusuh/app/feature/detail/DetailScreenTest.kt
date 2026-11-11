@@ -145,22 +145,26 @@ class DetailScreenTest {
     }
 
     @Test
-    fun ticketCategoriesExpandInListOrder() {
-        val tickets = ticketCategories(categories, mapOf("tribun-atas" to 1, "fest-b" to 2))
-        assertEquals(listOf("fest-b", "fest-b", "tribun-atas"), tickets.map { it.id })
+    fun ticketsStayInInsertionOrderAndKeepTheirCategory() {
+        val form =
+            DetailFormState()
+                .withQuantity("tribun-atas", 1, 3)
+                .withQuantity("fest-b", 2, 3)
+        assertEquals(listOf("tribun-atas", "fest-b", "fest-b"), form.attendees.map { it.categoryId })
+        assertEquals(3, form.attendees.map { it.id }.toSet().size)
     }
 
     @Test
     fun subtotalSumsSelectedCategories() {
-        assertEquals(2 * 850_000 + 450_000, subtotalRupiah(categories, mapOf("fest-b" to 2, "tribun-atas" to 1)))
-        assertEquals(0, subtotalRupiah(categories, emptyMap()))
+        assertEquals(2 * 850_000L + 450_000L, subtotalRupiah(categories, mapOf("fest-b" to 2, "tribun-atas" to 1)))
+        assertEquals(0L, subtotalRupiah(categories, emptyMap()))
     }
 
     @Test
     fun adminFeeIsChargedOncePerOrderNotPerTicket() {
-        assertEquals(2_160_000, orderTotalRupiah(subtotal = 2_150_000, adminFee = 10_000, tickets = 3))
-        assertEquals(860_000, orderTotalRupiah(subtotal = 850_000, adminFee = 10_000, tickets = 1))
-        assertEquals(0, orderTotalRupiah(subtotal = 0, adminFee = 10_000, tickets = 0))
+        assertEquals(2_160_000L, orderTotalRupiah(subtotal = 2_150_000, adminFee = 10_000, tickets = 3))
+        assertEquals(860_000L, orderTotalRupiah(subtotal = 850_000, adminFee = 10_000, tickets = 1))
+        assertEquals(0L, orderTotalRupiah(subtotal = 0, adminFee = 10_000, tickets = 0))
     }
 
     @Test

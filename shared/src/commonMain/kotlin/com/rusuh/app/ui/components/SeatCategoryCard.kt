@@ -71,7 +71,7 @@ data class SeatCategoryUi(
     val id: String,
     val name: String,
     val description: String?,
-    val priceRupiah: Int,
+    val priceRupiah: Long,
     val availability: SeatAvailability = SeatAvailability.Available,
     val entryGate: String? = null,
 ) {
@@ -268,7 +268,7 @@ internal fun availabilityLabel(availability: SeatAvailability): StringResource =
  * Pure function — unit-tested directly. Reuses [formatThousands] so grouping
  * stays identical to the rest of the app.
  */
-internal fun formatRupiah(amount: Int): String = "Rp ${amount.formatThousands()}"
+internal fun formatRupiah(amount: Long): String = "Rp ${amount.formatThousands()}"
 
 /** Screen-reader description: name, seating, gate, price, availability and current selection. */
 @Composable
