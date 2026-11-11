@@ -10,6 +10,7 @@ import com.rusuh.app.data.repository.RealMyQueuesRepository
 import com.rusuh.app.data.repository.RealQueueRepository
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
+import com.rusuh.app.data.repository.StubQueueRepository
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
@@ -38,6 +39,14 @@ import org.koin.dsl.onClose
 const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
 
 /**
+ * The repositories that still resolve to FAKE data in [BackendMode.Real] while the fallback is on, release builds
+ * included (each logs one WARNING when first resolved). A release screen backed by one of them shows stub data: this
+ * list is the signal, kept in sync with the `notYetReal(...)` bindings by `DataModuleTest` and quoted in
+ * docs/data-layer.md. Shrink it as the real repositories land; remove the fallback when it is empty.
+ */
+val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("TicketsRepository", "DetailRepository")
+
+/**
  * Binds every repository interface to its stub or its real implementation, per [mode]; every environment defaults to
  * [BackendMode.Real] (see [BackendMode.defaultFor]), [BackendMode.Stub] is a debug-only opt-in.
  *
@@ -50,8 +59,7 @@ const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
  *   (singletons); without it, resolving throws [RealRepositoryNotAvailableException]. When a feature ticket builds
  *   a real repository, bind it in place of the `notYetReal(...)` line of that repository below.
  *
- * The device and queue ApiServices and the `DeviceRepository` are bound in both modes: in stub mode they run on the
- * [StubEngine].
+ * The ApiServices and the `DeviceRepository` are bound in both modes: in stub mode they run on the [StubEngine].
  *
  * Load it after `coreModule()`. A function, not a `val`, for the same reason as `coreModule()`.
  */
@@ -80,7 +88,6 @@ fun dataModule(
                 platform = platformName,
             )
         }
-        single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }
 
         when (mode) {
             BackendMode.Stub -> {
@@ -91,6 +98,7 @@ fun dataModule(
                 // shortcut: hand-written stub repositories until the feature tickets build the real ones.
                 single<HomeRepository> { StubHomeRepository() }
                 single<WaitingRoomRepository> { StubWaitingRoomRepository() }
+                single<QueueRepository> { StubQueueRepository(get()) }
                 single<TicketsRepository> { StubTicketsRepository() }
                 single<DetailRepository> { StubDetailRepository(get()) }
                 single<MyQueuesRepository> { StubMyQueuesRepository() }
@@ -98,6 +106,7 @@ fun dataModule(
             BackendMode.Real -> {
                 // ServerClock: coreModule's MonotonicServerClock, the instance the response plugin keeps in sync.
                 single<HomeRepository> { RealHomeRepository(get(), get(), get()) }
+                single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }
                 single<WaitingRoomRepository> { get<QueueRepository>() }
                 single<MyQueuesRepository> { RealMyQueuesRepository(get(), get(), get(), get(), get()) }
                 single<TicketsRepository> { notYetReal("TicketsRepository") { StubTicketsRepository() } }

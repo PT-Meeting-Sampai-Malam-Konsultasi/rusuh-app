@@ -26,7 +26,8 @@ private const val MILLIS_PER_MINUTE = 60_000L
 /**
  * Maps one event of `GET /events` to the Home card model, or null when it cannot be shown: a blank id or name, or a
  * state this app version does not know (a new server state must not show a wrong badge). [nowMillis] is the SERVER
- * time (the response's `serverNow`), used for the coming-soon countdown. Times are shown in the venue's zone.
+ * time (the response's `serverNow`), used for the coming-soon countdown; null (unknown) shows the event date instead.
+ * Times are shown in the venue's zone.
  *
  * shortcut: a sold-out event without `capacity` shows 1 as its capacity (the badge model requires a positive one),
  * a coming-soon event without `saleOpensAt` shows the event date in place of a countdown, and an ended one without
@@ -35,7 +36,7 @@ private const val MILLIS_PER_MINUTE = 60_000L
  */
 internal fun EventDto.toHomeEventItem(
     language: AppLanguage,
-    nowMillis: Long,
+    nowMillis: Long?,
 ): HomeEventItem? {
     val status = toStatus(language, nowMillis)
     return if (eventId.isBlank() || name.isBlank() || status == null) {
@@ -81,7 +82,7 @@ private fun EventDto.startMoment(): LocalMoment? =
 
 private fun EventDto.toStatus(
     language: AppLanguage,
-    nowMillis: Long,
+    nowMillis: Long?,
 ): EventStatus? {
     val words = language.words()
     val zone = zoneLabelFor(timezone)
@@ -100,10 +101,10 @@ private fun EventDto.toStatus(
 private fun EventDto.comingSoon(
     words: FormatWords,
     zone: TimeZoneLabel,
-    nowMillis: Long,
+    nowMillis: Long?,
 ): EventStatus {
     val opensAt = saleOpensAt?.let(::parseRfc3339Millis)
-    return if (opensAt == null) {
+    return if (opensAt == null || nowMillis == null) {
         EventStatus.ComingSoon(countdown = startMoment()?.dayMonthYear(words) ?: eventId)
     } else {
         EventStatus.ComingSoon(

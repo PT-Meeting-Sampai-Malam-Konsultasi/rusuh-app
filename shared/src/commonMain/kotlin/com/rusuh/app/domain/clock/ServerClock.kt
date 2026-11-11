@@ -7,6 +7,12 @@ package com.rusuh.app.domain.clock
  */
 fun interface ServerClock {
     fun nowMillis(): Long
+
+    /**
+     * False until a server time has been seen (the clock then counts from an arbitrary start, so [nowMillis] must not
+     * be compared with server timestamps). Fixed clocks such as the stub demo clock are always synced.
+     */
+    val isSynced: Boolean get() = true
 }
 
 /** Milliseconds left until [expiresAtMillis] on the server timeline; never negative. */

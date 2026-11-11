@@ -24,7 +24,7 @@ val appModule =
 
         // Waiting Room.
         factory { ObserveQueuePlaceUseCase(get()) }
-        factory { (eventId: String) -> WaitingRoomViewModel(eventId, get()) }
+        factory { (eventId: String) -> WaitingRoomViewModel(eventId, get(), get()) }
         // TODO(FR-04-M4 #30): the Waiting Room's LeaveQueue intent calls this once the ViewModel handles it.
         factory { LeaveQueueUseCase(get()) }
 

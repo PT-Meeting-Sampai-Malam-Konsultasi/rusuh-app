@@ -12,6 +12,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+private const val DAY = 24 * 60 * 60 * 1_000L
+
 class RealDeviceRepositoryTest {
     private val devicesLine = "POST /devices"
 
@@ -126,6 +128,53 @@ class RealDeviceRepositoryTest {
             h.devices.ensureRegistered()
 
             assertEquals(1, h.backend.callsTo(devicesLine))
+        }
+
+    private suspend fun unsyncedRepository(
+        h: QueueHarness,
+        expiresAt: Long,
+    ): RealDeviceRepository {
+        h.tokens.setDeviceToken("old-token")
+        h.deviceCache.setTokenExpiresAt(expiresAt)
+        return RealDeviceRepository(
+            api = com.rusuh.app.data.remote.DeviceApiService(h.backend.api),
+            tokens = h.tokens,
+            secureStore = h.secure,
+            cache = h.deviceCache,
+            // Not synced: it counts from an arbitrary small start and must not be compared with the expiry.
+            serverClock = TestServerClock(now = 5_000L, synced = false),
+            platform = "android",
+            newInstallId = { "install-1" },
+            wallClock = { FIXTURE_NOW_MILLIS },
+        )
+    }
+
+    @Test
+    fun beforeTheClockSyncsAFarFromExpiredTokenIsKept() =
+        runTest {
+            val h = QueueHarness()
+            h.backend.on(devicesLine, Reply.created(DEVICE_JSON))
+            val devices = unsyncedRepository(h, expiresAt = FIXTURE_NOW_MILLIS + 3 * DAY)
+
+            assertEquals(DomainResult.Success(Unit), devices.ensureRegistered())
+
+            assertEquals(0, h.backend.callsTo(devicesLine))
+            assertEquals("old-token", h.tokens.getDeviceToken())
+        }
+
+    @Test
+    fun beforeTheClockSyncsAnExpiredOrNearlyExpiredTokenIsReplaced() =
+        runTest {
+            listOf(FIXTURE_NOW_MILLIS - DAY, FIXTURE_NOW_MILLIS + 3_600_000L).forEach { expiresAt ->
+                val h = QueueHarness()
+                h.backend.on(devicesLine, Reply.created(DEVICE_JSON))
+                val devices = unsyncedRepository(h, expiresAt)
+
+                devices.ensureRegistered()
+
+                assertEquals(1, h.backend.callsTo(devicesLine), "expires at $expiresAt")
+                assertEquals("mock-device-token", h.tokens.getDeviceToken())
+            }
         }
 
     @Test

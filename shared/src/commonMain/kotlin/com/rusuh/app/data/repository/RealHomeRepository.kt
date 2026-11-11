@@ -12,7 +12,8 @@ import com.rusuh.app.feature.home.HomeRepository
 
 /**
  * [HomeRepository] over `GET /events`. The countdown on coming-soon cards counts from the response's `serverNow`
- * (the [serverClock] when the body has none), and all copy follows the active language of [localeProvider].
+ * (the [serverClock] when the body has none and it is synced), and all copy follows the active language of
+ * [localeProvider].
  * A failed call throws [DomainException], which the ViewModel shows as its error state with a retry.
  *
  * Cache-first rendering (`HomeCache`) is not wired yet.
@@ -27,7 +28,8 @@ class RealHomeRepository(
         if (result !is DomainResult.Success) throw DomainException(result)
         val body = result.data
         val language = localeProvider.language()
-        val now = body.serverNow?.let(::parseRfc3339Millis) ?: serverClock.nowMillis()
+        // An unsynced clock counts from an arbitrary start: without a server time the cards show no countdown.
+        val now = body.serverNow?.let(::parseRfc3339Millis) ?: serverClock.takeIf { it.isSynced }?.nowMillis()
         return body.items.mapNotNull { it.toHomeEventItem(language, now) }
     }
 }
