@@ -33,6 +33,18 @@ sealed class Screen(val route: String) {
         /** Build the concrete route for [eventId]. */
         fun routeFor(eventId: String): String = "waiting-room/$eventId"
     }
+
+    /**
+     * Detail Ticket page for a single event: pick categories, enter attendees, continue to pay.
+     *
+     * @property route the route pattern with an `eventId` path argument.
+     */
+    data object Detail : Screen("detail/{eventId}") {
+        const val ARG_EVENT_ID = "eventId"
+
+        /** Build the concrete route for [eventId]. */
+        fun routeFor(eventId: String): String = "detail/$eventId"
+    }
 }
 
 /**

@@ -155,3 +155,49 @@ and each test needs a fresh one.
 Wiring of ApiServices, Repositories and Caches (`single`) and UseCases (`factory`) arrives with the feature tickets.
 
 In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `CoreModuleTest`.
+
+## Storage
+
+| Data | Where | Persisted |
+|---|---|---|
+| Access token | `TokenStore.accessToken` (memory) | Never |
+| Refresh, device, admission tokens, queue token per event (`queue_token_<eventId>`) | `SecureStore` via `SecureTokenStore` | Yes, encrypted |
+| Non-sensitive cache (JSON payloads, flags) | `AppPreferences` via a module `*Cache` | Yes, plain |
+
+- `SecureStore` (`suspend` get/put/remove/clear): Android keeps an AES-256-GCM key in the AndroidKeyStore (not
+  exportable) and stores `base64(iv + ciphertext)` in private SharedPreferences, with the entry name bound as AAD.
+  We do not use `androidx.security:security-crypto` (`EncryptedSharedPreferences`): it is deprecated and no longer
+  maintained, while the KeyStore AES-GCM approach needs no extra dependency. iOS uses the Keychain
+  (`kSecClassGenericPassword`, service = bundle id, `AfterFirstUnlockThisDeviceOnly`: no iCloud sync, no restore
+  to another device). An undecryptable Android entry reads as `null` and is deleted, so the user simply signs in again.
+- `AppPreferences` is SharedPreferences / NSUserDefaults. Booleans are stored as `"true"`/`"false"`.
+- Interfaces live in `data/storage`; platform classes are bound in `platformModule`, the rest in `storageModule`.
+  Tests use in-memory fakes of both interfaces (`FakeStorage.kt`).
+- Cache pattern: extend `PrefsCache(prefs, prefix)` with the feature prefix (`home_`, `queue_`, `book_`, `tix_`,
+  `auth_`). The key strings are constants inside the owning cache and nowhere else; keys outside the prefix are
+  rejected. `HomeCache` is the example. Secure keys are owned by `SecureTokenStore`.
+- Logout: `TokenStore.clearSession()` clears the access token first, then removes the refresh, admission and all
+  `queue_token_` entries (via `SecureStore.removeWhere`), attempting every removal even if one fails and rethrowing
+  the first failure. The device token is never touched, because it identifies the install, not the session. Token
+  writes and logout share one lock.
+- Backup and restore: the `rusuh_secure_store` file is excluded from cloud backup and device transfer
+  (`backup_rules.xml`, `data_extraction_rules.xml`), since the Keystore key does not move between devices. After a
+  restore the user signs in again and the app registers a new device token.
+- iOS fresh install: the Keychain survives an uninstall but NSUserDefaults does not. `KeychainSecureStore` keeps a
+  first-launch flag in NSUserDefaults and wipes this service's Keychain items once when the flag is missing.
+  Keychain errors other than "not found" throw `KeychainException` (status only) instead of reading as a miss.
+- Android read failures: a bad tag, invalidated key or structurally corrupt entry (`IllegalArgumentException`: bad
+  base64, too short, malformed parameters) is deleted and reads as null; every other failure
+  (`GeneralSecurityException`, `ProviderException`, `IllegalStateException`, ...) is treated as transient: null, entry
+  kept. Failed writes throw.
+- Logout is cancellation-proof (`NonCancellable`), attempts every removal and rethrows the first failure with the
+  others as suppressed. `SecureTokenStore` keeps a session generation bumped by `clearSession`: a refresh, admission
+  or queue token write that started before a logout and runs after it is discarded, so it cannot resurrect a token.
+- Never persisted: the access token, passwords, OTPs, NIK and payment data. Never log token values.
+- Threat model: tokens are protected against other apps and against reading a device backup or file dump (private
+  app storage and a Keystore key that is non-exportable and, on devices that support it, hardware-backed). A rooted or jailbroken device with a live
+  process, or malware running as the app, can still use the keys; short access token lifetimes and server-side
+  refresh token revocation are the mitigation.
+- The platform actuals (Keystore, Keychain, SharedPreferences, NSUserDefaults) need a device or simulator, so
+  they are not unit tested; they are covered by the later integration test. iOS compilation is checked by
+  `compileKotlinIosSimulatorArm64`.

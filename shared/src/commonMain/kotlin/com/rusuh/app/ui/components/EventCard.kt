@@ -257,7 +257,10 @@ internal fun buildCardIdentity(data: EventCardData): String =
     ).filter { it.isNotBlank() }.joinToString(", ")
 
 /** Groups digits with dots (Indonesian thousands separator): 12000 -> "12.000". */
-internal fun Int.formatThousands(): String {
+internal fun Int.formatThousands(): String = toLong().formatThousands()
+
+/** Long variant of [Int.formatThousands] (money amounts). */
+internal fun Long.formatThousands(): String {
     val digits = toString()
     val sb = StringBuilder()
     for ((index, ch) in digits.withIndex()) {

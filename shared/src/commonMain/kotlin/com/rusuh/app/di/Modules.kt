@@ -9,4 +9,5 @@ val sharedModules: List<Module>
             coreModule(),
             appModule,
             platformModule,
+            storageModule,
         )

@@ -17,12 +17,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.rusuh.app.feature.auth.SignInSheet
+import com.rusuh.app.feature.auth.rememberPlaceholderSignIn
+import com.rusuh.app.feature.detail.DetailRoute
+import com.rusuh.app.feature.detail.DetailViewModel
+import com.rusuh.app.feature.detail.DetailViewModelHolder
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesRoute
@@ -69,6 +78,36 @@ fun RusuhNavGraph(navController: NavHostController) {
         topLevelTabs(navController)
 
         composable(
+            route = Screen.Detail.route,
+            arguments = listOf(navArgument(Screen.Detail.ARG_EVENT_ID) { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getString(Screen.Detail.ARG_EVENT_ID).orEmpty()
+            val koin = getKoin()
+            val viewModel =
+                viewModel<DetailViewModelHolder>(
+                    viewModelStoreOwner = backStackEntry,
+                    key = "detail-$eventId",
+                    factory =
+                        viewModelFactory {
+                            initializer { DetailViewModelHolder(koin.get<DetailViewModel> { parametersOf(eventId) }) }
+                        },
+                ).viewModel
+            DetailRoute(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onHome = { navController.popBackStack(Screen.Home.route, inclusive = false) },
+                // TODO(FR-04-M5 #78): temporary queue entry until the join/route decision lands.
+                onQueue = { id ->
+                    navController.navigate(Screen.WaitingRoom.routeFor(id)) {
+                        popUpTo(Screen.Detail.route) { inclusive = true }
+                    }
+                },
+                // TODO(FR-16-M1 #81): no payment route yet; do not navigate.
+                onPayment = {},
+            )
+        }
+
+        composable(
             route = Screen.WaitingRoom.route,
             arguments = listOf(navArgument(Screen.WaitingRoom.ARG_EVENT_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
@@ -104,12 +143,11 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
             containerColor = RusuhColors.Paper,
         ) { innerPadding ->
             // Home's own content and business logic are unchanged; only the
-            // bottom-bar Scaffold wraps it. onEventClick (Detail routing) is left
-            // at its no-op default — the Detail destination is out of this task's
-            // scope, so wiring it here is deferred rather than pointed at the
-            // wrong screen.
+            // bottom-bar Scaffold wraps it. Tapping an event opens Detail directly.
+            // TODO(FR-04-M5 #78): temporary until the queue join/route decision lands.
             HomeScreen(
                 viewModel = viewModel,
+                onEventClick = { eventId -> navController.navigate(Screen.Detail.routeFor(eventId)) },
                 modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
             )
         }
@@ -140,17 +178,24 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
                 }
             }
         }
-        TicketsScreen(
-            state = state.ui,
-            actions =
-                TicketsActions(
-                    onViewETicket = { viewModel.dispatch(TicketsIntent.ViewETicket(it)) },
-                    onTabSelected = onTabSelected,
-                    onBrowseEvents = { viewModel.dispatch(TicketsIntent.BrowseEvents) },
-                    onSignIn = { viewModel.dispatch(TicketsIntent.SignIn) },
-                    onRetry = { viewModel.dispatch(TicketsIntent.Retry) },
-                ),
-        )
+        // Placeholder sign-in (local UI state only) until AUTH-00-M3 wires the real auth state.
+        val signIn = rememberPlaceholderSignIn()
+        Box(Modifier.fillMaxSize()) {
+            TicketsScreen(
+                state = state.ui,
+                // Inert for TalkBack while the sheet is open.
+                modifier = if (signIn.state != null) Modifier.clearAndSetSemantics {} else Modifier,
+                actions =
+                    TicketsActions(
+                        onViewETicket = { viewModel.dispatch(TicketsIntent.ViewETicket(it)) },
+                        onTabSelected = onTabSelected,
+                        onBrowseEvents = { viewModel.dispatch(TicketsIntent.BrowseEvents) },
+                        onSignIn = signIn::open,
+                        onRetry = { viewModel.dispatch(TicketsIntent.Retry) },
+                    ),
+            )
+            signIn.state?.let { SignInSheet(state = it, actions = signIn.actions) }
+        }
     }
 
     composable(Screen.Account.route) {
