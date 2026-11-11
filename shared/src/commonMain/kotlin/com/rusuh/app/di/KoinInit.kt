@@ -1,6 +1,7 @@
 package com.rusuh.app.di
 
 import com.rusuh.app.data.network.AppEnvironment
+import com.rusuh.app.data.network.NetworkConfig
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.dsl.KoinAppDeclaration
@@ -25,4 +26,18 @@ fun initKoin(
         modules(module { single { environment } })
         modules(sharedModules(backendMode))
     }
+}
+
+/**
+ * Starts Koin the way a platform build type asks for it: [isDebug] is the build type, [backendModeName] an optional
+ * debug-only override (`"Stub"` or `"Real"`). The mock-or-real choice is `NetworkConfig.MOCK_API`, applied to debug
+ * builds only; a release build always starts on Production with real HTTP (see [NetworkConfig.startup]).
+ */
+fun initKoinForBuild(
+    isDebug: Boolean,
+    backendModeName: String? = null,
+    appDeclaration: KoinAppDeclaration = {},
+): KoinApplication {
+    val startup = NetworkConfig.startup(isDebug, backendModeName)
+    return initKoin(startup.environment, startup.backendMode, appDeclaration)
 }

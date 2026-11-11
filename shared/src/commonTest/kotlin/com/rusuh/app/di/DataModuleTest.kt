@@ -6,14 +6,23 @@ import com.rusuh.app.data.network.ApiClient
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.AppEnvironment
 import com.rusuh.app.data.network.buildHttpClient
+import com.rusuh.app.data.repository.RealDeviceRepository
+import com.rusuh.app.data.repository.RealHomeRepository
+import com.rusuh.app.data.repository.RealMyQueuesRepository
+import com.rusuh.app.data.repository.RealQueueRepository
+import com.rusuh.app.data.storage.AppPreferences
+import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.data.storage.FakeSecureStore
+import com.rusuh.app.data.storage.SecureStore
 import com.rusuh.app.data.storage.SecureTokenStore
 import com.rusuh.app.data.storage.TokenStore
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.repository.DetailRepository
+import com.rusuh.app.domain.repository.DeviceRepository
 import com.rusuh.app.domain.repository.MyQueuesRepository
+import com.rusuh.app.domain.repository.QueueRepository
 import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.StubHomeRepository
 import com.rusuh.app.feature.tickets.TicketsRepository
@@ -53,8 +62,10 @@ class DataModuleTest {
             modules(
                 module {
                     single { environment }
-                    single<TokenStore> { SecureTokenStore(FakeSecureStore()) }
+                    single<SecureStore> { FakeSecureStore() }
+                    single<AppPreferences> { FakeAppPreferences() }
                 },
+                storageModule,
                 coreModule(),
                 dataModule(mode, allowFallback) { warnings += it },
             )
@@ -66,28 +77,36 @@ class DataModuleTest {
         allowFallback: Boolean = true,
     ): Koin = app(environment, mode, allowFallback).koin
 
-    private val repositories: Map<String, KClass<*>> =
+    /** Repositories with a network implementation in [BackendMode.Real]. */
+    private val realRepositories: Map<String, KClass<*>> =
         mapOf(
             "HomeRepository" to HomeRepository::class,
             "WaitingRoomRepository" to WaitingRoomRepository::class,
-            "TicketsRepository" to TicketsRepository::class,
-            "DetailRepository" to DetailRepository::class,
             "MyQueuesRepository" to MyQueuesRepository::class,
+            "QueueRepository" to QueueRepository::class,
+            "DeviceRepository" to DeviceRepository::class,
         )
 
+    /** Repositories that still fall back to their stub in [BackendMode.Real]. */
+    private val stubOnlyRepositories: Map<String, KClass<*>> =
+        mapOf(
+            "TicketsRepository" to TicketsRepository::class,
+            "DetailRepository" to DetailRepository::class,
+        )
+
+    private val repositories: Map<String, KClass<*>> = realRepositories + stubOnlyRepositories
+
     @Test
-    fun mockDefaultsToStubAndTheRestToReal() {
-        assertEquals(BackendMode.Stub, BackendMode.defaultFor(AppEnvironment.Mock))
-        assertEquals(BackendMode.Real, BackendMode.defaultFor(AppEnvironment.Staging))
-        assertEquals(BackendMode.Real, BackendMode.defaultFor(AppEnvironment.Production))
+    fun everyEnvironmentDefaultsToRealHttp() {
+        AppEnvironment.entries.forEach { assertEquals(BackendMode.Real, BackendMode.defaultFor(it), "$it") }
     }
 
     @Test
     fun resolveAppliesTheOverrideAndTheDefault() {
-        assertEquals(BackendMode.Stub, BackendMode.resolve(AppEnvironment.Mock))
-        assertEquals(BackendMode.Stub, BackendMode.resolve(AppEnvironment.Mock, ""))
-        assertEquals(BackendMode.Stub, BackendMode.resolve(AppEnvironment.Mock, null))
-        assertEquals(BackendMode.Real, BackendMode.resolve(AppEnvironment.Mock, "real"))
+        assertEquals(BackendMode.Real, BackendMode.resolve(AppEnvironment.Mock))
+        assertEquals(BackendMode.Real, BackendMode.resolve(AppEnvironment.Mock, ""))
+        assertEquals(BackendMode.Real, BackendMode.resolve(AppEnvironment.Mock, null))
+        assertEquals(BackendMode.Stub, BackendMode.resolve(AppEnvironment.Mock, "stub"))
         assertEquals(BackendMode.Stub, BackendMode.resolve(AppEnvironment.Staging, " Stub "))
     }
 
@@ -113,10 +132,22 @@ class DataModuleTest {
     }
 
     @Test
-    fun strictRealModeFailsLoudlyForEveryRepositoryWithoutANetworkImplementation() {
+    fun realModeBindsTheNetworkImplementationsForHomeQueueMyQueuesAndDevice() {
         val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
 
-        repositories.forEach { (name, type) ->
+        assertIs<RealHomeRepository>(koin.get<HomeRepository>())
+        assertIs<RealQueueRepository>(koin.get<QueueRepository>())
+        assertIs<RealMyQueuesRepository>(koin.get<MyQueuesRepository>())
+        assertIs<RealDeviceRepository>(koin.get<DeviceRepository>())
+        assertSame<Any>(koin.get<QueueRepository>(), koin.get<WaitingRoomRepository>(), "one queue behind both seams")
+        assertTrue(warnings.isEmpty(), "no stub is used for these: $warnings")
+    }
+
+    @Test
+    fun strictRealModeFailsLoudlyOnlyForTheRepositoriesWithoutANetworkImplementation() {
+        val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
+
+        stubOnlyRepositories.forEach { (name, type) ->
             val failure = assertFailsWith<Exception>(name) { koin.get<Any>(type) }
             val messages = generateSequence<Throwable>(failure) { it.cause }.mapNotNull { it.message }.toList()
             assertTrue(
@@ -124,6 +155,7 @@ class DataModuleTest {
                 "$name: $messages",
             )
         }
+        realRepositories.forEach { (name, type) -> assertTrue(koin.get<Any>(type) != null, name) }
         assertTrue(warnings.isEmpty())
     }
 
@@ -131,22 +163,22 @@ class DataModuleTest {
     fun strictRealModeKeepsFailingOnASecondResolution() {
         val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
 
-        assertFailsWith<Exception> { koin.get<HomeRepository>() }
-        assertFailsWith<Exception> { koin.get<HomeRepository>() }
+        assertFailsWith<Exception> { koin.get<DetailRepository>() }
+        assertFailsWith<Exception> { koin.get<DetailRepository>() }
     }
 
     @Test
-    fun realModeFallsBackToTheStubAndWarnsOncePerRepository() {
+    fun realModeFallsBackToTheStubOnlyForDetailAndTicketsAndWarnsOncePerRepository() {
         val koin = koin(AppEnvironment.Staging, BackendMode.Real)
 
         repositories.values.forEach { type -> koin.get<Any>(type) }
         repositories.values.forEach { type -> koin.get<Any>(type) } // singletons: no second warning
 
-        assertIs<StubHomeRepository>(koin.get<HomeRepository>())
-        assertEquals(repositories.size, warnings.size, "$warnings")
-        repositories.keys.forEach { name ->
+        assertEquals(stubOnlyRepositories.size, warnings.size, "$warnings")
+        stubOnlyRepositories.keys.forEach { name ->
             assertTrue(warnings.count { it.startsWith("WARNING: $name ") && "STUB" in it } == 1, "$name: $warnings")
         }
+        assertTrue(warnings.none { realName -> realRepositories.keys.any { it in realName } }, "$warnings")
     }
 
     @Test
@@ -245,8 +277,8 @@ class DataModuleTest {
     }
 
     @Test
-    fun initKoinUsesTheStubDefaultForMock() {
-        val koin = initKoin(AppEnvironment.Mock).koin
+    fun initKoinStartsTheStubWhenAskedForIt() {
+        val koin = initKoin(AppEnvironment.Mock, BackendMode.Stub).koin
         try {
             assertIs<StubHomeRepository>(koin.get<HomeRepository>())
         } finally {

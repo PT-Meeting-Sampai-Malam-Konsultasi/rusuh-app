@@ -7,7 +7,7 @@ import com.rusuh.app.data.network.AppEnvironment
  *
  * - [Stub]: repositories and the HTTP engine run in process on spec-based stub payloads. No backend, no network.
  * - [Real]: repositories use the network implementations over HTTP to the environment's hosts. With
- *   [AppEnvironment.Mock] that is the Mockoon server.
+ *   [AppEnvironment.Mock] that is the Mockoon server (see `NetworkConfig.MOCK_API`).
  */
 enum class BackendMode {
     Stub,
@@ -16,11 +16,12 @@ enum class BackendMode {
 
     companion object {
         /**
-         * Default per environment: [AppEnvironment.Mock] runs on [Stub] so a debug build works with no backend;
-         * Staging and Production are [Real].
+         * Default for every environment: [Real] (HTTP; to Mockoon for [AppEnvironment.Mock], to the real host
+         * otherwise). [Stub] is an explicit debug opt-in only. [environment] is kept so a future environment can
+         * differ.
          */
-        fun defaultFor(environment: AppEnvironment): BackendMode =
-            if (environment == AppEnvironment.Mock) Stub else Real
+        @Suppress("UnusedParameter")
+        fun defaultFor(environment: AppEnvironment): BackendMode = Real
 
         /**
          * The mode for [environment] given an optional entry-point override ([overrideName]: null or blank keeps

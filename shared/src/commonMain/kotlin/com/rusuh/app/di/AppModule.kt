@@ -3,6 +3,7 @@ package com.rusuh.app.di
 import com.rusuh.app.domain.usecase.CreateBookingUseCase
 import com.rusuh.app.domain.usecase.GetDetailUseCase
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
+import com.rusuh.app.domain.usecase.LeaveQueueUseCase
 import com.rusuh.app.domain.usecase.ValidateAttendeeUseCase
 import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.home.HomeViewModel
@@ -24,6 +25,8 @@ val appModule =
         // Waiting Room.
         factory { ObserveQueuePlaceUseCase(get()) }
         factory { (eventId: String) -> WaitingRoomViewModel(eventId, get()) }
+        // TODO(FR-04-M4 #30): the Waiting Room's LeaveQueue intent calls this once the ViewModel handles it.
+        factory { LeaveQueueUseCase(get()) }
 
         // Tickets (Tiket tab).
         factory { GetMyTicketsUseCase(get()) }

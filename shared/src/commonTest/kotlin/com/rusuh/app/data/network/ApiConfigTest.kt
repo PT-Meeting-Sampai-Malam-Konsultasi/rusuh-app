@@ -87,14 +87,14 @@ class ApiConfigTest {
     }
 
     @Test
-    fun productionAndStagingUseSeparateHttpsHosts() {
+    fun productionAndStagingUseTheRealHostForAllThreeHosts() {
+        // shortcut: the queue and pay hosts are not confirmed, so every host is the one real host for now.
         listOf(AppEnvironment.Staging, AppEnvironment.Production).forEach { env ->
             val config = ApiConfig.forEnvironment(env)
-            val hosts = setOf(config.baseUrl, config.queueBaseUrl, config.payBaseUrl)
-            assertEquals(3, hosts.size, "$env hosts must differ")
-            assertTrue(hosts.all { it.startsWith("https://") }, "$env must be https")
+            assertEquals("https://api.rusuh-tiket.web.id", config.baseUrl, "$env api")
+            assertEquals("https://api.rusuh-tiket.web.id", config.queueBaseUrl, "$env queue")
+            assertEquals("https://api.rusuh-tiket.web.id", config.payBaseUrl, "$env pay")
         }
-        assertEquals(ApiConfig.PLACEHOLDER_PROD_PAY_URL, ApiConfig.forEnvironment(AppEnvironment.Production).payBaseUrl)
     }
 
     @Test
@@ -110,10 +110,17 @@ class ApiConfigTest {
     }
 
     @Test
-    fun placeholderHostsAreFlagged() {
-        assertTrue(ApiConfig.forEnvironment(AppEnvironment.Production).usesPlaceholderHosts)
-        assertTrue(ApiConfig.forEnvironment(AppEnvironment.Staging).usesPlaceholderHosts)
-        assertTrue(!ApiConfig.forEnvironment(AppEnvironment.Mock).usesPlaceholderHosts)
+    fun placeholderHostsAreFlaggedPerHost() {
+        assertTrue(config(api = "https://api.rusuh.invalid").usesPlaceholderHosts)
+        assertTrue(config(queue = "https://q.rusuh.invalid:8443/x").usesPlaceholderHosts)
+        assertTrue(config(pay = "https://pay.rusuh.invalid").usesPlaceholderHosts)
         assertTrue(!config().usesPlaceholderHosts)
+    }
+
+    @Test
+    fun noEnvironmentUsesAPlaceholderHostAnyMore() {
+        AppEnvironment.entries.forEach { env ->
+            assertTrue(!ApiConfig.forEnvironment(env).usesPlaceholderHosts, "$env")
+        }
     }
 }
