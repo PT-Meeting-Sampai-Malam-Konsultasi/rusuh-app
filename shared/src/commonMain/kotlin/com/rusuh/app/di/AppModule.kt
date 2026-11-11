@@ -1,8 +1,12 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.data.repository.StubMyQueuesRepository
+import com.rusuh.app.domain.repository.MyQueuesRepository
+import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
 import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.home.StubHomeRepository
+import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
 import com.rusuh.app.feature.tickets.StubTicketsRepository
 import com.rusuh.app.feature.tickets.TicketsRepository
@@ -21,5 +25,11 @@ val appModule =
         // shortcut: StubTicketsRepository parses JSON strings until TICKET-00-M4 provides the real one.
         single<TicketsRepository> { StubTicketsRepository() }
         factory { GetMyTicketsUseCase(get()) }
+
+        // My Queues (Antrian tab).
+        // shortcut: StubMyQueuesRepository until FR-APP-01-M4 (#50) provides the real one.
+        single<MyQueuesRepository> { StubMyQueuesRepository() }
+        factory { GetMyQueuesUseCase(get()) }
+        factory { MyQueuesViewModel(get()) }
         factory { TicketsViewModel(get()) }
     }
