@@ -269,3 +269,104 @@ stub.assertRequest(0, HttpMethod.Get, "/queue/evt_1/frontier", mapOf("Accept" to
 - The platform actuals (Keystore, Keychain, SharedPreferences, NSUserDefaults) need a device or simulator, so
   they are not unit tested; they are covered by the later integration test. iOS compilation is checked by
   `compileKotlinIosSimulatorArm64`.
+
+## HTTP plugins
+
+Every request on every host goes through the same plugin chain. The shared `HttpClient` (one engine) installs the
+host-independent plugins (`ApiClient.configurePlugins(...)`); each host client from
+`ApiClient.forHost(shared, baseUrl, hostAuth)` adds its token plugins on top (`coreModule()` wires all of it).
+Redirects are not followed (`followRedirects = false`): a 3xx is an `ApiResult.Error`, so token headers can never be
+replayed to another host.
+
+Order (request direction): `ContentNegotiation`, `HttpTimeout`, `AcceptLanguagePlugin`, `ServerClockPlugin`,
+`Logging` (shared client), then `AuthHeadersPlugin` and `SessionRefreshPlugin` (per host).
+
+| Plugin | What it does |
+|---|---|
+| `AcceptLanguagePlugin` | `Accept-Language: id` or `en` from `LocaleProvider` (default `SystemLocaleProvider`: device language, anything but English is `id`, Android's legacy `in` included). Read per request. A header the call sets itself wins. |
+| `ServerClockPlugin` | Marks the send time of each request and reads `serverNow` (RFC 3339) from small `application/json` bodies (top level, a direct member object, or the first element of a member array that has it, e.g. `GET /bookings/active`). Bodies without the text `"serverNow"` are not parsed; streams, downloads and bodies over 256 KB (by received byte count) are skipped. |
+| `AuthHeadersPlugin` | `X-Device-Token` and `Authorization: Bearer <access>` from `TokenStore` when present; never replaces a header the call set. Never logs values. |
+| `SessionRefreshPlugin` | On `401`: one single-flight `POST /auth/refresh`, then the same request once more with the new access token. |
+| `Logging` (opt-in) | Level is injectable (`logLevel`, default INFO). `Authorization`, `X-Device-Token`, `X-Queue-Token`, `X-Admission-Token`, `X-Turnstile-Token`, `Cookie` and `Set-Cookie` are masked at any level, matched case-insensitively. |
+
+### What an ApiService does
+
+- Nothing for language, device token, Bearer, refresh or the clock: automatic.
+- Queue and admission tokens are opt-in per call, never automatic:
+  `api.get(EP) { queueToken(token) }`, `api.post(EP) { admissionToken(token) }` (`X-Queue-Token`, `X-Admission-Token`;
+  read the value from `TokenStore` in the repository).
+- Outside the session by default (no Bearer, no refresh, no `SessionExpired`; the device token is still sent): the
+  paths ending in `/auth/otp`, `/auth/otp/verify`, `/auth/otp/request`, `/auth/refresh` and `/devices`. A 401 from
+  verify-OTP is a wrong code, not an expired session. Any other such call adds `skipSessionAuth()`.
+- Creating or charging POSTs add `idempotencyKey(key)`.
+
+### Per-host policy (`HostAuth`)
+
+`HostAuth(tokenStore, refreshCoordinator, sendDeviceToken, sendBearer)` is the per-host switch. Decision: all three hosts
+(`api`, `queue`, `pay`) use the default (device token and Bearer sent, refresh on). The contract lists `bearerAuth` on the
+payment endpoints as the alternative to the web-only `__Host-pay_session` cookie (mobile has no cookie session), the
+queue endpoints need `X-Device-Token`, and the auth endpoints take the device token only: sending both headers
+everywhere is harmless to hosts that ignore one. To change it for a host, pass a different `HostAuth` in `coreModule()`.
+
+### 401 and refresh
+
+`SessionRefreshCoordinator` (single-flight):
+
+1. A 401 on a request that carried a Bearer, or any 401 while a refresh token is stored, asks the coordinator for a
+   new access token. All 401s that arrive while a refresh runs await the SAME in-flight refresh and get the same
+   result (success or failure), so the server sees exactly one refresh (reusing a rotated refresh token revokes the
+   token family). The refresh runs in the coordinator's own scope: cancelling one waiting request does not cancel it
+   for the others. Anonymous 401s (no Bearer, no refresh token) are returned untouched.
+2. Success: the rotated refresh token is persisted, the access token set in memory, and the failed request is sent
+   once more with `Authorization: Bearer <new>`. A second 401 is returned as is: no loop. Only the request the server
+   already rejected is replayed, and a 401 means it was not processed, so no write is ever repeated.
+3. Refresh rejected (401 only; a 400 is not treated as a dead session), or a session without any refresh token:
+   `TokenStore.clearSession()` (access, refresh, queue, admission tokens; the device token stays) and
+   `SessionEvents.events` emits `SessionEvent.SessionExpired`. Tokens are cleared only if the stored refresh token is
+   still the one that was rejected, so a newer login is never wiped.
+4. `SessionEvents.expired` (`StateFlow<Boolean>`) is the sticky twin of the event: true from the expiry until a login.
+   The UI shell reads it on start (so an expiry with no collector attached is not lost) and also collects `events`.
+   It resets on the next request that carries an access token, or explicitly with `SessionEvents.reset()` (call it
+   when the auth data layer stores a login, #67).
+5. Refresh that could not complete (offline, timeout, 5xx, 400): the session is kept, the original 401 is returned,
+   and a burst of further 401s does not start another attempt for 5 seconds (`unavailableCooldown`).
+6. The refresh runs `NonCancellable` and carries only the device token (the contract's security for
+   `POST /auth/refresh`: the refresh token is in the body on mobile), so it never triggers the 401 handler itself.
+
+`TokenRefresher` is the seam: the default `ApiTokenRefresher` calls `POST /auth/refresh` through the `api` client;
+`AuthRepository.refresh` (#67) can replace it by rebinding `TokenRefresher`. Tests inject a fake lambda.
+
+### Idempotency keys
+
+`newIdempotencyKey()` returns a random UUID. Rule: one key per user attempt, the same key on every retry of that
+attempt, a new key only for a new user attempt. Never auto-retry a charging or creating POST with a different key: that
+is a second charge. Keep the key in the ViewModel/use case state for the attempt (not in the ApiService).
+
+### Server clock
+
+One clock, `MonotonicServerClock` (bound as `ServerClock` and `ServerTimeSink` in `coreModule()`): it stores the last
+`serverNow` plus a monotonic mark, so `nowMillis()` follows the server and never the device clock.
+
+- Latency: each request's send time is marked; the anchor is `serverNow + (receivedAt - sentAt) / 2` (midpoint
+  estimate, error at most half the round trip).
+- Order: a response whose request was sent before the request of the current anchor is ignored, so a slow old response
+  arriving late never moves the clock backwards. (A request retried after a 401 has no send mark and counts as sent on
+  arrival.)
+- Until the first response it counts from 0 (the Detail stub's behaviour) and `isSynced` is false: gate on `isSynced`
+  wherever a wrong time matters (a payment countdown).
+- Read time only through `ServerClock`; `ServerClock.remainingMillis(expiresAtMillis)` is never negative. Tests pass a
+  `TestTimeSource` as `timeSource`.
+
+### Testing the plugins
+
+`testHttp(...)` in `commonTest/.../data/network/plugin/HttpPluginTestSupport.kt` builds an `ApiClient` on a `MockEngine`
+with any of the language provider, clock sink, `HostAuth` and a log level; see `HeaderPluginsTest`,
+`SessionRefreshTest`, `ServerClockTest`.
+
+### Building clients (`ClientBuilder`)
+
+`buildHttpClient(engine, localeProvider, serverTime, logLevel)` and `buildHostClient(shared, baseUrl, hostAuth)` in
+`data/network/ClientBuilder.kt` are the only places that assemble the plugin chain. `coreModule()` passes the real
+locale provider, the `MonotonicServerClock` as `ServerTimeSink` and a `HostAuth`; the `StubEngine` calls them without
+auth or clock sink (stub mode has no session, and its `ServerClock` is the ticking `StubClock`). In `BackendMode.Real`
+the `ServerClock` consumers read the same `MonotonicServerClock` instance the response plugin updates.

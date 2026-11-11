@@ -1,9 +1,14 @@
 package com.rusuh.app.di
 
 import com.rusuh.app.data.clock.MonotonicServerClock
+import com.rusuh.app.data.clock.ServerTimeSink
 import com.rusuh.app.data.network.ApiClient
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.AppEnvironment
+import com.rusuh.app.data.network.buildHttpClient
+import com.rusuh.app.data.storage.FakeSecureStore
+import com.rusuh.app.data.storage.SecureTokenStore
+import com.rusuh.app.data.storage.TokenStore
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
@@ -14,6 +19,11 @@ import com.rusuh.app.feature.home.StubHomeRepository
 import com.rusuh.app.feature.tickets.TicketsRepository
 import com.rusuh.app.feature.waitingroom.domain.repository.WaitingRoomRepository
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.job
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -41,7 +51,10 @@ class DataModuleTest {
         koinApplication {
             allowOverride(true)
             modules(
-                module { single { environment } },
+                module {
+                    single { environment }
+                    single<TokenStore> { SecureTokenStore(FakeSecureStore()) }
+                },
                 coreModule(),
                 dataModule(mode, allowFallback) { warnings += it },
             )
@@ -147,8 +160,58 @@ class DataModuleTest {
 
         assertSame(koin.get<StubClock>(), koin.get<ServerClock>())
         assertSame(koin.get<StubClock>(), koin.get<StubEngine>().clock)
-        assertIs<MonotonicServerClock>(koin(AppEnvironment.Staging, BackendMode.Real).get<ServerClock>())
     }
+
+    @Test
+    fun realModeReadsTheSameClockInstanceTheResponsePluginUpdates() {
+        val koin = koin(AppEnvironment.Staging, BackendMode.Real)
+
+        assertIs<MonotonicServerClock>(koin.get<ServerClock>())
+        assertSame<Any>(koin.get<ServerClock>(), koin.get<ServerTimeSink>())
+    }
+
+    @Test
+    fun stubModeKeepsTheStubClockAndNeverTouchesTheSyncedOne() {
+        val koin = koin(AppEnvironment.Mock, BackendMode.Stub)
+
+        assertIs<StubClock>(koin.get<ServerClock>())
+        assertTrue(koin.get<ServerClock>() !== koin.get<ServerTimeSink>())
+    }
+
+    @Test
+    fun aServerNowResponseThroughTheRealClientMovesTheRealModeClock() =
+        runTest {
+            val engine =
+                MockEngine {
+                    respond(
+                        "{\"serverNow\":\"2026-11-14T10:40:00Z\"}",
+                        HttpStatusCode.OK,
+                        headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val koin =
+                koinApplication {
+                    allowOverride(true)
+                    modules(
+                        module {
+                            single<AppEnvironment> { AppEnvironment.Staging }
+                            single<TokenStore> { SecureTokenStore(FakeSecureStore()) }
+                        },
+                        coreModule(),
+                        dataModule(BackendMode.Real, true) { },
+                        module {
+                            single<HttpClient> { buildHttpClient(engine, localeProvider = get(), serverTime = get()) }
+                        },
+                    )
+                }.koin
+            val clock = koin.get<MonotonicServerClock>()
+            assertEquals(false, clock.isSynced)
+
+            koin.get<ApiClient>(ApiClientQualifier.Api).get<JsonObject>("/bookings/1")
+
+            assertTrue(clock.isSynced)
+            assertTrue(koin.get<ServerClock>().nowMillis() >= SERVER_NOW)
+        }
 
     @Test
     fun theStubHttpClientIsClosedWhenKoinStops() {
@@ -189,5 +252,10 @@ class DataModuleTest {
         } finally {
             stopKoin()
         }
+    }
+
+    private companion object {
+        // 2026-11-14T10:40:00Z
+        const val SERVER_NOW = 1_794_652_800_000L
     }
 }

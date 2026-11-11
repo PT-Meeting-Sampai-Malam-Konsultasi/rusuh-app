@@ -6,6 +6,9 @@ import com.rusuh.app.data.network.ApiConfig
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.AppEnvironment
 import com.rusuh.app.data.network.platformMockBaseUrl
+import com.rusuh.app.data.storage.FakeSecureStore
+import com.rusuh.app.data.storage.SecureTokenStore
+import com.rusuh.app.data.storage.TokenStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respondOk
@@ -26,7 +29,13 @@ class CoreModuleTest {
     ): Koin =
         koinApplication {
             allowOverride(true)
-            modules(coreModule(), module { single { environment } })
+            modules(
+                coreModule(),
+                module {
+                    single { environment }
+                    single<TokenStore> { SecureTokenStore(FakeSecureStore()) }
+                },
+            )
             if (mockEngine != null) {
                 modules(module { single<HttpClient> { HttpClient(mockEngine) { configurePlugins() } } })
             }
@@ -132,7 +141,7 @@ class CoreModuleTest {
     fun initKoinStartsWithTheGivenEnvironment() {
         val koin = initKoin(AppEnvironment.Mock).koin
         try {
-            assertEquals(platformMockBaseUrl, koin.get<ApiClient>(ApiClientQualifier.Pay).baseUrl)
+            assertEquals(platformMockBaseUrl, koin.get<ApiConfig>().payBaseUrl)
         } finally {
             stopKoin()
         }
