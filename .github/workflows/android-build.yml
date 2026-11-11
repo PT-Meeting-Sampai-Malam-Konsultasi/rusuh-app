@@ -17,7 +17,7 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :androidApp:assembleDebug --stacktrace
       - name: Guard cleartext config (debug only)
-        run: ./gradlew :androidApp:verifyNoCleartextOutsideDebug --stacktrace
+        run: ./gradlew :androidApp:verifyNoCleartextOutsideDebug :androidApp:verifyMergedManifestsHaveInternet --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
