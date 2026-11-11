@@ -64,7 +64,15 @@ dependencies {
 // Guard: cleartext HTTP may only be configured in the debug source set (see docs/data-layer.md).
 val verifyNoCleartextOutsideDebug by tasks.registering {
     val srcDir = layout.projectDirectory.dir("src")
+    // The merged release manifest must be clean too, whatever a library or flavour might contribute.
+    dependsOn("processReleaseManifest")
+    val releaseManifest =
+        layout.buildDirectory.file("intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml")
     doLast {
+        val merged = releaseManifest.get().asFile.readText()
+        check(!merged.contains("usesCleartextTraffic") && !merged.contains("networkSecurityConfig")) {
+            "The merged release manifest must not allow cleartext or set a network security config"
+        }
         val root = srcDir.asFile
         val manifest = root.resolve("main/AndroidManifest.xml").readText()
         check(!manifest.contains("usesCleartextTraffic") && !manifest.contains("networkSecurityConfig")) {

@@ -15,6 +15,12 @@ class ApiConfig(
     val queueBaseUrl: String = normalise("queueBaseUrl", queueBaseUrl)
     val payBaseUrl: String = normalise("payBaseUrl", payBaseUrl)
 
+    /** True while any host is a `.invalid` placeholder (see [forEnvironment]): that build reaches no backend. */
+    val usesPlaceholderHosts: Boolean =
+        listOf(this.baseUrl, this.queueBaseUrl, this.payBaseUrl).any { url ->
+            url.substringAfter("://").substringBefore('/').substringBefore(':').endsWith(".invalid")
+        }
+
     override fun toString(): String = "ApiConfig(baseUrl=$baseUrl, queueBaseUrl=$queueBaseUrl, payBaseUrl=$payBaseUrl)"
 
     companion object {
@@ -31,6 +37,7 @@ class ApiConfig(
         internal const val PLACEHOLDER_STAGING_QUEUE_URL = "https://q.staging.rusuh.invalid"
         internal const val PLACEHOLDER_STAGING_PAY_URL = "https://pay.staging.rusuh.invalid"
 
+        private val PORT_PATTERN = Regex(""":(\d+)$""")
         private const val MAX_PORT = 65535
         private val URL_PATTERN =
             Regex(
@@ -71,7 +78,7 @@ class ApiConfig(
             require(URL_PATTERN.matches(url) && !url.contains("..")) {
                 "ApiConfig.$name is not a well-formed http(s) URL: '$raw'"
             }
-            val port = Regex(""":(\d+)(/|$)""").find(url.substringAfter("://"))?.groupValues?.get(1)?.toInt()
+            val port = PORT_PATTERN.find(url.substringAfter("://").substringBefore('/'))?.groupValues?.get(1)?.toInt()
             require(port == null || port in 1..MAX_PORT) { "ApiConfig.$name has an invalid port (1-65535): '$raw'" }
             return url.trimEnd('/')
         }

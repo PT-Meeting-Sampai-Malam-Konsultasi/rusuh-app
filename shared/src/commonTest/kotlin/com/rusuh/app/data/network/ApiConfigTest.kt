@@ -103,4 +103,17 @@ class ApiConfigTest {
         assertEquals(AppEnvironment.Production, AppEnvironment.fromName(" Production "))
         assertTrue(failure { AppEnvironment.fromName("prod") }.contains("prod"))
     }
+
+    @Test
+    fun portIsCheckedOnTheAuthorityOnly() {
+        assertEquals("https://a.test/x:99999", config(api = "https://a.test/x:99999/").baseUrl)
+    }
+
+    @Test
+    fun placeholderHostsAreFlagged() {
+        assertTrue(ApiConfig.forEnvironment(AppEnvironment.Production).usesPlaceholderHosts)
+        assertTrue(ApiConfig.forEnvironment(AppEnvironment.Staging).usesPlaceholderHosts)
+        assertTrue(!ApiConfig.forEnvironment(AppEnvironment.Mock).usesPlaceholderHosts)
+        assertTrue(!config().usesPlaceholderHosts)
+    }
 }

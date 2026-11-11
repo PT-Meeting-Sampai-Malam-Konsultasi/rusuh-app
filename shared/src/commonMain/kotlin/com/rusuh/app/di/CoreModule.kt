@@ -18,7 +18,15 @@ import org.koin.dsl.onClose
  */
 fun coreModule(): Module =
     module {
-        single { ApiConfig.forEnvironment(get<AppEnvironment>()) }
+        single {
+            val environment = get<AppEnvironment>()
+            ApiConfig.forEnvironment(environment).also { config ->
+                if (environment != AppEnvironment.Mock && config.usesPlaceholderHosts) {
+                    // Visible, not silent: requests to `.invalid` hosts can never succeed. No tokens or secrets here.
+                    println("WARNING: $environment build uses placeholder API hosts: $config")
+                }
+            }
+        }
         single<HttpClient> { HttpClientFactory.create { configurePlugins() } } onClose { it?.close() }
         single(ApiClientQualifier.Api) { ApiClient.forHost(get(), get<ApiConfig>().baseUrl) }
         single(ApiClientQualifier.Queue) { ApiClient.forHost(get(), get<ApiConfig>().queueBaseUrl) }
