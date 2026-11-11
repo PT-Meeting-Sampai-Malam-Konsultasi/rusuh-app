@@ -1,8 +1,14 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.data.storage.AppPreferences
+import com.rusuh.app.data.storage.KeychainSecureStore
+import com.rusuh.app.data.storage.SecureStore
+import com.rusuh.app.data.storage.UserDefaultsAppPreferences
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 actual val platformModule: Module =
     module {
+        single<SecureStore> { KeychainSecureStore() }
+        single<AppPreferences> { UserDefaultsAppPreferences() }
     }

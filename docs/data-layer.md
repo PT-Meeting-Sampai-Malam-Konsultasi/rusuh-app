@@ -103,3 +103,34 @@ ApiClient(baseUrl, client = HttpClient(MockEngine { respond(...) }) { configure(
 See `ApiClientTest` for success, 204, problem+json, 5xx, timeout, malformed body and cancellation examples.
 Koin wiring (ApiService/Repository/Cache = `single`, UseCases = `factory`) arrives with the environment and base URL
 config (EPIC-01-M2).
+
+## Storage
+
+| Data | Where | Persisted |
+|---|---|---|
+| Access token | `TokenStore.accessToken` (memory) | Never |
+| Refresh, device, admission tokens, queue token per event (`queue_token_<eventId>`) | `SecureStore` via `SecureTokenStore` | Yes, encrypted |
+| Non-sensitive cache (JSON payloads, flags) | `AppPreferences` via a module `*Cache` | Yes, plain |
+
+- `SecureStore` (`suspend` get/put/remove/clear): Android keeps an AES-256-GCM key in the AndroidKeyStore (not
+  exportable) and stores `base64(iv + ciphertext)` in private SharedPreferences, with the entry name bound as AAD.
+  We do not use `androidx.security:security-crypto` (`EncryptedSharedPreferences`): it is deprecated and no longer
+  maintained, while the KeyStore AES-GCM approach needs no extra dependency. iOS uses the Keychain
+  (`kSecClassGenericPassword`, service = bundle id, `AfterFirstUnlockThisDeviceOnly`: no iCloud sync, no restore
+  to another device). An undecryptable Android entry reads as `null` and is deleted, so the user simply signs in again.
+- `AppPreferences` is SharedPreferences / NSUserDefaults. Booleans are stored as `"true"`/`"false"`.
+- Interfaces live in `data/storage`; platform classes are bound in `platformModule`, the rest in `storageModule`.
+  Tests use in-memory fakes of both interfaces (`FakeStorage.kt`).
+- Cache pattern: extend `PrefsCache(prefs, prefix)` with the feature prefix (`home_`, `queue_`, `book_`, `tix_`,
+  `auth_`). The key strings are constants inside the owning cache and nowhere else; keys outside the prefix are
+  rejected. `HomeCache` is the example. Secure keys are owned by `SecureTokenStore`.
+- Logout: `TokenStore.clearSession()` clears the access, refresh, admission and all queue tokens. The device token
+  survives, because it identifies the install, not the session.
+- Never persisted: the access token, passwords, OTPs, NIK and payment data. Never log token values.
+- Threat model: tokens are protected against other apps and against reading a device backup or file dump (private
+  app storage and a hardware-backed key that cannot be extracted). A rooted or jailbroken device with a live
+  process, or malware running as the app, can still use the keys; short access token lifetimes and server-side
+  refresh token revocation are the mitigation.
+- The platform actuals (Keystore, Keychain, SharedPreferences, NSUserDefaults) need a device or simulator, so
+  they are not unit tested; they are covered by the later integration test. iOS compilation is checked by
+  `compileKotlinIosSimulatorArm64`.

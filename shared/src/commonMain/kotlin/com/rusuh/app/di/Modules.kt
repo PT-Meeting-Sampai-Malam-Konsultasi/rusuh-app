@@ -8,4 +8,5 @@ val sharedModules: List<Module>
         listOf(
             appModule,
             platformModule,
+            storageModule,
         )
