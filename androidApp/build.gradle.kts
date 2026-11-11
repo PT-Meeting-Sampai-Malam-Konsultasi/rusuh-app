@@ -38,10 +38,15 @@ android {
         // Environment per build type, parsed by AppEnvironment.fromName (see docs/data-layer.md).
         getByName("debug") {
             buildConfigField("String", "APP_ENVIRONMENT", "\"Mock\"")
+            // Optional backend mode override, e.g. ./gradlew assembleDebug -PbackendMode=Real (Mockoon over HTTP).
+            // Empty keeps the default for the environment (see BackendMode and docs/data-layer.md).
+            val backendMode = providers.gradleProperty("backendMode").getOrElse("")
+            buildConfigField("String", "BACKEND_MODE", "\"$backendMode\"")
         }
         getByName("release") {
             isMinifyEnabled = false
             buildConfigField("String", "APP_ENVIRONMENT", "\"Production\"")
+            buildConfigField("String", "BACKEND_MODE", "\"\"")
         }
     }
 

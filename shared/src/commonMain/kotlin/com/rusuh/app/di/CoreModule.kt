@@ -1,10 +1,10 @@
 package com.rusuh.app.di
 
 import com.rusuh.app.data.network.ApiClient
-import com.rusuh.app.data.network.ApiClient.Companion.configurePlugins
 import com.rusuh.app.data.network.ApiConfig
 import com.rusuh.app.data.network.AppEnvironment
-import com.rusuh.app.data.network.HttpClientFactory
+import com.rusuh.app.data.network.buildHostClient
+import com.rusuh.app.data.network.buildHttpClient
 import io.ktor.client.HttpClient
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -27,8 +27,8 @@ fun coreModule(): Module =
                 }
             }
         }
-        single<HttpClient> { HttpClientFactory.create { configurePlugins() } } onClose { it?.close() }
-        single(ApiClientQualifier.Api) { ApiClient.forHost(get(), get<ApiConfig>().baseUrl) }
-        single(ApiClientQualifier.Queue) { ApiClient.forHost(get(), get<ApiConfig>().queueBaseUrl) }
-        single(ApiClientQualifier.Pay) { ApiClient.forHost(get(), get<ApiConfig>().payBaseUrl) }
+        single<HttpClient> { buildHttpClient() } onClose { it?.close() }
+        single(ApiClientQualifier.Api) { buildHostClient(get(), get<ApiConfig>().baseUrl) }
+        single(ApiClientQualifier.Queue) { buildHostClient(get(), get<ApiConfig>().queueBaseUrl) }
+        single(ApiClientQualifier.Pay) { buildHostClient(get(), get<ApiConfig>().payBaseUrl) }
     }
