@@ -20,6 +20,7 @@ import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSBundle
 import platform.Foundation.NSData
 import platform.Foundation.NSDictionary
+import platform.Foundation.NSLock
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.NSUserDefaults
@@ -29,6 +30,7 @@ import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
 import platform.Security.SecItemUpdate
+import platform.Security.errSecDecode
 import platform.Security.errSecItemNotFound
 import platform.Security.errSecSuccess
 import platform.Security.kSecAttrAccessible
@@ -50,6 +52,8 @@ class KeychainException(
     operation: String,
 ) : IllegalStateException("Keychain $operation failed with status $status")
 
+private fun malformedList() = KeychainException(errSecDecode, "list")
+
 private fun check(
     status: Int,
     operation: String,
@@ -69,6 +73,7 @@ class KeychainSecureStore(
     private val service: String = NSBundle.mainBundle.bundleIdentifier ?: FALLBACK_SERVICE,
     private val defaults: NSUserDefaults = NSUserDefaults.standardUserDefaults,
 ) : SecureStore {
+    private val initLock = NSLock()
     private var initialized = false
 
     override suspend fun getString(key: String): String? {
@@ -143,12 +148,18 @@ class KeychainSecureStore(
     }
 
     private fun ensureFreshInstallCleared() {
-        if (initialized) return
-        if (!defaults.boolForKey(FLAG_KEY)) {
-            deleteMatching(account = null)
-            defaults.setBool(true, forKey = FLAG_KEY)
+        initLock.lock()
+        try {
+            if (initialized) return
+            if (!defaults.boolForKey(FLAG_KEY)) {
+                deleteMatching(account = null)
+                defaults.setBool(true, forKey = FLAG_KEY)
+                defaults.synchronize()
+            }
+            initialized = true
+        } finally {
+            initLock.unlock()
         }
-        initialized = true
     }
 
     private fun deleteMatching(account: String?) {
@@ -167,9 +178,11 @@ class KeychainSecureStore(
                 }) { SecItemCopyMatching(it, result.ptr) }
             if (status == errSecItemNotFound) return@memScoped emptyList()
             check(status, "list")
-            val accountKey = CFBridgingRelease(CFRetain(kSecAttrAccount)) as? String ?: return@memScoped emptyList()
-            val items = CFBridgingRelease(result.value) as? List<*> ?: return@memScoped emptyList()
-            items.mapNotNull { (it as? NSDictionary)?.objectForKey(accountKey) as? String }
+            val accountKey = CFBridgingRelease(CFRetain(kSecAttrAccount)) as? String ?: throw malformedList()
+            val items = CFBridgingRelease(result.value) as? List<*> ?: throw malformedList()
+            items.map { item ->
+                (item as? NSDictionary)?.objectForKey(accountKey) as? String ?: throw malformedList()
+            }
         }
 
     private fun <T> withDict(block: (CFMutableDictionaryRef?) -> T): T {
