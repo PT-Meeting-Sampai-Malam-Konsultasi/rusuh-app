@@ -64,7 +64,8 @@ private val EMPTY_STATE_MIN_HEIGHT = 400.dp
  * any navigator dependency.
  *
  * @param viewModel the [HomeViewModel] providing state, effects and intent sink.
- * @param onEventClick invoked with an event id when the user opens an event.
+ * @param onOpenQueue invoked with an event id when the user taps an event whose queue can be joined (the
+ *   ViewModel decides, see [canQueue]); the Waiting Room does the join.
  *   Defaults to a no-op so previews and non-navigating hosts can render the screen;
  *   a host that wants navigation must pass a real callback (the nav graph wires it).
  */
@@ -72,7 +73,7 @@ private val EMPTY_STATE_MIN_HEIGHT = 400.dp
 fun HomeScreen(
     viewModel: HomeViewModel,
     modifier: Modifier = Modifier,
-    onEventClick: (String) -> Unit = {},
+    onOpenQueue: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -83,15 +84,15 @@ fun HomeScreen(
         viewModel.dispatch(HomeIntent.LoadEvents)
     }
 
-    // Keep the latest onEventClick without restarting the effect collector, so a
+    // Keep the latest onOpenQueue without restarting the effect collector, so a
     // recomposition that supplies a new callback never fires the stale one.
-    val currentOnEventClick by rememberUpdatedState(onEventClick)
+    val currentOnOpenQueue by rememberUpdatedState(onOpenQueue)
 
     // One-time effects: navigate on tap, surface transient errors as a snackbar.
     LaunchedEffect(viewModel) {
         viewModel.effect.collect { effect ->
             when (effect) {
-                is HomeEffect.NavigateToEvent -> currentOnEventClick(effect.id)
+                is HomeEffect.NavigateToQueue -> currentOnOpenQueue(effect.id)
                 is HomeEffect.ShowError -> snackbarHostState.showSnackbar(effect.message)
             }
         }
@@ -207,7 +208,8 @@ private fun EventGrid(
         items(items = events, key = { it.id }) { event ->
             EventCard(
                 data = event.toEventCardData(),
-                onClick = { onEventClick(event.id) },
+                // Cards that cannot be queued for never dispatch (the ViewModel guards again).
+                onClick = { if (event.status.canQueue()) onEventClick(event.id) },
             )
         }
     }

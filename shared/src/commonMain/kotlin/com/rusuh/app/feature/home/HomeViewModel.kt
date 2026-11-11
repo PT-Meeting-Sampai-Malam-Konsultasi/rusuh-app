@@ -17,8 +17,14 @@ class HomeViewModel(
         when (intent) {
             is HomeIntent.LoadEvents -> loadEvents()
             is HomeIntent.RefreshEvents -> loadEvents()
-            is HomeIntent.EventClicked -> sendEffect(HomeEffect.NavigateToEvent(intent.id))
+            is HomeIntent.EventClicked -> openQueue(intent.id)
         }
+    }
+
+    /** The route decision: only a known event that can be queued for opens its Waiting Room. */
+    private fun openQueue(id: String) {
+        val event = currentState.events.firstOrNull { it.id == id }
+        if (event != null && event.status.canQueue()) sendEffect(HomeEffect.NavigateToQueue(id))
     }
 
     private suspend fun loadEvents() {

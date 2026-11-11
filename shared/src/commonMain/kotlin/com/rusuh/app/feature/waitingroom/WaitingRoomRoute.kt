@@ -30,19 +30,20 @@ private const val TICK_MILLIS = 1_000L
  * Stateful host for the Waiting Room: starts the [viewModel], renders its state through the
  * stateless [WaitingRoomScreen], ticks countdowns once a second and routes one-time effects.
  *
- * Navigation to the event Detail is not wired yet: [WaitingRoomEffect.NavigateToDetail] is ignored.
- * TODO(FR-08-M1 #79): navigate to Detail once its route exists (claim #79).
+ * [WaitingRoomEffect.NavigateToDetail] (the turn's "choose tickets" action) goes to [onChooseTickets].
  */
 @Composable
 fun WaitingRoomRoute(
     viewModel: WaitingRoomViewModel,
     onBack: () -> Unit,
     onBrowseEvents: () -> Unit,
+    onChooseTickets: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
     val currentOnBack by rememberUpdatedState(onBack)
     val currentOnBrowseEvents by rememberUpdatedState(onBrowseEvents)
+    val currentOnChooseTickets by rememberUpdatedState(onChooseTickets)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val refreshMessage = stringResource(Res.string.waiting_refresh_error)
@@ -68,8 +69,7 @@ fun WaitingRoomRoute(
                         val result = snackbarHostState.showSnackbar(refreshMessage, actionLabel = retryLabel)
                         if (result == SnackbarResult.ActionPerformed) viewModel.dispatch(WaitingRoomIntent.Retry)
                     }
-                // TODO(FR-08-M1 #79): no Detail route yet; do not navigate.
-                is WaitingRoomEffect.NavigateToDetail -> Unit
+                is WaitingRoomEffect.NavigateToDetail -> currentOnChooseTickets(effect.eventId)
             }
         }
     }

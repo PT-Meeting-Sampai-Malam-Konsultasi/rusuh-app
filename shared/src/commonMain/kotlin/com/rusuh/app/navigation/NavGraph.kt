@@ -120,6 +120,12 @@ fun RusuhNavGraph(navController: NavHostController) {
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
+                // The turn: go to Detail and drop the Waiting Room so Back does not return into it.
+                onChooseTickets = { id ->
+                    navController.navigate(Screen.Detail.routeFor(id)) {
+                        popUpTo(Screen.WaitingRoom.route) { inclusive = true }
+                    }
+                },
             )
         }
     }
@@ -143,11 +149,11 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
             containerColor = RusuhColors.Paper,
         ) { innerPadding ->
             // Home's own content and business logic are unchanged; only the
-            // bottom-bar Scaffold wraps it. Tapping an event opens Detail directly.
-            // TODO(FR-04-M5 #78): temporary until the queue join/route decision lands.
+            // bottom-bar Scaffold wraps it. HomeViewModel decides which taps open the Waiting Room,
+            // which joins the queue.
             HomeScreen(
                 viewModel = viewModel,
-                onEventClick = { eventId -> navController.navigate(Screen.Detail.routeFor(eventId)) },
+                onOpenQueue = { eventId -> navController.navigate(Screen.WaitingRoom.routeFor(eventId)) },
                 modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
             )
         }
