@@ -62,6 +62,10 @@ class ApiConfigTest {
             "http://api.test#f",
             "http://-bad",
             "http://a:b@c",
+            "http://a..b",
+            "http://api.test:0",
+            "http://api.test:65536",
+            "http://api.test:99999/x",
         )
             .forEach { bad ->
                 val message = failure { config(pay = bad) }

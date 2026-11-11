@@ -60,3 +60,20 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)
 }
+
+// Guard: cleartext HTTP may only be configured in the debug source set (see docs/data-layer.md).
+val verifyNoCleartextOutsideDebug by tasks.registering {
+    val srcDir = layout.projectDirectory.dir("src")
+    doLast {
+        val root = srcDir.asFile
+        val manifest = root.resolve("main/AndroidManifest.xml").readText()
+        check(!manifest.contains("usesCleartextTraffic") && !manifest.contains("networkSecurityConfig")) {
+            "src/main/AndroidManifest.xml must not allow cleartext or set a network security config"
+        }
+        val configs = root.walkTopDown().filter { it.name == "network_security_config.xml" }.toList()
+        check(configs.all { it.relativeTo(root).path.startsWith("debug/") }) {
+            "network_security_config.xml is only allowed under src/debug: $configs"
+        }
+    }
+}
+tasks.named("check") { dependsOn(verifyNoCleartextOutsideDebug) }

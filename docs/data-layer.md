@@ -101,6 +101,7 @@ ApiClient(baseUrl, client = HttpClient(MockEngine { respond(...) }) { configure(
 ```
 
 See `ApiClientTest` for success, 204, problem+json, 5xx, timeout, malformed body and cancellation examples.
+
 ## Environments and hosts
 
 `AppEnvironment { Mock, Staging, Production }` picks the backend. The platform entry point chooses it from its
@@ -117,13 +118,19 @@ build type and passes it to `initKoin(environment)` (there is no default, so rel
 
 - Mock: all three hosts share one Mockoon instance; the address differs per platform because of how the
   emulator reaches the host machine: Android emulator `http://10.0.2.2:3000`, iOS simulator
-  `http://localhost:3000` (`platformMockBaseUrl`, `expect`/`actual`). A physical device needs the machine's LAN IP.
+  `http://localhost:3000` (`platformMockBaseUrl`, `expect`/`actual`). A physical Android device can use
+  `adb reverse tcp:3000 tcp:3000` (the debug config allows `localhost`) or the machine's LAN IP (add it to the debug
+  `network_security_config.xml`). A physical iOS device cannot reach `localhost`: point it at another environment or
+  a LAN URL.
 - Staging and Production use `PLACEHOLDER_*` constants in `ApiConfig`, marked `shortcut:` because the real hosts
-  are not known yet (the spec has no `servers`). No secrets live in the repo.
+  are not known yet (the spec has no `servers`). They use the reserved `.invalid` TLD, which never resolves, so a
+  build shipped without real hosts fails with a network error. To replace them, edit the constants in `ApiConfig`
+  once the backend publishes the hosts and update `ApiConfigTest`. No secrets live in the repo.
 - Cleartext HTTP to the mock is allowed in debug only: Android `androidApp/src/debug` (manifest overlay plus
   `network_security_config.xml` for `10.0.2.2` and `localhost`; the release manifest has none), iOS an ATS exception
   for `localhost` in `iosApp/iosApp/Info-Debug.plist`, used only by the Debug configuration (keep it in sync
-  with `Info.plist`).
+  with `Info.plist`; `scripts/check-info-plist.sh` runs in the Lint workflow and fails when they drift).
+  `./gradlew :androidApp:verifyNoCleartextOutsideDebug` guards the Android side (part of `:androidApp:check`).
 
 `coreModule()` (`di/CoreModule.kt`) owns the infrastructure: `ApiConfig`, one shared `HttpClient` (engine plus the
 common plugins) and three `ApiClient`s qualified with `ApiClientQualifier.Api`, `.Queue` and `.Pay`, each pointing

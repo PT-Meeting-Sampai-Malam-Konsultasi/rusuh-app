@@ -217,7 +217,8 @@ class ApiClient(
 
         /**
          * An [ApiClient] for [baseUrl] that reuses [shared] (its engine and plugins) through `HttpClient.config`.
-         * Closing it closes the shared engine, so the owner of [shared] is the one to close.
+         * The derived client shares the engine but does not own it: closing one does not affect the others.
+         * The owner of [shared] closes it (coreModule does, on Koin close).
          */
         fun forHost(
             shared: HttpClient,

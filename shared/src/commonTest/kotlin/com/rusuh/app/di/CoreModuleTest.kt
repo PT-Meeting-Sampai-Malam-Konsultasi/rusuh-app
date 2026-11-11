@@ -11,6 +11,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respondOk
 import kotlinx.coroutines.test.runTest
 import org.koin.core.Koin
+import org.koin.core.context.stopKoin
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlin.test.Test
@@ -97,4 +98,43 @@ class CoreModuleTest {
                 urls,
             )
         }
+
+    @Test
+    fun prefixedBaseUrlJoinsWithThePath() =
+        runTest {
+            val urls = mutableListOf<String>()
+            val engine =
+                MockEngine { request ->
+                    urls += request.url.toString()
+                    respondOk("")
+                }
+            val shared = HttpClient(engine) { configurePlugins() }
+            val pay = ApiConfig("https://api.test", "https://q.test", "https://pay.test/v1/").payBaseUrl
+
+            ApiClient.forHost(shared, pay).get<Unit>("/payments/1")
+
+            assertEquals(listOf("https://pay.test/v1/payments/1"), urls)
+        }
+
+    @Test
+    fun closingOneHostClientLeavesTheOthersWorking() =
+        runTest {
+            val shared = HttpClient(MockEngine { respondOk("") }) { configurePlugins() }
+            val api = ApiClient.forHost(shared, "https://api.test")
+            val pay = ApiClient.forHost(shared, "https://pay.test")
+
+            api.close()
+
+            assertIs<ApiResult.Success<Unit>>(pay.get<Unit>("/x"))
+        }
+
+    @Test
+    fun initKoinStartsWithTheGivenEnvironment() {
+        val koin = initKoin(AppEnvironment.Mock).koin
+        try {
+            assertEquals(platformMockBaseUrl, koin.get<ApiClient>(ApiClientQualifier.Pay).baseUrl)
+        } finally {
+            stopKoin()
+        }
+    }
 }
