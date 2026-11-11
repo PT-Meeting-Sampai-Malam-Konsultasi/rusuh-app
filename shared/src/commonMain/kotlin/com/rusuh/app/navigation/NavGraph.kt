@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -26,6 +27,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.rusuh.app.feature.auth.SignInSheet
+import com.rusuh.app.feature.auth.rememberPlaceholderSignIn
 import com.rusuh.app.feature.detail.DetailRoute
 import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.detail.DetailViewModelHolder
@@ -175,17 +178,24 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
                 }
             }
         }
-        TicketsScreen(
-            state = state.ui,
-            actions =
-                TicketsActions(
-                    onViewETicket = { viewModel.dispatch(TicketsIntent.ViewETicket(it)) },
-                    onTabSelected = onTabSelected,
-                    onBrowseEvents = { viewModel.dispatch(TicketsIntent.BrowseEvents) },
-                    onSignIn = { viewModel.dispatch(TicketsIntent.SignIn) },
-                    onRetry = { viewModel.dispatch(TicketsIntent.Retry) },
-                ),
-        )
+        // Placeholder sign-in (local UI state only) until AUTH-00-M3 wires the real auth state.
+        val signIn = rememberPlaceholderSignIn()
+        Box(Modifier.fillMaxSize()) {
+            TicketsScreen(
+                state = state.ui,
+                // Inert for TalkBack while the sheet is open.
+                modifier = if (signIn.state != null) Modifier.clearAndSetSemantics {} else Modifier,
+                actions =
+                    TicketsActions(
+                        onViewETicket = { viewModel.dispatch(TicketsIntent.ViewETicket(it)) },
+                        onTabSelected = onTabSelected,
+                        onBrowseEvents = { viewModel.dispatch(TicketsIntent.BrowseEvents) },
+                        onSignIn = signIn::open,
+                        onRetry = { viewModel.dispatch(TicketsIntent.Retry) },
+                    ),
+            )
+            signIn.state?.let { SignInSheet(state = it, actions = signIn.actions) }
+        }
     }
 
     composable(Screen.Account.route) {
