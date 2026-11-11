@@ -47,7 +47,7 @@ class RealHomeRepositoryTest {
                 items.map { it.id },
             )
             assertEquals(
-                listOf("coming", "waiting", "onSale", "almost", "full", "soldOut", "ended"),
+                listOf("coming", "waiting", "waiting", "almost", "full", "soldOut", "ended"),
                 items.map { it.status.kind() },
             )
         }
@@ -66,7 +66,9 @@ class RealHomeRepositoryTest {
     @Test
     fun anOnSaleEventMapsEveryDisplayFieldInIndonesian() =
         runTest {
-            val samudra = events().single { it.id == "evt_samudra" }
+            // The mock lists Samudra as waiting_room_open; the same event on sale is the plain OnSale card.
+            val body = """{"items": [${EVENT_FIXTURES[2].replace("waiting_room_open", "on_sale")}]}"""
+            val samudra = repository(backendWith(Reply.ok(body))).getEvents().single()
 
             assertEquals(
                 HomeEventItem(
@@ -207,7 +209,7 @@ class RealHomeRepositoryTest {
     @Test
     fun anEventOfAnUnknownStateOrWithoutIdOrNameIsLeftOut() =
         runTest {
-            val unknown = EVENT_FIXTURES[2].replace("on_sale", "teleporting")
+            val unknown = EVENT_FIXTURES[2].replace("waiting_room_open", "teleporting")
             val blankId = EVENT_FIXTURES[3].replace("evt_almost", "")
             val blankName = EVENT_FIXTURES[4].replace(""""name": "Kelana"""", """"name": """"")
             val body = """{"items": [$unknown, $blankId, $blankName, ${EVENT_FIXTURES[5]}]}"""

@@ -36,7 +36,7 @@ val EVENT_FIXTURES: List<String> =
             .withMembers(COMING_OPENS + COMING_ROOM),
         event("evt_wr_open", "Nada Pantai", "Festival Musim Panas", "waiting_room_open", 275000)
             .withMembers(WR_OPENS + WR_ROOM),
-        event("evt_samudra", "Samudra", "Tur Gelombang 2026", "on_sale", 450000),
+        event("evt_samudra", "Samudra", "Tur Gelombang 2026", "waiting_room_open", 450000),
         event("evt_almost", "Pelita", "Tur Kota Lama", "almost_gone", 350000),
         event("evt_full", "Kelana", "Tur Pulau", "temporarily_full", 400000),
         event("evt_soldout", "Rimba Raya", "Showcase", "sold_out", 300000).withMembers(SOLD_OUT_AT),
