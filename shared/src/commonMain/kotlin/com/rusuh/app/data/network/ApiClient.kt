@@ -1,8 +1,9 @@
 package com.rusuh.app.data.network
 
+import com.rusuh.app.data.remote.dto.ProblemDetails
 import io.ktor.client.HttpClient
+import io.ktor.client.HttpClientConfig
 import io.ktor.client.call.body
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -10,17 +11,31 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.accept
+import io.ktor.client.request.header
 import io.ktor.client.request.request
+import io.ktor.client.request.setBody
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.http.contentLength
+import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.CancellationException
-import kotlinx.io.IOException
-import kotlinx.serialization.SerializationException
+import kotlinx.io.readByteArray
 import kotlinx.serialization.json.Json
 
+/**
+ * Shared HTTP entry point for every ApiService. Each helper returns an [ApiResult]
+ * that keeps the HTTP status; success bodies are the payload itself (no envelope).
+ * Use `ApiResult<Unit>` for endpoints that answer 204 No Content.
+ */
+@Suppress("TooManyFunctions") // one helper per HTTP verb plus the raw-bytes helper
 class ApiClient(
     val baseUrl: String,
     private val enableLogging: Boolean = false,
@@ -30,50 +45,116 @@ class ApiClient(
     suspend inline fun <reified T> request(
         method: HttpMethod,
         path: String,
-        crossinline block: HttpRequestBuilder.() -> Unit = {},
-    ): NetworkResult<T> =
-        safeCall {
+        noinline block: HttpRequestBuilder.() -> Unit = {},
+    ): ApiResult<T> = execute(method, path, block) { response -> response.body<T>() }
+
+    suspend inline fun <reified T> get(
+        path: String,
+        noinline block: HttpRequestBuilder.() -> Unit = {},
+    ): ApiResult<T> = request(HttpMethod.Get, path, block)
+
+    suspend inline fun <reified T> post(
+        path: String,
+        noinline block: HttpRequestBuilder.() -> Unit = {},
+    ): ApiResult<T> = request(HttpMethod.Post, path, block)
+
+    suspend inline fun <reified T> put(
+        path: String,
+        noinline block: HttpRequestBuilder.() -> Unit = {},
+    ): ApiResult<T> = request(HttpMethod.Put, path, block)
+
+    suspend inline fun <reified T> patch(
+        path: String,
+        noinline block: HttpRequestBuilder.() -> Unit = {},
+    ): ApiResult<T> = request(HttpMethod.Patch, path, block)
+
+    suspend inline fun <reified T> delete(
+        path: String,
+        noinline block: HttpRequestBuilder.() -> Unit = {},
+    ): ApiResult<T> = request(HttpMethod.Delete, path, block)
+
+    /**
+     * Runs one call and folds every outcome into an [ApiResult]. [readBody] decodes a 2xx response.
+     * Cancellation is always rethrown, never turned into a result.
+     */
+    @PublishedApi
+    @Suppress("TooGenericExceptionCaught")
+    internal suspend fun <T> execute(
+        method: HttpMethod,
+        path: String,
+        block: HttpRequestBuilder.() -> Unit,
+        readBody: suspend (HttpResponse) -> T,
+    ): ApiResult<T> =
+        try {
             val response =
                 client.request {
                     this.method = method
                     url(path.removePrefix("/"))
                     block()
                 }
-            handle(response)
+            if (response.status.isSuccess()) {
+                ApiResult.Success(response.status.value, readBody(response))
+            } else {
+                ApiResult.Error(
+                    code = response.status.value,
+                    problem = readProblem(response),
+                    retryAfterSeconds = readRetryAfter(response),
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            ApiResult.Failure(failure)
         }
 
-    suspend inline fun <reified T> get(
+    /**
+     * Raw bytes of a successful response, for downloads such as a ticket PDF. No JSON `Accept` is forced
+     * ([accept] defaults to any type). Server-sent event streams are not supported here: use [client] directly.
+     */
+    suspend fun getBytes(
         path: String,
-        crossinline block: HttpRequestBuilder.() -> Unit = {},
-    ): NetworkResult<T> = request(HttpMethod.Get, path, block)
+        accept: ContentType = ContentType.Any,
+        block: HttpRequestBuilder.() -> Unit = {},
+    ): ApiResult<ByteArray> =
+        execute(
+            method = HttpMethod.Get,
+            path = path,
+            block = {
+                accept(accept)
+                block()
+            },
+            readBody = { response -> response.body<ByteArray>() },
+        )
 
-    suspend inline fun <reified T> post(
-        path: String,
-        crossinline block: HttpRequestBuilder.() -> Unit = {},
-    ): NetworkResult<T> = request(HttpMethod.Post, path, block)
+    /** Seconds form of `Retry-After` only; the HTTP-date form is ignored (null) as the API sends seconds. */
+    private fun readRetryAfter(response: HttpResponse): Int? =
+        response.headers[HttpHeaders.RetryAfter]?.trim()?.toIntOrNull()?.takeIf { it >= 0 }
 
-    suspend inline fun <reified T> handle(response: HttpResponse): NetworkResult<T> =
-        if (response.status.isSuccess()) {
-            NetworkResult.Success(response.body<T>())
+    /**
+     * Reads an `application/problem+json` body; null when absent, of another type, malformed,
+     * or larger than [MAX_PROBLEM_BYTES] (a problem body is tiny, so anything bigger is not one).
+     */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    private suspend fun readProblem(response: HttpResponse): ProblemDetails? {
+        val isProblem = response.contentType()?.match(ContentType.Application.ProblemJson) == true
+        val declaredLength = response.contentLength()
+        return if (isProblem && (declaredLength == null || declaredLength <= MAX_PROBLEM_BYTES)) {
+            try {
+                val bytes = response.bodyAsChannel().readRemaining(MAX_PROBLEM_BYTES + 1L).readByteArray()
+                if (bytes.size > MAX_PROBLEM_BYTES) {
+                    null
+                } else {
+                    defaultJson.decodeFromString(ProblemDetails.serializer(), bytes.decodeToString())
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (malformed: Exception) {
+                null
+            }
         } else {
-            NetworkResult.Error(
-                message = response.status.description,
-                code = response.status.value,
-            )
+            null
         }
-
-    suspend inline fun <T> safeCall(block: () -> NetworkResult<T>): NetworkResult<T> =
-        try {
-            block()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: HttpRequestTimeoutException) {
-            NetworkResult.Error(message = "Request timed out", cause = e)
-        } catch (e: SerializationException) {
-            NetworkResult.Error(message = "Failed to parse response: ${e.message}", cause = e)
-        } catch (e: IOException) {
-            NetworkResult.Error(message = e.message ?: "Network I/O error", cause = e)
-        }
+    }
 
     fun close() = client.close()
 
@@ -85,7 +166,6 @@ class ApiClient(
         val defaultJson: Json =
             Json {
                 ignoreUnknownKeys = true
-                isLenient = true
                 encodeDefaults = true
                 explicitNulls = false
             }
@@ -94,24 +174,48 @@ class ApiClient(
             baseUrl: String,
             enableLogging: Boolean,
             logger: (String) -> Unit,
-        ): HttpClient =
-            HttpClientFactory.create {
-                install(ContentNegotiation) { json(defaultJson) }
-                install(HttpTimeout) {
-                    requestTimeoutMillis = REQUEST_TIMEOUT_MS
-                    connectTimeoutMillis = CONNECT_TIMEOUT_MS
-                    socketTimeoutMillis = SOCKET_TIMEOUT_MS
-                }
-                if (enableLogging) {
-                    install(Logging) {
-                        this.logger =
-                            object : Logger {
-                                override fun log(message: String) = logger(message)
-                            }
-                        level = LogLevel.INFO
-                    }
-                }
-                defaultRequest { url(baseUrl.trimEnd('/') + "/") }
+        ): HttpClient = HttpClientFactory.create { configure(baseUrl, enableLogging, logger) }
+
+        /** Installs the shared plugins and defaults; also used to build test clients on a mock engine. */
+        internal fun HttpClientConfig<*>.configure(
+            baseUrl: String,
+            enableLogging: Boolean = false,
+            logger: (String) -> Unit = {},
+            requestTimeoutMs: Long = REQUEST_TIMEOUT_MS,
+        ) {
+            install(ContentNegotiation) { json(defaultJson) }
+            install(HttpTimeout) {
+                requestTimeoutMillis = requestTimeoutMs
+                connectTimeoutMillis = CONNECT_TIMEOUT_MS
+                socketTimeoutMillis = SOCKET_TIMEOUT_MS
             }
+            if (enableLogging) {
+                install(Logging) {
+                    this.logger =
+                        object : Logger {
+                            override fun log(message: String) = logger(message)
+                        }
+                    level = LogLevel.INFO
+                }
+            }
+            // No default Accept: ContentNegotiation adds it for JSON calls, raw calls choose their own.
+            defaultRequest { url(baseUrl.trimEnd('/') + "/") }
+        }
+
+        /** Upper bound for an error body that is still parsed as problem details. */
+        internal const val MAX_PROBLEM_BYTES = 64 * 1024
     }
 }
+
+/** Sets [body] as a JSON request body. */
+inline fun <reified B> HttpRequestBuilder.jsonBody(body: B) {
+    contentType(ContentType.Application.Json)
+    setBody(body)
+}
+
+/** Marks a mutating request as safe to retry: the server de-duplicates repeats carrying the same [key]. */
+fun HttpRequestBuilder.idempotencyKey(key: String) {
+    header(IDEMPOTENCY_KEY_HEADER, key)
+}
+
+private const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"

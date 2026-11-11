@@ -58,6 +58,8 @@
     <string name="waiting_empty_title">Tidak ada antrian</string>
     <string name="waiting_empty_body">Anda tidak sedang berada dalam antrian untuk acara ini.</string>
     <string name="waiting_error_title">Gagal memuat antrian</string>
+    <string name="waiting_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="waiting_refresh_error">Koneksi terputus. Menampilkan posisi terakhir Anda.</string>
 
     <!-- Queue position card -->
     <string name="waiting_back_description">Kembali</string>
@@ -147,6 +149,9 @@
     <string name="detail_empty_title">Belum ada kategori</string>
     <string name="detail_empty_body">Tiket untuk acara ini belum tersedia.</string>
     <string name="detail_error_title">Gagal memuat detail</string>
+    <string name="detail_error_load">Detail tidak bisa dimuat. Coba lagi.</string>
+    <string name="detail_error_booking">Belum bisa lanjut ke pembayaran. Coba lagi.</string>
+    <string name="detail_error_nik_rejected">Salah satu NIK tidak bisa diverifikasi. Periksa NIK lalu coba lagi.</string>
     <string name="detail_expired_description">Waktu habis. 5 menit sudah lewat. Pilihan Anda belum disimpan.</string>
     <string name="detail_expired_badge">Waktu habis</string>
     <string name="detail_expired_headline">5 menit sudah lewat.</string>
@@ -164,7 +169,9 @@
 
     <!-- My Queues (Antrian) screen + queue list item -->
     <string name="my_queues_title">Antrian saya</string>
-    <string name="my_queues_count">%1$d antrian aktif</string>
+    <plurals name="my_queues_count">
+        <item quantity="other">%1$d antrian aktif</item>
+    </plurals>
     <string name="my_queues_logo_description">Rusuh</string>
     <string name="my_queues_language_group">Bahasa</string>
     <string name="my_queues_language_id">ID</string>
@@ -174,6 +181,8 @@
     <string name="my_queues_empty_body">Pilih event lalu masuk antriannya. Posisi Anda akan muncul di sini.</string>
     <string name="my_queues_empty_action">Lihat event</string>
     <string name="my_queues_error_title">Gagal memuat antrian</string>
+    <string name="my_queues_refresh_failed">Gagal memperbarui antrian.</string>
+    <string name="my_queues_error_body">Periksa koneksi Anda lalu coba lagi.</string>
     <string name="queue_list_item_phase_open">Antrian dibuka</string>
     <string name="queue_list_item_phase_live">Berlangsung</string>
     <string name="queue_list_item_phase_paused">Dijeda</string>
