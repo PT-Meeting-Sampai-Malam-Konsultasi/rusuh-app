@@ -1,9 +1,7 @@
 package com.rusuh.app.di
 
-import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
-import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.repository.DetailRepository
 import com.rusuh.app.domain.repository.MyQueuesRepository
 import com.rusuh.app.domain.usecase.CreateBookingUseCase
@@ -45,8 +43,8 @@ val appModule =
         factory { GetMyTicketsUseCase(get()) }
 
         // Detail ticket page.
-        // shortcut: stub repository + monotonic clock until FR-15/16/17-M1 (#80, #81, #82) land.
-        single<ServerClock> { MonotonicServerClock() }
+        // ServerClock comes from coreModule (synced from `serverNow`).
+        // shortcut: stub repository until FR-15/16/17-M1 (#80, #81, #82) land.
         single<DetailRepository> { StubDetailRepository(get()) }
         factory { GetDetailUseCase(get()) }
         factory { ValidateAttendeeUseCase(get()) }

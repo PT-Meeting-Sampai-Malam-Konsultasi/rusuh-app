@@ -201,3 +201,79 @@ In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `
 - The platform actuals (Keystore, Keychain, SharedPreferences, NSUserDefaults) need a device or simulator, so
   they are not unit tested; they are covered by the later integration test. iOS compilation is checked by
   `compileKotlinIosSimulatorArm64`.
+
+## HTTP plugins
+
+Every request on every host goes through the same plugin chain. The shared `HttpClient` (one engine) installs the
+host-independent plugins; each host client from `ApiClient.forHost(shared, baseUrl, hostAuth)` adds its token
+plugins on top (`coreModule()` wires all of it).
+
+Order (request direction): `ContentNegotiation`, `HttpTimeout`, `AcceptLanguagePlugin`, `ServerClockPlugin`,
+`Logging` (shared client), then `AuthHeadersPlugin` and `SessionRefreshPlugin` (per host).
+
+| Plugin | What it does |
+|---|---|
+| `AcceptLanguagePlugin` | `Accept-Language: id` or `en` from `LocaleProvider` (default `SystemLocaleProvider`: device language, anything but English is `id`, Android's legacy `in` included). Read per request. A header the call sets itself wins. |
+| `ServerClockPlugin` | Reads `serverNow` (RFC 3339) from small `application/json` bodies, top level or one nested object, and re-anchors the `ServerClock`. Cheap: bodies without the text `"serverNow"` are not parsed, streams and downloads are skipped. |
+| `AuthHeadersPlugin` | `X-Device-Token` and `Authorization: Bearer <access>` from `TokenStore` when present; never replaces a header the call set. Never logs values (`Logging` also masks the token headers). |
+| `SessionRefreshPlugin` | On `401`: one single-flight `POST /auth/refresh`, then the same request once more with the new access token. |
+
+### What an ApiService does
+
+- Nothing for language, device token, Bearer, refresh or the clock: automatic.
+- Queue and admission tokens are opt-in per call, never automatic:
+  `api.get(EP) { queueToken(token) }`, `api.post(EP) { admissionToken(token) }` (`X-Queue-Token`, `X-Admission-Token`;
+  read the value from `TokenStore` in the repository).
+- Calls outside the session (the refresh call, OTP calls that must not carry a stale Bearer) add `skipSessionAuth()`:
+  no Bearer and no 401 handling; the device token is still sent.
+- Creating or charging POSTs add `idempotencyKey(key)`.
+
+### Per-host policy (`HostAuth`)
+
+`HostAuth(tokenStore, refreshCoordinator, sendDeviceToken, sendBearer)` is the per-host switch. Decision: all three hosts
+(`api`, `queue`, `pay`) use the default (device token and Bearer sent, refresh on). The contract lists `bearerAuth` on the
+payment endpoints as the alternative to the web-only `__Host-pay_session` cookie (mobile has no cookie session), the
+queue endpoints need `X-Device-Token`, and the auth endpoints take the device token only: sending both headers
+everywhere is harmless to hosts that ignore one. To change it for a host, pass a different `HostAuth` in `coreModule()`.
+
+### 401 and refresh
+
+`SessionRefreshCoordinator` (single-flight, one lock):
+
+1. A 401 on a request that carried a Bearer, or any 401 while a refresh token is stored, asks the coordinator for a
+   new access token. Concurrent 401s queue on the lock; the first calls refresh, the others see the new access token
+   in `TokenStore` and reuse it, so the server sees exactly one refresh (reusing a rotated refresh token revokes the
+   token family). Anonymous 401s (no Bearer, no refresh token) are returned untouched.
+2. Success: the rotated refresh token is persisted, the access token set in memory, and the failed request is sent
+   once more with `Authorization: Bearer <new>`. A second 401 is returned as is: no loop. Only the request the server
+   already rejected is replayed, and a 401 means it was not processed, so no write is ever repeated.
+3. Refresh rejected (400 or 401), or a session without any refresh token: `TokenStore.clearSession()` (access, refresh,
+   queue, admission tokens; the device token stays) and `SessionEvents.events` emits `SessionEvent.SessionExpired`; the
+   UI shell collects it once and routes to sign-in. Nothing is replayed to late collectors.
+4. Refresh that could not complete (offline, timeout, 5xx): the session is kept and the original 401 is returned.
+5. The refresh runs `NonCancellable`, so a cancelled caller cannot lose a rotated token.
+6. The refresh call carries `skipSessionAuth()` and only the device token (the contract's security for `POST /auth/refresh`:
+   the refresh token is in the body on mobile), so it never triggers the 401 handler itself.
+
+`TokenRefresher` is the seam: the default `ApiTokenRefresher` calls `POST /auth/refresh` through the `api` client;
+`AuthRepository.refresh` (#67) can replace it by rebinding `TokenRefresher`. Tests inject a fake lambda.
+
+### Idempotency keys
+
+`newIdempotencyKey()` returns a random UUID. Rule: one key per user attempt, the same key on every retry of that
+attempt, a new key only for a new user attempt. Never auto-retry a charging or creating POST with a different key: that
+is a second charge. Keep the key in the ViewModel/use case state for the attempt (not in the ApiService).
+
+### Server clock
+
+One clock, `MonotonicServerClock` (bound as `ServerClock` and `ServerTimeSink` in `coreModule()`): it stores the last
+`serverNow` plus a monotonic mark, so `nowMillis()` follows the server and never the device clock. Every response with
+`serverNow` re-anchors it (latest wins, which corrects drift); latency is not compensated (the clock runs about half a
+round trip behind, which can only lengthen a countdown slightly). Until the first response it counts from 0 (the
+Detail stub's behaviour). Read time only through `ServerClock`; `ServerClock.remainingMillis(expiresAtMillis)` is never
+negative. Tests pass a `TestTimeSource` as `timeSource`.
+
+### Testing the plugins
+
+`testHttp(...)` in `commonTest/.../data/network/plugin/HttpPluginTestSupport.kt` builds an `ApiClient` on a `MockEngine`
+with any of the language provider, clock sink and `HostAuth`; see `HeaderPluginsTest`, `SessionRefreshTest`, `ServerClockTest`.

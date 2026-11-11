@@ -1,5 +1,10 @@
 package com.rusuh.app.data.network
 
+import com.rusuh.app.data.clock.ServerTimeSink
+import com.rusuh.app.data.network.plugin.AcceptLanguagePlugin
+import com.rusuh.app.data.network.plugin.AuthHeadersPlugin
+import com.rusuh.app.data.network.plugin.ServerClockPlugin
+import com.rusuh.app.data.network.plugin.SessionRefreshPlugin
 import com.rusuh.app.data.remote.dto.ProblemDetails
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
@@ -187,11 +192,17 @@ class ApiClient(
             useBaseUrl(baseUrl)
         }
 
-        /** Shared plugins only, with no host: one such client (one engine) serves every [forHost] client. */
+        /**
+         * Shared plugins only, with no host: one such client (one engine) serves every [forHost] client. The
+         * language header and server clock are on every request of every host; they are skipped when their
+         * provider is null (plain tests). Per-host token plugins come from [forHost].
+         */
         internal fun HttpClientConfig<*>.configurePlugins(
             enableLogging: Boolean = false,
             logger: (String) -> Unit = {},
             requestTimeoutMs: Long = REQUEST_TIMEOUT_MS,
+            localeProvider: LocaleProvider? = null,
+            serverTime: ServerTimeSink? = null,
         ) {
             install(ContentNegotiation) { json(defaultJson) }
             install(HttpTimeout) {
@@ -199,8 +210,11 @@ class ApiClient(
                 connectTimeoutMillis = CONNECT_TIMEOUT_MS
                 socketTimeoutMillis = SOCKET_TIMEOUT_MS
             }
+            localeProvider?.let { provider -> install(AcceptLanguagePlugin) { this.localeProvider = provider } }
+            serverTime?.let { target -> install(ServerClockPlugin) { sink = target } }
             if (enableLogging) {
                 install(Logging) {
+                    sanitizeHeader { name -> name in SENSITIVE_HEADERS }
                     this.logger =
                         object : Logger {
                             override fun log(message: String) = logger(message)
@@ -211,19 +225,47 @@ class ApiClient(
             // No default Accept: ContentNegotiation adds it for JSON calls, raw calls choose their own.
         }
 
-        private fun HttpClientConfig<*>.useBaseUrl(baseUrl: String) {
+        internal fun HttpClientConfig<*>.useBaseUrl(baseUrl: String) {
             defaultRequest { url(baseUrl.trimEnd('/') + "/") }
+        }
+
+        /**
+         * Token headers and 401 handling for one host, see [HostAuth]. Installed once per host client because
+         * the shared [HttpClient] serves hosts that may differ.
+         */
+        internal fun HttpClientConfig<*>.installHostAuth(hostAuth: HostAuth) {
+            install(AuthHeadersPlugin) {
+                tokenStore = hostAuth.tokenStore
+                sendDeviceToken = hostAuth.sendDeviceToken
+                sendBearer = hostAuth.sendBearer
+            }
+            hostAuth.refreshCoordinator?.let { sessions ->
+                install(SessionRefreshPlugin) { coordinator = sessions }
+            }
         }
 
         /**
          * An [ApiClient] for [baseUrl] that reuses [shared] (its engine and plugins) through `HttpClient.config`.
          * The derived client shares the engine but does not own it: closing one does not affect the others.
-         * The owner of [shared] closes it (coreModule does, on Koin close).
+         * The owner of [shared] closes it (coreModule does, on Koin close). [hostAuth] adds this host's token
+         * headers and 401 refresh; null sends no tokens.
          */
         fun forHost(
             shared: HttpClient,
             baseUrl: String,
-        ): ApiClient = ApiClient(baseUrl = baseUrl, client = shared.config { useBaseUrl(baseUrl) })
+            hostAuth: HostAuth? = null,
+        ): ApiClient =
+            ApiClient(
+                baseUrl = baseUrl,
+                client =
+                    shared.config {
+                        useBaseUrl(baseUrl)
+                        hostAuth?.let { installHostAuth(it) }
+                    },
+            )
+
+        private val SENSITIVE_HEADERS =
+            setOf(HttpHeaders.Authorization, "X-Device-Token", "X-Queue-Token", "X-Admission-Token", HttpHeaders.Cookie)
 
         /** Upper bound for an error body that is still parsed as problem details. */
         internal const val MAX_PROBLEM_BYTES = 64 * 1024
@@ -236,8 +278,13 @@ inline fun <reified B> HttpRequestBuilder.jsonBody(body: B) {
     setBody(body)
 }
 
-/** Marks a mutating request as safe to retry: the server de-duplicates repeats carrying the same [key]. */
+/**
+ * Marks a mutating request as safe to retry: the server de-duplicates repeats carrying the same [key]. Take the key
+ * from `newIdempotencyKey()`, once per user attempt, and reuse it on every retry of that attempt; never retry a
+ * charging POST with a different key.
+ */
 fun HttpRequestBuilder.idempotencyKey(key: String) {
+    require(key.isNotBlank()) { "Idempotency-Key must not be blank" }
     header(IDEMPOTENCY_KEY_HEADER, key)
 }
 
