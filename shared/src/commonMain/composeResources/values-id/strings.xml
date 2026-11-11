@@ -149,6 +149,9 @@
     <string name="detail_empty_title">Belum ada kategori</string>
     <string name="detail_empty_body">Tiket untuk acara ini belum tersedia.</string>
     <string name="detail_error_title">Gagal memuat detail</string>
+    <string name="detail_error_load">Detail tidak bisa dimuat. Coba lagi.</string>
+    <string name="detail_error_booking">Belum bisa lanjut ke pembayaran. Coba lagi.</string>
+    <string name="detail_error_nik_rejected">Salah satu NIK tidak bisa diverifikasi. Periksa NIK lalu coba lagi.</string>
     <string name="detail_expired_description">Waktu habis. 5 menit sudah lewat. Pilihan Anda belum disimpan.</string>
     <string name="detail_expired_badge">Waktu habis</string>
     <string name="detail_expired_headline">5 menit sudah lewat.</string>
@@ -231,4 +234,33 @@
     <string name="tickets_error_title">Tiket tidak bisa dimuat</string>
     <string name="tickets_error_body">Periksa koneksi Anda lalu coba lagi.</string>
     <string name="tickets_error_action">Coba lagi</string>
+    <string name="otp_input_label">Kode verifikasi</string>
+    <string name="otp_input_progress">%1$d dari %2$d digit terisi</string>
+    <string name="sign_in_sheet_description">Masuk ke Rusuh</string>
+    <string name="sign_in_badge">Masuk</string>
+    <string name="sign_in_email_headline">Masuk dengan email</string>
+    <string name="sign_in_email_body">Kami kirim kode 6 digit ke email Anda. Tanpa kata sandi.</string>
+    <string name="sign_in_email_label">Email</string>
+    <string name="sign_in_email_placeholder">nama@email.com</string>
+    <string name="sign_in_email_notice">Demi privasi, kami tidak memberi tahu apakah email sudah punya akun.</string>
+    <string name="sign_in_send_code">Kirim kode</string>
+    <string name="sign_in_dismiss">Nanti saja</string>
+    <string name="sign_in_code_headline">Masukkan kode</string>
+    <string name="sign_in_code_body">Jika %1$s bisa menerima email, kode 6 digit sedang dikirim. Berlaku 10 menit.</string>
+    <string name="sign_in_resend_wait">Kirim ulang kode dalam %1$s</string>
+    <string name="sign_in_resend">Kirim ulang kode</string>
+    <string name="sign_in_change_email">Ganti email</string>
+    <string name="sign_in_wrong_headline">Kode salah</string>
+    <plurals name="sign_in_wrong_attempts">
+        <item quantity="other">Kode salah. Sisa %1$d percobaan.</item>
+    </plurals>
+    <string name="sign_in_expired_headline">Kode kedaluwarsa</string>
+    <string name="sign_in_expired_body">Kode hanya berlaku 10 menit. Minta kode baru untuk lanjut.</string>
+    <string name="sign_in_new_headline">Akun baru</string>
+    <string name="sign_in_new_body">Belum ada akun untuk %1$s. Isi nama lengkap Anda untuk membuatnya.</string>
+    <string name="sign_in_name_label">Nama lengkap</string>
+    <string name="sign_in_name_placeholder">Nama lengkap Anda</string>
+    <string name="sign_in_consent">Saya setuju dengan Ketentuan Layanan dan Kebijakan Privasi Rusuh.</string>
+    <string name="sign_in_account_notice">Akun hanya menyimpan email dan nama Anda. Tidak perlu NIK untuk masuk.</string>
+    <string name="sign_in_create_account">Buat akun</string>
 </resources>

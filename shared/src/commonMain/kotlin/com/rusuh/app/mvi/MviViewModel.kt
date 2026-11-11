@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 abstract class MviViewModel<S : MviState, I : MviIntent, E : MviEffect>(
     initialState: S,
 ) {
-    protected val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    protected val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /**
      * UI state exposed as [StateFlow].
