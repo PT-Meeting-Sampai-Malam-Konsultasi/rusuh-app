@@ -152,9 +152,59 @@ and each test needs a fresh one.
    line to `coreModule()`.
 3. Extend `ApiConfigTest` and `CoreModuleTest`. For a non-local mock host, also extend the debug cleartext config.
 
-Wiring of ApiServices, Repositories and Caches (`single`) and UseCases (`factory`) arrives with the feature tickets.
+Wiring of ApiServices and Caches (`single`) and UseCases (`factory`) arrives with the feature tickets; repositories are bound per backend mode in `dataModule` (see below).
 
 In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `CoreModuleTest`.
+
+## Backend modes: Stub, Mockoon, Real
+
+`AppEnvironment` says which hosts exist; `BackendMode { Stub, Real }` (`di/BackendMode.kt`, the `useStubs` switch) says
+whether repositories talk to them. Three ways to run the app:
+
+| Mode | Environment + mode | Data comes from | Needs |
+|---|---|---|---|
+| Stub (in process) | `Mock` + `Stub` (the default for Mock) | `StubEngine`: a Ktor `MockEngine` serving `data/stub` payloads, and the hand-written stub repositories | Nothing: no backend, no network |
+| Mockoon over HTTP | `Mock` + `Real` | The Mockoon mock at `platformMockBaseUrl` (`workspace-local/mockoon`, not in the repo) | `mockoon-cli start --data rusuh-api.json -X` |
+| Real | `Staging` / `Production` + `Real` (their default) | The real hosts of `ApiConfig` | The backend |
+
+- Defaults: `BackendMode.defaultFor(env)`, Mock = Stub, everything else = Real. So a debug build runs end to end with no
+  backend. `Production` + `Stub` is rejected (`IllegalArgumentException`): a release build never ships fake data.
+- Switch: `initKoin(environment, backendMode)`. Android debug builds read `-PbackendMode=Real` (Gradle property, empty keeps
+  the default; release ignores it) into `BuildConfig.BACKEND_MODE`; iOS calls `KoinIosKt.doInitKoinWithBackend(environmentName:
+  backendModeName:)` (null keeps the default; `doInitKoin(environmentName:)` is unchanged).
+- `dataModule(mode)` (`di/DataModule.kt`) binds every repository interface per mode. In `Stub` it also replaces the
+  shared `HttpClient` with one on the in-process `StubEngine`, so the three named `ApiClient`s and any ApiService built on
+  them run with zero network. Today only stub repositories exist, so in `Real` each repository binding throws
+  `RealRepositoryNotAvailableException` when first resolved (never a silent fallback to a stub). A feature ticket that
+  builds a real repository replaces the matching `unavailable(...)` line in `dataModule` and adds its `Real` binding.
+- Mockoon bodies are schema-generated (blank ids), not the spec examples; the Stub mode payloads are the spec examples.
+
+### Stub payloads and the test harness (`data/stub`)
+
+- `StubJson`: one JSON constant per endpoint, copied from the `example`s of the OpenAPI contract (synthetic data only,
+  masked NIKs, example.com emails). When the contract changes, update the example there; `StubJsonTest` decodes every
+  stub (problem bodies through `ProblemDetails`) and fails on drift. Add each new DTO's decode check to it.
+- `StubResponses`: registry of `StubRoute(method, "/queue/{eventId}/frontier", response)`. `{param}` segments match any
+  value and a fixed segment wins (`/bookings/active` over `/bookings/{bookingId}`).
+- `StubError`: named error responses for scenarios: 409 with problem+json and extras (`QuantityOverReservation` has
+  `categoryId`, `WrongCode` has `attemptsLeft`), 410 queue errors, 422, 429 with `Retry-After: 30`, 503 with
+  `Retry-After: 10`.
+- `StubClock` (also a `ServerClock`): time-dependent members are placeholders (`@{now}`, `@{now+300}`, `@{epoch}`)
+  rendered against the clock when served, so `clock.advanceBy(2.minutes)` makes the next `expiresAt` later, with no
+  sleeping. It starts at the spec's `serverNow`, 2026-11-14T10:40:00Z.
+- `StubEngine(clock)`: serves the routes, records every request (`requests`: method, path, query, headers, body, path
+  params) and lets a scenario script a route: `stub.script(HttpMethod.Get, "/queue/{eventId}/frontier", responses)` serves
+  the responses in order and repeats the last. An unknown route answers a 404 problem naming it.
+- Tests (`commonTest/.../data/stub/StubTestSupport.kt`):
+
+```kotlin
+val stub = StubEngine()
+val api = stub.apiClient()                                  // the real ApiClient on the stub engine
+stub.script(HttpMethod.Get, "/queue/{eventId}/frontier", frontierSequence(stub.clock, 100, 140, 190))
+stub.script(HttpMethod.Post, "/bookings", StubError.QuantityOverReservation)
+// ... call the ApiService / repository under test ...
+stub.assertRequest(0, HttpMethod.Get, "/queue/evt_1/frontier", mapOf("Accept" to "application/json"))
+```
 
 ## Storage
 
