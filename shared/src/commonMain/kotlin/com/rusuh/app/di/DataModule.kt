@@ -1,6 +1,5 @@
 package com.rusuh.app.di
 
-import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
 import com.rusuh.app.data.stub.StubClock
@@ -35,7 +34,8 @@ const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
  * - [BackendMode.Stub]: stub repositories, and the shared [HttpClient] (from `coreModule`) is replaced by one on an
  *   in-process [StubEngine], so ApiServices built on the injected `ApiClient`s run with zero network. The
  *   [ServerClock] is the demo's ticking [StubClock], so countdowns run. The client is closed with Koin.
- * - [BackendMode.Real]: no real repository exists yet. With [allowStubFallback] each one resolves to its stub and
+ * - [BackendMode.Real]: the [ServerClock] is the one from `coreModule`, synced from `serverNow` in responses.
+ *   No real repository exists yet. With [allowStubFallback] each one resolves to its stub and
  *   logs a WARNING through [warn] once (singletons); without it, resolving throws
  *   [RealRepositoryNotAvailableException]. When a feature ticket builds a real repository, bind it in place of the
  *   `notYetReal(...)` line of that repository below.
@@ -67,8 +67,7 @@ fun dataModule(
                 single<MyQueuesRepository> { StubMyQueuesRepository() }
             }
             BackendMode.Real -> {
-                // shortcut: monotonic clock until FR-15/16/17-M1 (#80, #81, #82) sync it with the server.
-                single<ServerClock> { MonotonicServerClock() }
+                // ServerClock: coreModule's MonotonicServerClock, the instance the response plugin keeps in sync.
                 single<HomeRepository> { notYetReal("HomeRepository") { StubHomeRepository() } }
                 single<WaitingRoomRepository> { notYetReal("WaitingRoomRepository") { StubWaitingRoomRepository() } }
                 single<TicketsRepository> { notYetReal("TicketsRepository") { StubTicketsRepository() } }
