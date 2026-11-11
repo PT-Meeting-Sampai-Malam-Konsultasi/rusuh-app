@@ -183,6 +183,16 @@ class ApiClient(
             logger: (String) -> Unit = {},
             requestTimeoutMs: Long = REQUEST_TIMEOUT_MS,
         ) {
+            configurePlugins(enableLogging, logger, requestTimeoutMs)
+            useBaseUrl(baseUrl)
+        }
+
+        /** Shared plugins only, with no host: one such client (one engine) serves every [forHost] client. */
+        internal fun HttpClientConfig<*>.configurePlugins(
+            enableLogging: Boolean = false,
+            logger: (String) -> Unit = {},
+            requestTimeoutMs: Long = REQUEST_TIMEOUT_MS,
+        ) {
             install(ContentNegotiation) { json(defaultJson) }
             install(HttpTimeout) {
                 requestTimeoutMillis = requestTimeoutMs
@@ -199,8 +209,20 @@ class ApiClient(
                 }
             }
             // No default Accept: ContentNegotiation adds it for JSON calls, raw calls choose their own.
+        }
+
+        private fun HttpClientConfig<*>.useBaseUrl(baseUrl: String) {
             defaultRequest { url(baseUrl.trimEnd('/') + "/") }
         }
+
+        /**
+         * An [ApiClient] for [baseUrl] that reuses [shared] (its engine and plugins) through `HttpClient.config`.
+         * Closing it closes the shared engine, so the owner of [shared] is the one to close.
+         */
+        fun forHost(
+            shared: HttpClient,
+            baseUrl: String,
+        ): ApiClient = ApiClient(baseUrl = baseUrl, client = shared.config { useBaseUrl(baseUrl) })
 
         /** Upper bound for an error body that is still parsed as problem details. */
         internal const val MAX_PROBLEM_BYTES = 64 * 1024
