@@ -124,11 +124,21 @@ config (EPIC-01-M2).
 - Cache pattern: extend `PrefsCache(prefs, prefix)` with the feature prefix (`home_`, `queue_`, `book_`, `tix_`,
   `auth_`). The key strings are constants inside the owning cache and nowhere else; keys outside the prefix are
   rejected. `HomeCache` is the example. Secure keys are owned by `SecureTokenStore`.
-- Logout: `TokenStore.clearSession()` clears the access, refresh, admission and all queue tokens. The device token
-  survives, because it identifies the install, not the session.
+- Logout: `TokenStore.clearSession()` clears the access token first, then removes the refresh, admission and all
+  `queue_token_` entries (via `SecureStore.removeWhere`), attempting every removal even if one fails and rethrowing
+  the first failure. The device token is never touched, because it identifies the install, not the session. Token
+  writes and logout share one lock.
+- Backup and restore: the `rusuh_secure_store` file is excluded from cloud backup and device transfer
+  (`backup_rules.xml`, `data_extraction_rules.xml`), since the Keystore key does not move between devices. After a
+  restore the user signs in again and the app registers a new device token.
+- iOS fresh install: the Keychain survives an uninstall but NSUserDefaults does not. `KeychainSecureStore` keeps a
+  first-launch flag in NSUserDefaults and wipes this service's Keychain items once when the flag is missing.
+  Keychain errors other than "not found" throw `KeychainException` (status only) instead of reading as a miss.
+- Android read failures: a bad tag, invalidated key or corrupt entry is deleted and reads as null; other
+  `GeneralSecurityException`s are treated as transient (null, entry kept). Failed writes throw.
 - Never persisted: the access token, passwords, OTPs, NIK and payment data. Never log token values.
 - Threat model: tokens are protected against other apps and against reading a device backup or file dump (private
-  app storage and a hardware-backed key that cannot be extracted). A rooted or jailbroken device with a live
+  app storage and a Keystore key that is non-exportable and, on devices that support it, hardware-backed). A rooted or jailbroken device with a live
   process, or malware running as the app, can still use the keys; short access token lifetimes and server-side
   refresh token revocation are the mitigation.
 - The platform actuals (Keystore, Keychain, SharedPreferences, NSUserDefaults) need a device or simulator, so

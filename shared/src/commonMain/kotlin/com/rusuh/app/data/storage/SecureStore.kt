@@ -15,6 +15,9 @@ interface SecureStore {
 
     suspend fun remove(key: String)
 
+    /** Removes every entry whose key starts with [prefix]. A missing match is not an error. */
+    suspend fun removeWhere(prefix: String)
+
     /** Removes every entry owned by this store. */
     suspend fun clear()
 }
