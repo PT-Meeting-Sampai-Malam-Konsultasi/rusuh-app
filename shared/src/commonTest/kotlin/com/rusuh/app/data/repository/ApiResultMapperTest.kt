@@ -8,6 +8,7 @@ import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.HttpRequestBuilder
 import kotlinx.io.IOException
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -38,6 +39,17 @@ class ApiResultMapperTest {
     }
 
     @Test
+    fun `error carries extras, trace id and retry after`() {
+        val extras = mapOf("categoryId" to JsonPrimitive("cat-7"), "attemptsLeft" to JsonPrimitive(2))
+        val problem =
+            ProblemDetails(code = ErrorCode.CATEGORY_SOLD_OUT, detail = "d", traceId = "trace-1", extras = extras)
+
+        val result = ApiResult.Error(409, problem, retryAfterSeconds = 30).toDomainResult()
+
+        assertEquals(DomainResult.Error("d", 409, ErrorCode.CATEGORY_SOLD_OUT, "trace-1", extras, 30), result)
+    }
+
+    @Test
     fun `error message falls back to the title`() {
         val problem = ProblemDetails(title = "Judul", code = ErrorCode.FORBIDDEN)
 
@@ -54,14 +66,14 @@ class ApiResultMapperTest {
 
     @Test
     fun `io failures and timeouts map to NetworkError`() {
-        assertEquals(DomainResult.NetworkError, ApiResult.Exception(IOException("offline")).toDomainResult())
+        assertEquals(DomainResult.NetworkError, ApiResult.Failure(IOException("offline")).toDomainResult())
         val timeout = HttpRequestTimeoutException(HttpRequestBuilder())
-        assertEquals(DomainResult.NetworkError, ApiResult.Exception(timeout).toDomainResult())
+        assertEquals(DomainResult.NetworkError, ApiResult.Failure(timeout).toDomainResult())
     }
 
     @Test
     fun `other exceptions map to TechnicalError`() {
-        assertEquals(DomainResult.TechnicalError, ApiResult.Exception(SerializationException("bad")).toDomainResult())
-        assertEquals(DomainResult.TechnicalError, ApiResult.Exception(IllegalStateException()).toDomainResult())
+        assertEquals(DomainResult.TechnicalError, ApiResult.Failure(SerializationException("bad")).toDomainResult())
+        assertEquals(DomainResult.TechnicalError, ApiResult.Failure(IllegalStateException()).toDomainResult())
     }
 }
