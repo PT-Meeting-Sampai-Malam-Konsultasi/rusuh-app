@@ -10,11 +10,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,19 +31,15 @@ import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.detail.DetailViewModelHolder
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
-import com.rusuh.app.feature.queues.MyQueuesActions
-import com.rusuh.app.feature.queues.MyQueuesScreen
-import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
+import com.rusuh.app.feature.queues.MyQueuesRoute
+import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.TicketsActions
+import com.rusuh.app.feature.tickets.TicketsEffect
+import com.rusuh.app.feature.tickets.TicketsIntent
 import com.rusuh.app.feature.tickets.TicketsScreen
-import com.rusuh.app.feature.tickets.TicketsUiState
-import com.rusuh.app.feature.tickets.loadUiState
-import com.rusuh.app.feature.waitingroom.WaitingRoomAction
-import com.rusuh.app.feature.waitingroom.WaitingRoomEventUi
-import com.rusuh.app.feature.waitingroom.WaitingRoomPhase
-import com.rusuh.app.feature.waitingroom.WaitingRoomScreen
-import com.rusuh.app.feature.waitingroom.WaitingRoomUiState
-import com.rusuh.app.ui.components.QueuePositionUi
+import com.rusuh.app.feature.tickets.TicketsViewModel
+import com.rusuh.app.feature.waitingroom.WaitingRoomRoute
+import com.rusuh.app.feature.waitingroom.WaitingRoomViewModel
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
@@ -113,12 +108,15 @@ fun RusuhNavGraph(navController: NavHostController) {
             route = Screen.WaitingRoom.route,
             arguments = listOf(navArgument(Screen.WaitingRoom.ARG_EVENT_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
-            val eventId = backStackEntry.arguments?.getString(Screen.WaitingRoom.ARG_EVENT_ID)
-            WaitingRoomScreen(
-                state = placeholderWaitingRoomState(eventTitle = eventId.orEmpty()),
-                dispatch = { action ->
-                    if (action == WaitingRoomAction.Back) navController.popBackStack()
-                },
+            val eventId = backStackEntry.arguments?.getString(Screen.WaitingRoom.ARG_EVENT_ID).orEmpty()
+            // remember(eventId): koinInject's parameters lambda is a new instance every recomposition,
+            // so resolve once per event id to keep a single ViewModel for this destination.
+            val koin = getKoin()
+            val viewModel = remember(eventId) { koin.get<WaitingRoomViewModel> { parametersOf(eventId) } }
+            WaitingRoomRoute(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
             )
         }
     }
@@ -153,31 +151,39 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
     }
 
     composable(Screen.Queues.route) {
-        MyQueuesScreen(
-            actions =
-                MyQueuesActions(
-                    onOpenWaitingRoom = { eventId -> navController.navigate(Screen.WaitingRoom.routeFor(eventId)) },
-                    onTabSelected = onTabSelected,
-                    onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
-                ),
+        MyQueuesRoute(
+            viewModel = koinInject<MyQueuesViewModel>(),
+            onOpenWaitingRoom = { eventId -> navController.navigate(Screen.WaitingRoom.routeFor(eventId)) },
+            onSwitchTab = onTabSelected,
+            onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
         )
     }
 
     composable(Screen.Tickets.route) {
-        val getMyTickets = koinInject<GetMyTicketsUseCase>()
-        // shortcut: loaded inline until TICKET-00-M3 adds the ViewModel.
-        var attempt by remember { mutableIntStateOf(0) }
-        val state by produceState<TicketsUiState>(TicketsUiState.Loading, attempt) {
-            value = TicketsUiState.Loading
-            value = getMyTickets.loadUiState()
+        val viewModel = koinInject<TicketsViewModel>()
+        val state by viewModel.state.collectAsState()
+
+        LaunchedEffect(viewModel) { viewModel.dispatch(TicketsIntent.Load) }
+        LaunchedEffect(viewModel) {
+            viewModel.effect.collect { effect ->
+                when (effect) {
+                    TicketsEffect.GoToEvents -> navController.switchTab(RusuhTab.Event)
+                    // TODO(FR-22-M2 #71): navigate to the e-ticket page once the destination exists.
+                    is TicketsEffect.OpenETicket -> Unit
+                    // TODO(AUTH-00 #74): navigate to sign-in once the auth flow exists.
+                    TicketsEffect.OpenSignIn -> Unit
+                }
+            }
         }
         TicketsScreen(
-            state = state,
+            state = state.ui,
             actions =
                 TicketsActions(
+                    onViewETicket = { viewModel.dispatch(TicketsIntent.ViewETicket(it)) },
                     onTabSelected = onTabSelected,
-                    onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
-                    onRetry = { attempt++ },
+                    onBrowseEvents = { viewModel.dispatch(TicketsIntent.BrowseEvents) },
+                    onSignIn = { viewModel.dispatch(TicketsIntent.SignIn) },
+                    onRetry = { viewModel.dispatch(TicketsIntent.Retry) },
                 ),
         )
     }
@@ -267,22 +273,3 @@ private fun SplashPlaceholder() {
         Text("Splash Screen")
     }
 }
-
-/**
- * Placeholder Waiting Room content for a row tap, until M3 feeds the real queue
- * position. shortcut: fixed "waiting" position; swap for live state in M3/M4.
- */
-private fun placeholderWaitingRoomState(eventTitle: String): WaitingRoomUiState =
-    WaitingRoomUiState.Active(
-        event =
-            WaitingRoomEventUi(
-                title = eventTitle,
-                subtitle = "",
-                dateTimeLine = "",
-                venueLine = "",
-            ),
-        phase =
-            WaitingRoomPhase.Waiting(
-                QueuePositionUi(position = 128, estimatedWaitMinutes = 8, ratePerMinute = 310, updatedSecondsAgo = 2),
-            ),
-    )
