@@ -30,9 +30,18 @@ android {
         versionName = "1.0"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
+        // Environment per build type, parsed by AppEnvironment.fromName (see docs/data-layer.md).
+        getByName("debug") {
+            buildConfigField("String", "APP_ENVIRONMENT", "\"Mock\"")
+        }
         getByName("release") {
             isMinifyEnabled = false
+            buildConfigField("String", "APP_ENVIRONMENT", "\"Production\"")
         }
     }
 

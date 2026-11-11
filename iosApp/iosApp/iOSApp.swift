@@ -19,7 +19,11 @@ struct ContentView: View {
 @main
 struct iOSApp: App {
     init() {
-        KoinIosKt.doInitKoin()
+        #if DEBUG
+        KoinIosKt.doInitKoin(environmentName: "Mock")
+        #else
+        KoinIosKt.doInitKoin(environmentName: "Production")
+        #endif
     }
 
     var body: some Scene {
