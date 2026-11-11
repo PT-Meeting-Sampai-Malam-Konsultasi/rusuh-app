@@ -7,8 +7,13 @@ import com.rusuh.app.data.network.idempotencyKey
 import com.rusuh.app.data.network.newIdempotencyKey
 import com.rusuh.app.data.storage.FakeSecureStore
 import com.rusuh.app.data.storage.SecureTokenStore
+import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.respondOk
+import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.request.HttpRequestData
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -144,25 +149,64 @@ class HeaderPluginsTest {
         }
 
     @Test
-    fun loggingNeverPrintsTokenValues() =
+    fun loggingMasksTokenHeadersAtHeadersLevelCaseInsensitively() =
         runTest {
             val store = SecureTokenStore(FakeSecureStore())
             store.setDeviceToken("device-secret")
             store.accessToken = "access-secret"
             val lines = mutableListOf<String>()
             val http =
-                testHttp(hostAuth = HostAuth(store), logger = { lines += it }) { respondOk("") }
+                testHttp(
+                    localeProvider = { AppLanguage.English },
+                    hostAuth = HostAuth(store),
+                    logging = LogLevel.HEADERS to { lines += it },
+                ) {
+                    respond(
+                        "",
+                        HttpStatusCode.OK,
+                        headersOf(HttpHeaders.SetCookie, "__Host-rt=cookie-secret; Secure"),
+                    )
+                }
 
             http.api.get<Unit>("/x") {
                 queueToken("queue-secret")
                 admissionToken("admission-secret")
+                headers.append("x-turnstile-token", "turnstile-secret")
+                headers.append("COOKIE", "pay-cookie-secret")
             }
 
-            assertTrue(lines.isNotEmpty())
             val log = lines.joinToString("\n")
-            listOf("device-secret", "access-secret", "queue-secret", "admission-secret").forEach {
-                assertTrue(it !in log, "log leaked $it")
-            }
+            assertTrue("Accept-Language" in log, "headers must be logged at this level")
+            listOf(
+                "device-secret",
+                "access-secret",
+                "queue-secret",
+                "admission-secret",
+                "turnstile-secret",
+                "pay-cookie-secret",
+                "cookie-secret",
+            ).forEach { assertTrue(it !in log, "log leaked $it") }
+        }
+
+    @Test
+    fun redirectsAreNotFollowedSoTokensStayOnTheirHost() =
+        runTest {
+            val store = SecureTokenStore(FakeSecureStore())
+            store.setDeviceToken("device-1")
+            store.accessToken = "access-1"
+            val http =
+                testHttp(hostAuth = HostAuth(store)) {
+                    respond(
+                        "",
+                        HttpStatusCode.Found,
+                        headersOf(HttpHeaders.Location, "https://evil.test/steal"),
+                    )
+                }
+
+            val result = http.api.get<Unit>("/x")
+
+            assertEquals(302, assertIs<ApiResult.Error>(result).code)
+            assertEquals(1, http.engine.requestHistory.size)
         }
 
     @Test

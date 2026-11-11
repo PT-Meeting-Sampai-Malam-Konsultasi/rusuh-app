@@ -10,6 +10,7 @@ import com.rusuh.app.data.network.LocaleProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
+import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
 
@@ -25,7 +26,7 @@ internal fun testHttp(
     localeProvider: LocaleProvider? = null,
     serverTime: ServerTimeSink? = null,
     hostAuth: HostAuth? = null,
-    logger: ((String) -> Unit)? = null,
+    logging: Pair<LogLevel, (String) -> Unit>? = null,
     handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
 ): TestHttp {
     val engine = MockEngine(handler)
@@ -35,8 +36,9 @@ internal fun testHttp(
             client =
                 HttpClient(engine) {
                     configurePlugins(
-                        enableLogging = logger != null,
-                        logger = logger ?: {},
+                        enableLogging = logging != null,
+                        logger = logging?.second ?: {},
+                        logLevel = logging?.first ?: LogLevel.INFO,
                         localeProvider = localeProvider,
                         serverTime = serverTime,
                     )

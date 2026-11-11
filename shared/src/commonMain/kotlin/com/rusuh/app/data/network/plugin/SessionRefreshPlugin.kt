@@ -26,7 +26,7 @@ val SessionRefreshPlugin =
         on(Send) { request ->
             val call = proceed(request)
             if (call.response.status != HttpStatusCode.Unauthorized ||
-                request.attributes.contains(SkipSessionAuthKey) ||
+                request.isOutsideSession() ||
                 request.attributes.contains(RetriedKey)
             ) {
                 return@on call
@@ -34,6 +34,8 @@ val SessionRefreshPlugin =
             val usedToken = request.headers[HttpHeaders.Authorization]?.removePrefix(BEARER_PREFIX)
             val fresh = coordinator.refreshAfterUnauthorized(usedToken) ?: return@on call
             request.attributes.put(RetriedKey, true)
+            // The send mark belongs to the first attempt; the clock treats the retry as sent when it arrives.
+            request.attributes.remove(SentAtKey)
             request.headers.remove(HttpHeaders.Authorization)
             request.header(HttpHeaders.Authorization, "$BEARER_PREFIX$fresh")
             proceed(request)

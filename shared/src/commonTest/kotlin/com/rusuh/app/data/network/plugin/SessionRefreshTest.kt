@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -35,13 +36,20 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.TestTimeSource
+import kotlin.time.TimeSource
 
+@OptIn(ExperimentalTime::class)
 class SessionRefreshTest {
     private class Fixture(
         refresher: (suspend (String) -> RefreshOutcome)? = null,
+        timeSource: TimeSource = TimeSource.Monotonic,
         handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
     ) {
         val store = SecureTokenStore(FakeSecureStore())
@@ -61,7 +69,7 @@ class SessionRefreshTest {
                         ApiTokenRefresher(http.api)
                     }
                 }
-            val coordinator = SessionRefreshCoordinator(store, tokenRefresher, events)
+            val coordinator = SessionRefreshCoordinator(store, tokenRefresher, events, timeSource = timeSource)
             http = testHttp(hostAuth = HostAuth(store, coordinator), handler = handler)
         }
 
@@ -346,6 +354,177 @@ class SessionRefreshTest {
         }
 
     @Test
+    fun tenParallelUnauthorizedWithAFailingRefreshCallRefreshExactlyOnce() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val unauthorizedSeen = Channel<Unit>(Channel.UNLIMITED)
+            val f =
+                Fixture(refresher = {
+                    gate.await()
+                    RefreshOutcome.Unavailable
+                }) {
+                    unauthorizedSeen.trySend(Unit)
+                    unauthorized()
+                }
+            f.signIn()
+            val calls = 10
+
+            val results = async { (1..calls).map { async { f.http.api.get<Unit>("/tickets/$it") } }.awaitAll() }
+            withContext(Dispatchers.Default) {
+                withTimeout(WAIT_MS) { repeat(calls) { unauthorizedSeen.receive() } }
+                delay(SETTLE_MS)
+            }
+            gate.complete(Unit)
+
+            results.await().forEach { assertIs<ApiResult.Error>(it) }
+            assertEquals(1, f.refreshCalls.size)
+            assertEquals(calls, f.http.engine.requestHistory.size)
+        }
+
+    @Test
+    fun cancellingOneWaiterDoesNotCancelTheSharedRefresh() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val unauthorizedSeen = Channel<Unit>(Channel.UNLIMITED)
+            val f =
+                Fixture(refresher = {
+                    gate.await()
+                    RefreshOutcome.Refreshed("new", "refresh-2")
+                }) { request ->
+                    if (request.bearer() == "Bearer new") {
+                        ok()
+                    } else {
+                        unauthorizedSeen.trySend(Unit)
+                        unauthorized()
+                    }
+                }
+            f.signIn()
+
+            val cancelled = async { f.http.api.get<Unit>("/a") }
+            val survivor = async { f.http.api.get<Unit>("/b") }
+            withContext(Dispatchers.Default) {
+                withTimeout(WAIT_MS) { repeat(2) { unauthorizedSeen.receive() } }
+                delay(SETTLE_MS)
+            }
+            cancelled.cancel()
+            gate.complete(Unit)
+
+            assertIs<ApiResult.Success<Unit>>(survivor.await())
+            assertEquals(1, f.refreshCalls.size)
+            assertEquals("new", f.store.accessToken)
+        }
+
+    @Test
+    fun unavailableRefreshIsNotRetriedDuringTheCooldown() =
+        runTest {
+            val time = TestTimeSource()
+            val f = Fixture(refresher = { RefreshOutcome.Unavailable }, timeSource = time) { unauthorized() }
+            f.signIn()
+
+            f.http.api.get<Unit>("/a")
+            f.http.api.get<Unit>("/b")
+            assertEquals(1, f.refreshCalls.size)
+            time += 6.seconds
+            f.http.api.get<Unit>("/c")
+
+            assertEquals(2, f.refreshCalls.size)
+        }
+
+    @Test
+    fun expiredStateIsStickyForALateCollectorUntilLoginResetsIt() =
+        runTest {
+            var serverAcceptsLogin = false
+            val f =
+                Fixture(refresher = { RefreshOutcome.Rejected }) {
+                    if (serverAcceptsLogin) ok() else unauthorized()
+                }
+            f.signIn()
+
+            f.http.api.get<Unit>("/tickets") // no collector is attached
+            assertTrue(f.events.expired.value)
+            // A later 401 with no tokens does not silently clear the state.
+            f.http.api.get<Unit>("/tickets")
+            assertTrue(f.events.expired.value)
+
+            // A shell that starts collecting late still sees it.
+            assertEquals(true, f.events.expired.first())
+
+            // Login: tokens are stored and the next request resets the state.
+            f.store.accessToken = "again"
+            serverAcceptsLogin = true
+            f.http.api.get<Unit>("/tickets")
+            assertFalse(f.events.expired.value)
+        }
+
+    @Test
+    fun explicitResetClearsTheExpiredState() {
+        val events = SessionEvents()
+        events.emit(SessionEvent.SessionExpired)
+        assertTrue(events.expired.value)
+
+        events.reset()
+
+        assertFalse(events.expired.value)
+    }
+
+    @Test
+    fun rejectedRefreshDoesNotWipeANewerLogin() =
+        runTest {
+            lateinit var f: Fixture
+            f =
+                Fixture(refresher = {
+                    // Another login replaced the refresh token while this refresh was in flight.
+                    f.store.setRefreshToken("refresh-newer")
+                    RefreshOutcome.Rejected
+                }) { unauthorized() }
+            f.signIn()
+            val expired = f.nextEvent(backgroundScope)
+
+            f.http.api.get<Unit>("/tickets")
+
+            assertEquals("refresh-newer", f.store.getRefreshToken())
+            assertFalse(f.events.expired.value)
+            assertNull(withContext(Dispatchers.Default) { withTimeoutOrNull(QUIET_MS) { expired.await() } })
+        }
+
+    @Test
+    fun unauthorizedFromVerifyOtpDoesNotRefreshOrSendBearer() =
+        runTest {
+            val f = Fixture(refresher = { RefreshOutcome.Refreshed("new", "refresh-2") }) { unauthorized() }
+            f.signIn()
+
+            listOf("/auth/otp", "/auth/otp/verify", "/auth/otp/request", "/auth/refresh", "/devices").forEach {
+                val result = f.http.api.post<Unit>(it)
+                assertEquals(401, assertIs<ApiResult.Error>(result).code)
+            }
+
+            assertTrue(f.refreshCalls.isEmpty())
+            assertEquals(5, f.http.engine.requestHistory.size)
+            assertTrue(f.http.engine.requestHistory.all { it.bearer() == null })
+            assertFalse(f.events.expired.value)
+            assertEquals("refresh-1", f.store.getRefreshToken())
+        }
+
+    @Test
+    fun badRequestFromRefreshIsNotARejectedSession() =
+        runTest {
+            val f =
+                Fixture { request ->
+                    if (request.url.encodedPath.endsWith("/auth/refresh")) {
+                        respond("", HttpStatusCode.BadRequest)
+                    } else {
+                        unauthorized()
+                    }
+                }
+            f.signIn()
+
+            f.http.api.get<Unit>("/tickets")
+
+            assertEquals("refresh-1", f.store.getRefreshToken())
+            assertFalse(f.events.expired.value)
+        }
+
+    @Test
     fun noStateLeaksIntoTokenFreeDtos() {
         assertTrue("refresh-1" !in RefreshRequestDto("refresh-1").toString())
         assertTrue("secret" !in RefreshOutcome.Refreshed("new-secret", "r-secret").toString())
@@ -354,5 +533,6 @@ class SessionRefreshTest {
     private companion object {
         const val WAIT_MS = 5_000L
         const val QUIET_MS = 200L
+        const val SETTLE_MS = 100L
     }
 }

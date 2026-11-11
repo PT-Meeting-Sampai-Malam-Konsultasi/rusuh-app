@@ -24,13 +24,13 @@ class ApiTokenRefresher(
         return when {
             result is ApiResult.Success && result.data.accessToken.isNotBlank() ->
                 RefreshOutcome.Refreshed(result.data.accessToken, result.data.refreshToken?.takeIf { it.isNotBlank() })
-            result is ApiResult.Error && result.code in REJECTED_CODES -> RefreshOutcome.Rejected
+            result is ApiResult.Error && result.code == REJECTED_CODE -> RefreshOutcome.Rejected
             else -> RefreshOutcome.Unavailable
         }
     }
 
     private companion object {
         const val EP_REFRESH = "/auth/refresh"
-        val REJECTED_CODES = setOf(HttpStatusCode.Unauthorized.value, HttpStatusCode.BadRequest.value)
+        val REJECTED_CODE = HttpStatusCode.Unauthorized.value
     }
 }

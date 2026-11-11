@@ -7,12 +7,16 @@ import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.http.HttpHeaders
+import io.ktor.http.encodedPath
 import io.ktor.util.AttributeKey
 
 class AuthHeadersConfig {
     lateinit var tokenStore: TokenStore
     var sendDeviceToken: Boolean = true
     var sendBearer: Boolean = true
+
+    /** Called when a request is built while an access token exists (a login happened). */
+    var onSignedIn: (() -> Unit)? = null
 }
 
 /**
@@ -25,19 +29,23 @@ val AuthHeadersPlugin =
         val store = pluginConfig.tokenStore
         val sendDevice = pluginConfig.sendDeviceToken
         val sendBearer = pluginConfig.sendBearer
+        val onSignedIn = pluginConfig.onSignedIn
         onRequest { request, _ ->
             if (sendDevice && !request.headers.contains(DEVICE_TOKEN_HEADER)) {
                 store.getDeviceToken()?.let { request.header(DEVICE_TOKEN_HEADER, it) }
             }
-            if (sendBearer && !request.attributes.contains(SkipSessionAuthKey) &&
-                !request.headers.contains(HttpHeaders.Authorization)
-            ) {
-                store.accessToken?.let { request.header(HttpHeaders.Authorization, "$BEARER_PREFIX$it") }
+            val access = store.accessToken
+            if (access != null) onSignedIn?.invoke()
+            if (sendBearer && !request.isOutsideSession() && !request.headers.contains(HttpHeaders.Authorization)) {
+                access?.let { request.header(HttpHeaders.Authorization, "$BEARER_PREFIX$it") }
             }
         }
     }
 
-/** Marks a call as outside the session: no Bearer header and no 401 refresh (the refresh call itself, OTP calls). */
+/**
+ * Marks a call as outside the session: no Bearer header, no 401 refresh and no `SessionExpired`. The auth and device
+ * endpoints ([SESSIONLESS_PATHS]) are outside the session by default; use this for any other such call.
+ */
 fun HttpRequestBuilder.skipSessionAuth() {
     attributes.put(SkipSessionAuthKey, true)
 }
@@ -51,6 +59,16 @@ fun HttpRequestBuilder.queueToken(token: String) {
 fun HttpRequestBuilder.admissionToken(token: String) {
     header(ADMISSION_TOKEN_HEADER, token)
 }
+
+/** True for calls that must neither carry a Bearer nor trigger refresh handling. */
+internal fun HttpRequestBuilder.isOutsideSession(): Boolean {
+    val path = "/" + url.encodedPath.trim('/')
+    return attributes.contains(SkipSessionAuthKey) || SESSIONLESS_PATHS.any { path.endsWith(it) }
+}
+
+/** Their contract security is the device token only (or none): a 401 there is a bad code, not an expired session. */
+internal val SESSIONLESS_PATHS =
+    listOf("/auth/otp", "/auth/otp/verify", "/auth/otp/request", "/auth/refresh", "/devices")
 
 internal val SkipSessionAuthKey = AttributeKey<Boolean>("rusuh.skipSessionAuth")
 internal const val DEVICE_TOKEN_HEADER = "X-Device-Token"

@@ -14,7 +14,7 @@ sealed interface RefreshOutcome {
         override fun toString(): String = "Refreshed(tokens redacted)"
     }
 
-    /** The server refused the refresh token (400 or 401): the session is over. */
+    /** The server refused the refresh token (401): the session is over. */
     data object Rejected : RefreshOutcome
 
     /** Offline, timeout, 5xx or an unreadable answer: the session may still be valid, so it is kept. */

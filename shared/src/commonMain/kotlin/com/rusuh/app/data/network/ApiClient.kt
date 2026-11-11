@@ -197,13 +197,16 @@ class ApiClient(
          * language header and server clock are on every request of every host; they are skipped when their
          * provider is null (plain tests). Per-host token plugins come from [forHost].
          */
+        @Suppress("LongParameterList") // independent knobs of the one shared client configuration
         internal fun HttpClientConfig<*>.configurePlugins(
             enableLogging: Boolean = false,
             logger: (String) -> Unit = {},
             requestTimeoutMs: Long = REQUEST_TIMEOUT_MS,
             localeProvider: LocaleProvider? = null,
             serverTime: ServerTimeSink? = null,
+            logLevel: LogLevel = LogLevel.INFO,
         ) {
+            followRedirects = false // a redirect must never carry token headers to another host
             install(ContentNegotiation) { json(defaultJson) }
             install(HttpTimeout) {
                 requestTimeoutMillis = requestTimeoutMs
@@ -214,12 +217,12 @@ class ApiClient(
             serverTime?.let { target -> install(ServerClockPlugin) { sink = target } }
             if (enableLogging) {
                 install(Logging) {
-                    sanitizeHeader { name -> name in SENSITIVE_HEADERS }
+                    sanitizeHeader { name -> SENSITIVE_HEADERS.any { it.equals(name, ignoreCase = true) } }
                     this.logger =
                         object : Logger {
                             override fun log(message: String) = logger(message)
                         }
-                    level = LogLevel.INFO
+                    level = logLevel
                 }
             }
             // No default Accept: ContentNegotiation adds it for JSON calls, raw calls choose their own.
@@ -238,6 +241,7 @@ class ApiClient(
                 tokenStore = hostAuth.tokenStore
                 sendDeviceToken = hostAuth.sendDeviceToken
                 sendBearer = hostAuth.sendBearer
+                onSignedIn = hostAuth.refreshCoordinator?.let { it::notifySignedIn }
             }
             hostAuth.refreshCoordinator?.let { sessions ->
                 install(SessionRefreshPlugin) { coordinator = sessions }
@@ -265,7 +269,15 @@ class ApiClient(
             )
 
         private val SENSITIVE_HEADERS =
-            setOf(HttpHeaders.Authorization, "X-Device-Token", "X-Queue-Token", "X-Admission-Token", HttpHeaders.Cookie)
+            setOf(
+                HttpHeaders.Authorization,
+                "X-Device-Token",
+                "X-Queue-Token",
+                "X-Admission-Token",
+                "X-Turnstile-Token",
+                HttpHeaders.Cookie,
+                HttpHeaders.SetCookie,
+            )
 
         /** Upper bound for an error body that is still parsed as problem details. */
         internal const val MAX_PROBLEM_BYTES = 64 * 1024
