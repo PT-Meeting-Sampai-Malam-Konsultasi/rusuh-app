@@ -104,13 +104,21 @@ See `ApiClientTest` for success, 204, problem+json, 5xx, timeout, malformed body
 
 ## Environments and hosts
 
-`AppEnvironment { Mock, Staging, Production }` picks the backend. The platform entry point chooses it from its
-build type and passes it to `initKoin(environment)` (there is no default, so release never falls back to the mock):
+`AppEnvironment { Mock, Staging, Production }` picks the backend. The ONE switch between the local mock and the real
+host is `NetworkConfig.MOCK_API` (`data/network/NetworkConfig.kt`): edit the constant and rebuild.
 
-| Platform | Debug | Release |
+| Build | `MOCK_API = true` | `MOCK_API = false` |
 |---|---|---|
-| Android | `BuildConfig.APP_ENVIRONMENT = "Mock"` | `"Production"` (androidApp/build.gradle.kts) |
-| iOS | `#if DEBUG` in `iOSApp.swift` passes `"Mock"` | `"Production"` |
+| Debug | `Mock` + `BackendMode.Real`: HTTP to the local Mockoon | `Staging` + `BackendMode.Real`: HTTP to the real host |
+| Release | `Production` + `Real` (the flag is ignored) | `Production` + `Real` |
+
+The platform entry points only say whether the build is debug and pass the optional debug-only backend mode override
+to `initKoinForBuild(isDebug, backendModeName)`, which asks `NetworkConfig.startup`: Android `RusuhApplication` passes
+`BuildConfig.DEBUG` and `BuildConfig.BACKEND_MODE`, iOS `iOSApp.swift` calls `KoinIosKt.doInitKoin(isDebug:backendModeName:)`
+inside `#if DEBUG` / `#else`. A release build can never select the mock or stub data: `startup` ignores the flag and
+the override unless `isDebug`, `NetworkConfigTest` covers every combination, and `./gradlew
+:androidApp:verifyReleaseNeverUsesMockApi` (part of `:androidApp:check`) checks the generated release `BuildConfig`
+(`DEBUG = false`, empty `BACKEND_MODE`).
 
 `ApiConfig.forEnvironment(env)` returns three independently configured hosts: `baseUrl` (api), `queueBaseUrl`
 (`q.`) and `payBaseUrl` (`pay.`). Every URL is validated at construction (blank, malformed or non-http(s) throws
@@ -122,10 +130,12 @@ build type and passes it to `initKoin(environment)` (there is no default, so rel
   `adb reverse tcp:3000 tcp:3000` (the debug config allows `localhost`) or the machine's LAN IP (add it to the debug
   `network_security_config.xml`). A physical iOS device cannot reach `localhost`: point it at another environment or
   a LAN URL.
-- Staging and Production use `PLACEHOLDER_*` constants in `ApiConfig`, marked `shortcut:` because the real hosts
-  are not known yet (the spec has no `servers`). They use the reserved `.invalid` TLD, which never resolves, so a
-  build shipped without real hosts fails with a network error. To replace them, edit the constants in `ApiConfig`
-  once the backend publishes the hosts and update `ApiConfigTest`. No secrets live in the repo.
+- Staging and Production use the real host `https://api.rusuh-tiket.web.id` (`ApiConfig.REAL_HOST_URL`). The queue
+  (`q.`) and payment (`pay.`) hosts are not confirmed, so all three hosts use the same URL for now (`shortcut:` in
+  `ApiConfig`); give them their own constants when the backend publishes them. The host is a skeleton: until the backend
+  routes exist every call answers 404, which the app shows as its error states. `ApiConfig.usesPlaceholderHosts` (a
+  `.invalid` host, which never resolves) stays for hosts added later; today it is false for every environment. No
+  secrets live in the repo.
 - Cleartext HTTP to the mock is allowed in debug only: Android `androidApp/src/debug` (manifest overlay plus
   `network_security_config.xml` for `10.0.2.2` and `localhost`; the release manifest has none), iOS an ATS exception
   for `localhost` in `iosApp/iosApp/Info-Debug.plist`, used only by the Debug configuration (keep it in sync
@@ -159,32 +169,59 @@ In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `
 ## Backend modes: Stub, Mockoon, Real
 
 `AppEnvironment` says which hosts exist; `BackendMode { Stub, Real }` (`di/BackendMode.kt`, the `useStubs` switch) says
-whether repositories talk to them. Three ways to run the app, and what each does TODAY (no real repository exists yet):
+whether repositories talk to them. Four ways to run the app:
 
-| Mode | Environment + mode | Network | Repositories today | Needs |
+| Mode | Environment + mode | Network | Repositories | Needs |
 |---|---|---|---|---|
-| Stub (in process) | `Mock` + `Stub` (the default for Mock) | None: the HTTP client runs on `StubEngine` | Stub repositories | Nothing |
-| Mockoon over HTTP | `Mock` + `Real` | HTTP to the Mockoon mock at `platformMockBaseUrl` | Stub repositories, with one WARNING per repository (temporary fallback below) | `mockoon-cli start --data rusuh-api.json -X` |
-| Staging / Production | `Staging` / `Production` + `Real` (their default) | HTTP to the real hosts of `ApiConfig` (placeholders until published) | Stub repositories, with one WARNING per repository (temporary fallback below) | The backend |
+| Mockoon over HTTP (the debug default) | `Mock` + `Real` (`MOCK_API = true`) | HTTP to the Mockoon mock at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device; stub Detail and Tickets (WARNING once each) | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
+| Real host (debug) | `Staging` + `Real` (`MOCK_API = false`) | HTTP to `https://api.rusuh-tiket.web.id` | Same as above | The backend (404 on every route today) |
+| Release | `Production` + `Real` | HTTP to the real host | Same as above | The backend |
+| Stub (in process, offline demo) | `Mock`/`Staging` + `Stub` (debug only, `-PbackendMode=Stub` or `BACKEND_MODE=Stub` in the Xcode scheme) | None: the HTTP client runs on `StubEngine` | Stub repositories | Nothing |
 
-- Defaults: `BackendMode.defaultFor(env)`, Mock = Stub, everything else = Real. So a debug build runs end to end with no
-  backend. An explicit `Stub` request for `Production` is rejected (`IllegalArgumentException`).
-- Switch: `initKoin(environment, backendMode)`. Android debug builds read `-PbackendMode=Real` (Gradle property, empty keeps
-  the default; release ignores it) into `BuildConfig.BACKEND_MODE`; iOS calls `KoinIosKt.doInitKoinWithBackend(environmentName:
-  backendModeName:)` (null keeps the default; `doInitKoin(environmentName:)` is unchanged).
+- Defaults: `BackendMode.defaultFor(env)` is `Real` for every environment. `Stub` is an explicit debug opt-in; asking
+  for it for `Production` is rejected (`IllegalArgumentException`).
+- Switch: `initKoin(environment, backendMode)` for tests and tools; apps use `initKoinForBuild` (see Environments).
 - `dataModule(mode)` (`di/DataModule.kt`) binds every repository interface and the `ServerClock` per mode. In `Stub` it
   replaces the shared `HttpClient` with one on the in-process `StubEngine` (closed with Koin), so the three named
   `ApiClient`s and any ApiService built on them run with zero network, and the `ServerClock` is the demo's ticking
   `StubClock`, so countdowns run.
-- Temporary fallback (`shortcut:`): until the real repositories exist, `Real` would have nothing to resolve, so each
-  repository resolves to its stub and logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)`
-  once. A Staging or Production build therefore shows fake repository data (and its `ApiClient`s still hit the real hosts).
-  The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES` (`DataModule.kt`, default `true`) controls it; set it to
-  `false`, or pass `dataModule(mode, allowStubFallback = false)`, for the strict behaviour: resolving a repository throws
-  `RealRepositoryNotAvailableException`. Remove the constant and fallback when the real repositories land (Home, Waiting
-  Room FR-04-M4 #30, Tickets TICKET-00-M4, Detail #80 #81 #82, My Queues #50): a feature ticket then binds its real
-  repository in place of that repository's `notYetReal(...)` line.
-- Mockoon bodies are schema-generated (blank ids), not the spec examples; the Stub mode payloads are the spec examples.
+- Real repositories (`data/repository`): `RealHomeRepository` (`GET /events`), `RealQueueRepository` (behind both
+  `WaitingRoomRepository` and `QueueRepository`: join, frontier polling at the ADR-0003 cadence, claim, leave),
+  `RealMyQueuesRepository`, `RealDeviceRepository` (`POST /devices`, the install id lives in the `SecureStore`). They
+  are built on `EventApiService`, `QueueApiService` and `DeviceApiService` (`data/remote`), which use the `Api` and
+  `Queue` clients (`/devices` and `/queue/*` belong to the queue service). Failed calls surface as `DomainException`
+  (carrying the `DomainResult`), `SignInRequiredException` for a guest claim. `QueuePacing` makes the waits and the
+  jitter injectable, so tests run in virtual time.
+- Temporary fallback (`shortcut:`): a repository without a real implementation resolves to its stub in `Real` mode and
+  logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)` once. Detail and Tickets are the
+  ones left. The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES` (`DataModule.kt`, default `true`) controls it;
+  set it to `false`, or pass `dataModule(mode, allowStubFallback = false)`, for the strict behaviour: resolving such a
+  repository throws `RealRepositoryNotAvailableException`. Remove the constant and fallback when Tickets
+  (TICKET-00-M4) and Detail (#80 #81 #82) land: a feature ticket then binds its real repository in place of that
+  repository's `notYetReal(...)` line.
+- Queue polling resilience: a transient failure inside the wait (network, 408, 429, 5xx) is retried with capped
+  exponential backoff (2, 4, 8, 16, 30 s, `QueuePacing.backoffMillis`) that honours `Retry-After` (capped at 2 min); the
+  flow fails after 5 failures in a row, or at once on a failure waiting cannot fix (401/403/404). Any success resets the
+  count. The claim retries inside its 60 s window on the monotonic clock; a wait that would pass the window is cut to it
+  and one last attempt follows before the place counts as missed. A claim 401 with problem code `UNAUTHORIZED` is
+  "sign in required" (`SignInRequiredException`, `WaitingRoomErrorKind.SignInRequired`; `TODO(AUTH-00 #77)`), any other
+  401 registers the device again once. After the pre-sale draw the number comes from `/me`: 410 ends the run, a 404 or a
+  missing `seq` means "not drawn yet" (asked again at the next poll), and the random 0-30 s wait happens once.
+- Claimed admission: the token goes to the `TokenStore`; its non-secret details (`slotId`, `maxTickets`, `expiresAt`)
+  go to `QueueCache` as `AdmissionInfo` for the Detail screen. The Waiting Room keeps its own 60 s YourTurn countdown
+  (the admission's longer order window is Detail's business), so the turn is not re-emitted after the claim. Leaving
+  the queue clears the queue token and, when it belongs to that event, the admission token and details.
+- Server time: `ServerClock.isSynced` is false until the first response carrying `serverNow`; then the clock counts from
+  an arbitrary start. Unsynced, the queue uses the frontier's own `ts`, Home shows no countdown, and the device-token
+  expiry is judged against the device wall clock with a one day margin (`wallClockMillis`, used for nothing else).
+- My Queues reads entries in parallel (at most 4). An entry is dropped on 401/410/closed (and forgotten), left out but
+  kept on 404 or a transient failure; the load fails only when every entry failed.
+- Release builds still show FAKE Detail and Tickets data through the fallback above (one WARNING each). The list is
+  `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`, checked against the bindings by `DataModuleTest`): currently
+  `TicketsRepository` and `DetailRepository`. `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
+- Mockoon (`workspace-local/mockoon`) simulates a moving queue: the frontier is SEQUENTIAL (served 100, 130, ..., two
+  paused polls, then `served >= seq`), claim answers 409 `NOT_YET` once and then 200. Restart it to replay the sequence.
+- TODO(FR-04-M4 #30): the last 2,000 places also get SSE (ADR-0015); only polling is implemented.
 
 ### Stub payloads and the test harness (`data/stub`)
 

@@ -63,6 +63,9 @@ sealed interface WaitingRoomEffect : MviEffect {
 
     /** Updates stopped after a place was already shown; the last place stays on screen. */
     data object ShowRefreshError : WaitingRoomEffect
+
+    /** Updates stopped after a place was shown because claiming needs a signed-in account. */
+    data object SignInRequired : WaitingRoomEffect
 }
 
 /** Maps a screen [WaitingRoomAction] onto the matching [WaitingRoomIntent]. */

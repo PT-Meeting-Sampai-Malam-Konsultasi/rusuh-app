@@ -15,7 +15,10 @@ class ApiConfig(
     val queueBaseUrl: String = normalise("queueBaseUrl", queueBaseUrl)
     val payBaseUrl: String = normalise("payBaseUrl", payBaseUrl)
 
-    /** True while any host is a `.invalid` placeholder (see [forEnvironment]): that build reaches no backend. */
+    /**
+     * True while any host is a `.invalid` placeholder (reserved TLD, RFC 2606, never resolves): that build reaches no
+     * backend. No environment uses one today (all hosts are real); the check stays for hosts added later.
+     */
     val usesPlaceholderHosts: Boolean =
         listOf(this.baseUrl, this.queueBaseUrl, this.payBaseUrl).any { url ->
             url.substringAfter("://").substringBefore('/').substringBefore(':').endsWith(".invalid")
@@ -24,18 +27,15 @@ class ApiConfig(
     override fun toString(): String = "ApiConfig(baseUrl=$baseUrl, queueBaseUrl=$queueBaseUrl, payBaseUrl=$payBaseUrl)"
 
     companion object {
-        // shortcut: the real hosts are not known yet (the API spec has no `servers`); replace these
-        // placeholders when the backend publishes them. They use the reserved `.invalid` TLD (RFC 2606), which
-        // never resolves, so a build shipped with them fails with a network error instead of reaching a
-        // host nobody confirmed. Each host is configured independently.
-        internal const val PLACEHOLDER_PROD_API_URL = "https://api.rusuh.invalid"
-        internal const val PLACEHOLDER_PROD_QUEUE_URL = "https://q.rusuh.invalid"
-        internal const val PLACEHOLDER_PROD_PAY_URL = "https://pay.rusuh.invalid"
+        /** The real backend host (a skeleton today: every route answers 404 until the backend routes exist). */
+        internal const val REAL_HOST_URL = "https://api.rusuh-tiket.web.id"
 
-        // shortcut: placeholder staging hosts, same caveat as production.
-        internal const val PLACEHOLDER_STAGING_API_URL = "https://api.staging.rusuh.invalid"
-        internal const val PLACEHOLDER_STAGING_QUEUE_URL = "https://q.staging.rusuh.invalid"
-        internal const val PLACEHOLDER_STAGING_PAY_URL = "https://pay.staging.rusuh.invalid"
+        // shortcut: the queue (`q.`) and payment (`pay.`) hosts are not confirmed yet, so every host points at the
+        // one real host above. Give them their own constants here when the backend publishes them. Staging has no
+        // host of its own either: it is the same real host as production.
+        internal const val REAL_API_URL = REAL_HOST_URL
+        internal const val REAL_QUEUE_URL = REAL_HOST_URL
+        internal const val REAL_PAY_URL = REAL_HOST_URL
 
         private val PORT_PATTERN = Regex(""":(\d+)$""")
         private const val MAX_PORT = 65535
@@ -56,14 +56,8 @@ class ApiConfig(
         ): ApiConfig =
             when (environment) {
                 AppEnvironment.Mock -> ApiConfig(mockBaseUrl, mockBaseUrl, mockBaseUrl)
-                AppEnvironment.Staging ->
-                    ApiConfig(
-                        PLACEHOLDER_STAGING_API_URL,
-                        PLACEHOLDER_STAGING_QUEUE_URL,
-                        PLACEHOLDER_STAGING_PAY_URL,
-                    )
-                AppEnvironment.Production ->
-                    ApiConfig(PLACEHOLDER_PROD_API_URL, PLACEHOLDER_PROD_QUEUE_URL, PLACEHOLDER_PROD_PAY_URL)
+                AppEnvironment.Staging, AppEnvironment.Production ->
+                    ApiConfig(REAL_API_URL, REAL_QUEUE_URL, REAL_PAY_URL)
             }
 
         private fun normalise(
