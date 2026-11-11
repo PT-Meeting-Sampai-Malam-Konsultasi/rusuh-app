@@ -35,17 +35,16 @@ android {
     }
 
     buildTypes {
-        // Environment per build type, parsed by AppEnvironment.fromName (see docs/data-layer.md).
+        // Mock or real host: NetworkConfig.MOCK_API in :shared, debug builds only (see docs/data-layer.md).
         getByName("debug") {
-            buildConfigField("String", "APP_ENVIRONMENT", "\"Mock\"")
-            // Optional backend mode override, e.g. ./gradlew assembleDebug -PbackendMode=Real (Mockoon over HTTP).
-            // Empty keeps the default for the environment (see BackendMode and docs/data-layer.md).
+            // Optional debug-only backend mode override, e.g. ./gradlew assembleDebug -PbackendMode=Stub for the
+            // offline demo. Empty keeps the default, real HTTP (see BackendMode and docs/data-layer.md).
             val backendMode = providers.gradleProperty("backendMode").getOrElse("")
             buildConfigField("String", "BACKEND_MODE", "\"$backendMode\"")
         }
         getByName("release") {
             isMinifyEnabled = false
-            buildConfigField("String", "APP_ENVIRONMENT", "\"Production\"")
+            // Never overridable: a release build is always Production on real HTTP (NetworkConfig.startup).
             buildConfigField("String", "BACKEND_MODE", "\"\"")
         }
     }
@@ -90,3 +89,23 @@ val verifyNoCleartextOutsideDebug by tasks.registering {
     }
 }
 tasks.named("check") { dependsOn(verifyNoCleartextOutsideDebug) }
+
+// Guard: a release build can never select the mock API or stub data (see NetworkConfig and docs/data-layer.md).
+// NetworkConfig.startup already ignores the flag unless BuildConfig.DEBUG; this also checks the generated release
+// constants, so a changed build type cannot turn them on unnoticed.
+val verifyReleaseNeverUsesMockApi by tasks.registering {
+    dependsOn("generateReleaseBuildConfig")
+    val releaseBuildConfig =
+        layout.buildDirectory.file("generated/source/buildConfig/release/com/rusuh/app/android/BuildConfig.java")
+    doLast {
+        val generated = releaseBuildConfig.get().asFile.readText()
+        check(generated.contains("boolean DEBUG = false")) { "The release build must have BuildConfig.DEBUG = false" }
+        check(generated.contains("BACKEND_MODE = \"\"")) {
+            "The release build must not override the backend mode (BACKEND_MODE must be empty)"
+        }
+        check(!generated.contains("Mock") && !generated.contains("Stub")) {
+            "The release build config must not mention the mock or stub backend"
+        }
+    }
+}
+tasks.named("check") { dependsOn(verifyReleaseNeverUsesMockApi) }

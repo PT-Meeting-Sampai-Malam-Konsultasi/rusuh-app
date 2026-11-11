@@ -3,7 +3,7 @@ package com.rusuh.app.data.cache
 import com.rusuh.app.data.storage.AppPreferences
 
 /**
- * Base for module caches. A subclass declares its prefix (`home_`, `queue_`, `book_`, `tix_`, `auth_`) and
+ * Base for module caches. A subclass declares its prefix (`home_`, `queue_`, `device_`, `book_`, `tix_`, `auth_`) and
  * owns every key string under it; [read]/[write]/[delete] reject keys outside the prefix.
  */
 abstract class PrefsCache(

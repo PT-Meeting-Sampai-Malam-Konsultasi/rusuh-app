@@ -2,6 +2,7 @@ package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.isNetworkFailure
+import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.ErrorCode
 
@@ -27,3 +28,6 @@ fun <T, R> ApiResult<T>.toDomainResult(transform: (T) -> R?): DomainResult<R> =
         is ApiResult.Failure ->
             if (isNetworkFailure(throwable)) DomainResult.NetworkError else DomainResult.TechnicalError
     }
+
+/** The failure of a non-success [ApiResult] as the exception the throwing repository contracts use. */
+internal fun ApiResult<Any?>.toException(): DomainException = DomainException(toDomainResult())

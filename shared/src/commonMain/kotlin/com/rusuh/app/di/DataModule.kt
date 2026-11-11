@@ -1,12 +1,22 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.data.platform.platformName
+import com.rusuh.app.data.remote.DeviceApiService
+import com.rusuh.app.data.remote.EventApiService
+import com.rusuh.app.data.remote.QueueApiService
+import com.rusuh.app.data.repository.RealDeviceRepository
+import com.rusuh.app.data.repository.RealHomeRepository
+import com.rusuh.app.data.repository.RealMyQueuesRepository
+import com.rusuh.app.data.repository.RealQueueRepository
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.repository.DetailRepository
+import com.rusuh.app.domain.repository.DeviceRepository
 import com.rusuh.app.domain.repository.MyQueuesRepository
+import com.rusuh.app.domain.repository.QueueRepository
 import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.StubHomeRepository
 import com.rusuh.app.feature.tickets.StubTicketsRepository
@@ -20,25 +30,28 @@ import org.koin.dsl.onClose
 
 /**
  * shortcut: TEMPORARY. While a repository has no real (network) implementation, [BackendMode.Real] resolves its
- * stub and logs a WARNING instead of crashing, so Staging and Release builds start. Remove this constant, the
- * fallback and its tests when the real repositories land: Home (EPIC-04 M4 API integration), Waiting Room (FR-04-M4
- * #30), Tickets (TICKET-00-M4), Detail (FR-15/16/17-M1 #80 #81 #82) and My Queues (FR-APP-01-M4 #50). Set it to
- * false (or pass `allowStubFallback = false`) for the strict behaviour: [RealRepositoryNotAvailableException].
+ * stub and logs a WARNING instead of crashing, so Staging and Release builds start. Home, the Waiting Room, My
+ * Queues and the device identity are real now; what is left is Tickets (TICKET-00-M4) and Detail (FR-15/16/17-M1
+ * #80 #81 #82). Remove this constant, the fallback and its tests when those land. Set it to false (or pass
+ * `allowStubFallback = false`) for the strict behaviour: [RealRepositoryNotAvailableException].
  */
 const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
 
 /**
- * Binds every repository interface to its stub or its real implementation, per [mode]; Mock runs [BackendMode.Stub]
- * by default (see [BackendMode.defaultFor]).
+ * Binds every repository interface to its stub or its real implementation, per [mode]; every environment defaults to
+ * [BackendMode.Real] (see [BackendMode.defaultFor]), [BackendMode.Stub] is a debug-only opt-in.
  *
  * - [BackendMode.Stub]: stub repositories, and the shared [HttpClient] (from `coreModule`) is replaced by one on an
  *   in-process [StubEngine], so ApiServices built on the injected `ApiClient`s run with zero network. The
  *   [ServerClock] is the demo's ticking [StubClock], so countdowns run. The client is closed with Koin.
  * - [BackendMode.Real]: the [ServerClock] is the one from `coreModule`, synced from `serverNow` in responses.
- *   No real repository exists yet. With [allowStubFallback] each one resolves to its stub and
- *   logs a WARNING through [warn] once (singletons); without it, resolving throws
- *   [RealRepositoryNotAvailableException]. When a feature ticket builds a real repository, bind it in place of the
- *   `notYetReal(...)` line of that repository below.
+ *   Home, Waiting Room, My Queues, Queue and Device are the network implementations. A repository without one yet
+ *   (Detail, Tickets) resolves to its stub with [allowStubFallback] and logs a WARNING through [warn] once
+ *   (singletons); without it, resolving throws [RealRepositoryNotAvailableException]. When a feature ticket builds
+ *   a real repository, bind it in place of the `notYetReal(...)` line of that repository below.
+ *
+ * The device and queue ApiServices and the `DeviceRepository` are bound in both modes: in stub mode they run on the
+ * [StubEngine].
  *
  * Load it after `coreModule()`. A function, not a `val`, for the same reason as `coreModule()`.
  */
@@ -52,6 +65,22 @@ fun dataModule(
             repository: String,
             stub: () -> T,
         ): T = stubOrFail(repository, allowStubFallback, warn, stub)
+
+        single { EventApiService(get(ApiClientQualifier.Api)) }
+        // /devices and the queue endpoints belong to the queue service (the `q.` host).
+        single { DeviceApiService(get(ApiClientQualifier.Queue)) }
+        single { QueueApiService(get(ApiClientQualifier.Queue)) }
+        single<DeviceRepository> {
+            RealDeviceRepository(
+                api = get(),
+                tokens = get(),
+                secureStore = get(),
+                cache = get(),
+                serverClock = get(),
+                platform = platformName,
+            )
+        }
+        single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }
 
         when (mode) {
             BackendMode.Stub -> {
@@ -68,11 +97,11 @@ fun dataModule(
             }
             BackendMode.Real -> {
                 // ServerClock: coreModule's MonotonicServerClock, the instance the response plugin keeps in sync.
-                single<HomeRepository> { notYetReal("HomeRepository") { StubHomeRepository() } }
-                single<WaitingRoomRepository> { notYetReal("WaitingRoomRepository") { StubWaitingRoomRepository() } }
+                single<HomeRepository> { RealHomeRepository(get(), get(), get()) }
+                single<WaitingRoomRepository> { get<QueueRepository>() }
+                single<MyQueuesRepository> { RealMyQueuesRepository(get(), get(), get(), get(), get()) }
                 single<TicketsRepository> { notYetReal("TicketsRepository") { StubTicketsRepository() } }
                 single<DetailRepository> { notYetReal("DetailRepository") { StubDetailRepository(get()) } }
-                single<MyQueuesRepository> { notYetReal("MyQueuesRepository") { StubMyQueuesRepository() } }
             }
         }
     }

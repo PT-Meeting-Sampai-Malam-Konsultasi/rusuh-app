@@ -50,13 +50,13 @@ class CoreModuleTest {
     }
 
     @Test
-    fun productionResolvesDistinctClientPerHost() {
+    fun productionResolvesOneClientPerHostOnTheRealBackend() {
         val koin = koin(AppEnvironment.Production)
         val config = koin.get<ApiConfig>()
         assertEquals(config.baseUrl, koin.get<ApiClient>(ApiClientQualifier.Api).baseUrl)
         assertEquals(config.queueBaseUrl, koin.get<ApiClient>(ApiClientQualifier.Queue).baseUrl)
         assertEquals(config.payBaseUrl, koin.get<ApiClient>(ApiClientQualifier.Pay).baseUrl)
-        assertEquals(ApiConfig.PLACEHOLDER_PROD_QUEUE_URL, koin.get<ApiClient>(ApiClientQualifier.Queue).baseUrl)
+        assertEquals("https://api.rusuh-tiket.web.id", koin.get<ApiClient>(ApiClientQualifier.Queue).baseUrl)
     }
 
     @Test
@@ -80,7 +80,7 @@ class CoreModuleTest {
             val result = koin.get<ApiClient>(ApiClientQualifier.Pay).get<Unit>("/payments/1")
 
             assertIs<ApiResult.Success<Unit>>(result)
-            assertEquals(listOf("${ApiConfig.PLACEHOLDER_PROD_PAY_URL}/payments/1"), urls)
+            assertEquals(listOf("${ApiConfig.REAL_PAY_URL}/payments/1"), urls)
         }
 
     @Test
@@ -100,9 +100,9 @@ class CoreModuleTest {
 
             assertEquals(
                 listOf(
-                    "${ApiConfig.PLACEHOLDER_STAGING_API_URL}/a",
-                    "${ApiConfig.PLACEHOLDER_STAGING_QUEUE_URL}/b",
-                    "${ApiConfig.PLACEHOLDER_STAGING_PAY_URL}/c",
+                    "${ApiConfig.REAL_API_URL}/a",
+                    "${ApiConfig.REAL_QUEUE_URL}/b",
+                    "${ApiConfig.REAL_PAY_URL}/c",
                 ),
                 urls,
             )

@@ -1,21 +1,14 @@
 package com.rusuh.app.di
 
-import com.rusuh.app.data.network.AppEnvironment
-
-/** Called from Swift (iOSApp.init) as `KoinIosKt.doInitKoin(environmentName:)`; see [AppEnvironment.fromName]. */
-fun doInitKoin(environmentName: String) {
-    initKoin(AppEnvironment.fromName(environmentName))
-}
-
 /**
- * Same as [doInitKoin] with an explicit backend mode override (`"Stub"` or `"Real"`; null or blank keeps the
- * default for the environment, see [BackendMode.resolve]). Swift:
- * `KoinIosKt.doInitKoinWithBackend(environmentName: "Mock", backendModeName: "Real")`.
+ * Called from Swift (iOSApp.init) as `KoinIosKt.doInitKoin(isDebug:backendModeName:)`. [isDebug] is the Swift `DEBUG`
+ * build flag; [backendModeName] an optional debug-only override (`"Stub"` or `"Real"`, null or blank = default).
+ * Debug builds follow `NetworkConfig.MOCK_API` (Mockoon or the real host); a release build always uses the real host
+ * and ignores the override, see `NetworkConfig.startup`.
  */
-fun doInitKoinWithBackend(
-    environmentName: String,
+fun doInitKoin(
+    isDebug: Boolean,
     backendModeName: String?,
 ) {
-    val environment = AppEnvironment.fromName(environmentName)
-    initKoin(environment, BackendMode.resolve(environment, backendModeName))
+    initKoinForBuild(isDebug, backendModeName)
 }
