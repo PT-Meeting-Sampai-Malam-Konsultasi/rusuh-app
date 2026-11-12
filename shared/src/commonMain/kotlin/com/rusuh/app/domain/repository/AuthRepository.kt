@@ -41,7 +41,8 @@ interface AuthRepository {
      * A 401 from the revoke is not an error. [DomainResult.NetworkError] means "not revoked, not worth retrying": the
      * local session is gone and a rotated refresh token may stay valid on the server until it expires. Before the clear
      * it may wait up to 5 s for a hanging cold-start storage read. No server call when not signed in. A [verifyOtp]
-     * that completes after a logout signs the user back in (TODO(AUTH-00 #77): generation counter in the state layer).
+     * that completes after a logout signs the user back in: callers go through `VerifyOtpUseCase`, which guards it
+     * with a generation counter.
      */
     suspend fun logout(): DomainResult<Unit>
 

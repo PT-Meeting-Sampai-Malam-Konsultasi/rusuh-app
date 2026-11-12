@@ -48,10 +48,8 @@ import rusuh_app.shared.generated.resources.account_verified
 /**
  * Signed-in Account profile body (design "Account · Profile", without NIK and without the
  * email-preferences section). Stateless; it renders only the content between the tab top bar and
- * the bottom bar, so the Account route can drop it into its signed-in branch.
- *
- * TODO(ACCOUNT-00 #104): wire to the real session state (GET /me, logout #67) once the auth
- * data layer (#100) is merged; this PR is UI only.
+ * the bottom bar, so the Account route can drop it into its signed-in branch (`AccountRoute` feeds it from
+ * `GET /me`; "Keluar" signs out).
  */
 @Composable
 fun AccountProfileContent(

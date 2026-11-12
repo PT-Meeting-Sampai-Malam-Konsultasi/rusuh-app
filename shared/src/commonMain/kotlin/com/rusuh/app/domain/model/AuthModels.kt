@@ -33,8 +33,8 @@ data class AuthUser(
 
 /**
  * Result of a successful code check. The tokens never leave the data layer (they are stored by the session layer).
- * [isNewAccount] is true when this sign-in created the account; with a null `user.fullName` the UI asks for the
- * name (and the consent) and requests a new code with `fullName` (the contract has no profile update).
+ * [isNewAccount] is true when this sign-in created the account; after verification the UI asks for a name only in
+ * that case. The contract has no profile update, so the name is kept on the device only.
  */
 data class AuthSession(
     val user: AuthUser,

@@ -344,6 +344,15 @@
     <string name="account_login_method_value">Kode 6 digit ke email ini. Tanpa kata sandi.</string>
     <string name="account_sign_out">Keluar</string>
     <string name="account_delete">Hapus akun</string>
+    <string name="sign_in_error_network">Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="sign_in_error_rate_limited">Terlalu banyak percobaan. Coba lagi dalam %1$s.</string>
+    <string name="sign_in_error_rate_limited_now">Terlalu banyak percobaan. Coba lagi sebentar lagi.</string>
+    <string name="sign_in_error_invalid">Permintaan ditolak. Periksa data yang Anda masukkan lalu coba lagi.</string>
+    <string name="sign_in_error_unknown">Terjadi kesalahan. Coba lagi.</string>
+    <string name="account_session_expired">Sesi Anda berakhir. Masuk lagi.</string>
+    <string name="account_loading">Memuat akun Anda</string>
+    <string name="account_error_title">Gagal memuat akun Anda</string>
+    <string name="account_error_body">Periksa koneksi Anda lalu coba lagi.</string>
     <!-- Localized API error messages, keyed by stable ErrorCode names. -->
     <string name="error_code_validation_failed">Permintaan gagal (validation failed). Silakan coba lagi.</string>
     <string name="error_code_internal_error">Permintaan gagal (internal error). Silakan coba lagi.</string>
