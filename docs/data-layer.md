@@ -267,7 +267,7 @@ Contract: the Apidog project "Rusuh Booking Tiket API" is the single reference (
 the live behaviour).
 
 ```
-AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> (auth state, #77)
+AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> use cases --> SignInViewModel / AccountViewModel
                                    |  tokens
                                SessionManager --> TokenStore (refresh: SecureStore, access: memory) + SessionEvents
 ```
@@ -295,8 +295,8 @@ AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> (auth state, 
   signed out) instead of blocking, and a read that throws anything is treated as signed out. A login or logout that
   happens before the restore wins. The first call after a cold start has no Bearer, gets a 401 and refreshes.
   `startSession` runs to the end even if its caller is cancelled, and a login without a refresh token removes the
-  stored one. `TODO(AUTH-00 #77)`: `GetMyTicketsUseCase` is NOT wired to the `SessionManager` yet (it keeps its
-  signed-in default, as before auth) until the sign-in UI exists.
+  stored one. `GetMyTicketsUseCase` follows the session: `isSignedIn = SessionManager::awaitSignedIn` (AppModule), so
+  the Tiket tab shows its signed-out state until a login.
 - `logout()`: snapshots the access and refresh tokens, clears the local session FIRST and non-cancellably (the UI is
   signed out at once and never waits for the network), then revokes on the server inside a 5 s bound. The returned
   result only describes the revoke attempt: read `SessionManager.isSignedIn` (already false while the revoke runs) to
@@ -308,9 +308,9 @@ AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> (auth state, 
   retrying, a rotated refresh token may stay valid on the server until it expires; one 5 s bound covers the refresh and
   the logout, and nothing from the refresh is stored. The logout call is marked `skipSessionAuth()` and carries only
   the snapshot Bearer, so a 401 is never replayed with a newer login's access token. Before the clear, `logout()`
-  may wait up to 5 s for a hanging cold-start storage read (`awaitSignedIn()`). Known gap, `TODO(AUTH-00 #77)`: a
-  `verifyOtp` that completes after a logout signs the user back in; the state layer needs a generation counter. No
-  server call when not signed in. If clearing
+  may wait up to 5 s for a hanging cold-start storage read (`awaitSignedIn()`). Known gap, closed by the state layer
+  (see "State layer" below): a `verifyOtp` that completes after a logout would sign the user back in, so
+  `VerifyOtpUseCase` drops such an answer and ends the session it started. No server call when not signed in. If clearing
   storage threw, the result is `TechnicalError`: the access token and the flag are gone but a refresh token may remain
   on disk, so offer a retry. The device token and the install id survive (`TokenStore.clearSession`).
 - Session-less paths (no Bearer, no refresh, no `SessionExpired`): `/auth/otp`, `/auth/otp/verify`, `/auth/refresh`,
@@ -327,6 +327,46 @@ AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> (auth state, 
   tokens never reach the secure store and a stub run starts signed out. Real mode has no fallback to it.
 - TODO(EPIC-01-M5 #66): the OTP gate headers (`X-Turnstile-Token`, `X-Queue-Token`, `X-Admission-Token`) are not sent yet.
 
+### State layer (AUTH-00-M3 #77, ACCOUNT-00 #104)
+
+```
+SignInViewModel   --> RequestOtpUseCase, VerifyOtpUseCase, SaveDisplayNameUseCase, ObserveSessionUseCase (+ ServerClock)
+AccountViewModel  --> GetProfileUseCase, SignOutUseCase, ObserveSessionUseCase
+AccountRoute      = both ViewModels -> AccountBody (login | loading | profile | retry)
+```
+
+ViewModels only call use cases (`domain/usecase/AuthUseCases.kt`) over `AuthRepository`, `DisplayNameStore` and the
+`SessionObserver` (a read-only view of `SessionManager`: `phase` Restoring/SignedOut/SignedIn, `expired` items). Both
+ViewModels are Koin `factory`s, kept per navigation back-stack entry (`SignInViewModelHolder`, `AccountViewModelHolder`)
+so a step survives rotation and tab switches; the work is cancelled when the entry is dropped.
+
+- Sign-in steps map onto the `SignInUiState` seam (Email, Code, WrongCode, CodeExpired, NewAccount); what that seam
+  does not cover is `SignInStatus` (in flight, and one inline `SignInError`: network, 429 with a countdown, 400, unknown;
+  localised copy, never server text).
+- Flow: `requestOtp(email trimmed, locale = app language)` -> Code step. The resend cooldown is `resendAfterSeconds`; the
+  validity countdown runs to `expiresAt` on the server clock (`ServerClock`, never the device clock; when the clock has
+  not seen the server yet the design's 5 minutes count from receipt). One ticker coroutine runs only while a code step or
+  a 429 countdown is on screen. `verifyOtp`: success with `isNewAccount = false` finishes (`SignedIn(isNewAccount =
+  false)`); `isNewAccount = true` opens the name step (the user is already signed in, so the Account tab keeps the login
+  on screen until "Lanjut", see `SignInState.holdsAccountPage`); `WRONG_CODE` -> WrongCode with the server's
+  `attemptsLeft` (counted locally when missing); `CHALLENGE_EXPIRED` and `CHALLENGE_LOCKED` -> CodeExpired carrying the
+  last code; resend opens a new challenge; "Ganti email" goes back to the Email step.
+- One request at a time: while a request is in flight every intent is ignored (double taps, the auto-submit of the last
+  digit plus the button). A 429 with `Retry-After` disables the main button until the countdown ends.
+- Race with logout: `SignOutUseCase` bumps `AuthGeneration` first; `VerifyOtpUseCase` compares it with the value it
+  started with and, if it moved, drops the answer and calls `logout()` again when the answer had signed in
+  (`VerifyOtpOutcome.Superseded`). The sign-in ViewModel resets to a fresh Email step when the session goes from
+  signed in to not signed in.
+- Account: `AccountViewModel` follows the phase, loads `GET /me` when the route asks (not during the name step), and
+  signs out (local session first, per `logout()`). Cold start shows a neutral state until the stored session is read
+  (bounded by `awaitSignedIn`, then signed out); `SessionExpired` returns to the login with a short message. `/me`
+  failure is a small retry state. "Hapus akun" stays inert, "Ganti email" is hidden.
+- `shortcut:` the new account's name has NO API (the Apidog contract has no profile update). It is kept on the device in
+  `AuthCache` (`auth_display_name` + `auth_display_name_user`, non-sensitive preferences, bound to the user id) and used
+  when `/me` has no name (else the part of the email before the `@`). Sign-out removes it. To confirm with the backend.
+- `shortcut:` the consent checkbox of the name step is not sent anywhere; the consent version travels with the code
+  request. Not saved across process death (the user requests a new code).
+
 ### Known live divergences (2026-11-12, `https://api.rusuh-tiket.web.id/v1`)
 
 The app follows the contract, so a real call from this build can fail until the backend matches it. This is intended.
@@ -340,6 +380,9 @@ The app follows the contract, so a real call from this build can fail until the 
   `CHALLENGE_EXPIRED`. `ProblemDetails` never reads `type` or `title` for a decision; `BAD_REQUEST` parses to
   `ErrorCode.UNKNOWN` (kept in `rawCode`) and still lands on `AuthFailure.InvalidInput` through the 400 status.
   `detail` is for diagnostics, never shown. Fixtures of these bodies are in `AuthHarness.kt`.
+- Result in the app: with `MOCK_API = false` the code request fails with a 400 until the backend matches the contract;
+  the sign-in screen shows the inline "request rejected" line and stays usable (no crash). The signed-in page needs
+  `GET /me`, which is a 404 on the live backend, so it shows the retry state.
 
 ## Storage
 
