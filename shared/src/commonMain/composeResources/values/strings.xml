@@ -238,6 +238,63 @@
     <string name="tickets_error_title">Couldn\'t load your tickets</string>
     <string name="tickets_error_body">Check your connection and try again.</string>
     <string name="tickets_error_action">Try again</string>
+    <string name="eticket_loading_description">Loading your e-ticket</string>
+    <string name="eticket_error_title">E-ticket could not be loaded</string>
+    <string name="eticket_error_body">Check your connection and try again.</string>
+    <string name="eticket_error_action">Try again</string>
+    <string name="eticket_not_found_title">E-ticket not found</string>
+    <string name="eticket_not_found_body">This order has no tickets we can show. Go back to your tickets and pick another order.</string>
+    <string name="eticket_not_found_action">Back to my tickets</string>
+    <string name="eticket_stamp_paid">✓ PAID · %1$s %2$s</string>
+    <string name="eticket_stamp_paid_description">Paid at %1$s %2$s</string>
+    <string name="eticket_headline">See you at %1$s!</string>
+    <plurals name="eticket_intro">
+        <item quantity="one">Your %2$s ticket is issued to the holder’s NIK. We also emailed the e-ticket to %3$s.</item>
+        <item quantity="other">%1$d %2$s tickets are issued, each under its own holder’s NIK. We also emailed the e-ticket to %3$s.</item>
+    </plurals>
+    <string name="eticket_add_to_calendar">Add to calendar</string>
+    <string name="eticket_order_line">Order %1$s · %2$s · %3$s</string>
+    <string name="eticket_ticket_label">TICKET %1$d/%2$d</string>
+    <string name="eticket_holder_label">HOLDER</string>
+    <string name="eticket_holder_nik">NIK %1$s</string>
+    <string name="eticket_entry_label">ENTRY</string>
+    <string name="eticket_doors_label">DOORS OPEN</string>
+    <string name="eticket_doors_value">%1$s, %2$d %3$s · %4$s %5$s</string>
+    <string name="eticket_time_format">%1$s:%2$s</string>
+    <string name="eticket_seating_standing">standing</string>
+    <string name="eticket_seating_seated">free seating</string>
+    <string name="eticket_qr_description">QR code for ticket %1$s</string>
+    <string name="eticket_ticket_summary">Ticket %1$d of %2$d, %3$s, NIK %4$s, entry %5$s, doors open %6$s</string>
+    <string name="eticket_ticket_summary_no_entry">Ticket %1$d of %2$d, %3$s, NIK %4$s, doors open %5$s</string>
+    <string name="eticket_at_door_title">At the door</string>
+    <string name="eticket_step_1">Show the ticket QR, from the app or a printout.</string>
+    <string name="eticket_step_2">Bring your %1$s with the same NIK as on the ticket. Without a matching ID the staff cannot scan it.</string>
+    <string name="eticket_step_2_bold">original KTP</string>
+    <string name="eticket_step_3">Each QR can be scanned only once. Do not post the ticket on social media.</string>
+    <string name="eticket_step_number">%1$d.</string>
+    <string-array name="eticket_weekdays_short">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+    <string-array name="eticket_months_short">
+        <item>Jan</item>
+        <item>Feb</item>
+        <item>Mar</item>
+        <item>Apr</item>
+        <item>May</item>
+        <item>Jun</item>
+        <item>Jul</item>
+        <item>Aug</item>
+        <item>Sep</item>
+        <item>Oct</item>
+        <item>Nov</item>
+        <item>Dec</item>
+    </string-array>
     <string name="otp_input_label">Verification code</string>
     <string name="otp_input_progress">%1$d of %2$d digits entered</string>
     <string name="sign_in_sheet_description">Sign in to Rusuh</string>
