@@ -11,7 +11,7 @@ import androidx.compose.runtime.Stable
 data class AccountProfileUi(
     val name: String,
     val email: String,
-    val emailVerified: Boolean = true,
+    val emailVerified: Boolean,
 )
 
 /**
@@ -19,11 +19,12 @@ data class AccountProfileUi(
  *
  * [onChangeEmail] is optional: the "Ganti email" link is only shown when it is non-null
  * (the `/me/email-change` flow is out of scope for this POC).
- * [onDeleteAccount] has no backend endpoint yet, so the default is inert.
+ * [onDeleteAccount] is optional: there is no backend endpoint yet, so with null (default) the
+ * "Hapus akun" text looks the same but is not clickable and TalkBack reads it as disabled.
  */
 @Stable
 class AccountProfileActions(
     val onSignOut: () -> Unit,
     val onChangeEmail: (() -> Unit)? = null,
-    val onDeleteAccount: () -> Unit = {},
+    val onDeleteAccount: (() -> Unit)? = null,
 )
