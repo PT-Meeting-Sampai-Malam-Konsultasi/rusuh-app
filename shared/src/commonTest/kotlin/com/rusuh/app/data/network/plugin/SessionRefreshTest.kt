@@ -506,6 +506,23 @@ class SessionRefreshTest {
         }
 
     @Test
+    fun logoutAndProfileAreNotSessionless() =
+        runTest {
+            listOf("/auth/logout", "/auth/profile").forEach { path ->
+                val f =
+                    Fixture(refresher = { RefreshOutcome.Refreshed("new", "refresh-2") }) {
+                        if (it.bearer() == "Bearer new") ok() else unauthorized()
+                    }
+                f.signIn()
+
+                f.http.api.post<Unit>(path)
+
+                assertEquals("Bearer old", f.http.engine.requestHistory.first().bearer(), path)
+                assertEquals(1, f.refreshCalls.size, "$path: a 401 refreshes the session")
+            }
+        }
+
+    @Test
     fun badRequestFromRefreshIsNotARejectedSession() =
         runTest {
             val f =

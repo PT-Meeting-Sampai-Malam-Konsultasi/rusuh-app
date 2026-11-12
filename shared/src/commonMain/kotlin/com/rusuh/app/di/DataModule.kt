@@ -1,19 +1,24 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.platform.platformName
+import com.rusuh.app.data.remote.AuthApiService
 import com.rusuh.app.data.remote.DeviceApiService
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
+import com.rusuh.app.data.repository.RealAuthRepository
 import com.rusuh.app.data.repository.RealDeviceRepository
 import com.rusuh.app.data.repository.RealHomeRepository
 import com.rusuh.app.data.repository.RealMyQueuesRepository
 import com.rusuh.app.data.repository.RealQueueRepository
+import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
 import com.rusuh.app.data.repository.StubQueueRepository
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
+import com.rusuh.app.domain.repository.AuthRepository
 import com.rusuh.app.domain.repository.DetailRepository
 import com.rusuh.app.domain.repository.DeviceRepository
 import com.rusuh.app.domain.repository.MyQueuesRepository
@@ -32,7 +37,7 @@ import org.koin.dsl.onClose
 /**
  * shortcut: TEMPORARY. While a repository has no real (network) implementation, [BackendMode.Real] resolves its
  * stub and logs a WARNING instead of crashing, so Staging and Release builds start. Home, the Waiting Room, My
- * Queues and the device identity are real now; what is left is Tickets (TICKET-00-M4) and Detail (FR-15/16/17-M1
+ * Queues, the device identity and auth are real now; what is left is Tickets (TICKET-00-M4) and Detail (FR-15/16/17-M1
  * #80 #81 #82). Remove this constant, the fallback and its tests when those land. Set it to false (or pass
  * `allowStubFallback = false`) for the strict behaviour: [RealRepositoryNotAvailableException].
  */
@@ -54,12 +59,14 @@ val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("TicketsRepository", "Det
  *   in-process [StubEngine], so ApiServices built on the injected `ApiClient`s run with zero network. The
  *   [ServerClock] is the demo's ticking [StubClock], so countdowns run. The client is closed with Koin.
  * - [BackendMode.Real]: the [ServerClock] is the one from `coreModule`, synced from `serverNow` in responses.
- *   Home, Waiting Room, My Queues, Queue and Device are the network implementations. A repository without one yet
+ *   Home, Waiting Room, My Queues, Queue, Device and Auth are the network implementations. A repository without one yet
  *   (Detail, Tickets) resolves to its stub with [allowStubFallback] and logs a WARNING through [warn] once
  *   (singletons); without it, resolving throws [RealRepositoryNotAvailableException]. When a feature ticket builds
  *   a real repository, bind it in place of the `notYetReal(...)` line of that repository below.
  *
- * The ApiServices and the `DeviceRepository` are bound in both modes: in stub mode they run on the [StubEngine].
+ * The ApiServices, the `DeviceRepository` and the [SessionManager] are bound in both modes: in stub mode the
+ * ApiServices run on the [StubEngine]. `AuthRepository` is the network one in Real and a hand-written demo
+ * (`StubAuthRepository`, code 123456) in Stub; both drive the same [SessionManager].
  *
  * Load it after `coreModule()`. A function, not a `val`, for the same reason as `coreModule()`.
  */
@@ -78,6 +85,9 @@ fun dataModule(
         // /devices and the queue endpoints belong to the queue service (the `q.` host).
         single { DeviceApiService(get(ApiClientQualifier.Queue)) }
         single { QueueApiService(get(ApiClientQualifier.Queue)) }
+        // Auth is served by the core (api) host, like the refresh call of the session layer.
+        single { AuthApiService(get(ApiClientQualifier.Api)) }
+        single { SessionManager(tokenStore = get(), events = get()) } onClose { it?.close() }
         single<DeviceRepository> {
             RealDeviceRepository(
                 api = get(),
@@ -102,6 +112,7 @@ fun dataModule(
                 single<TicketsRepository> { StubTicketsRepository() }
                 single<DetailRepository> { StubDetailRepository(get()) }
                 single<MyQueuesRepository> { StubMyQueuesRepository() }
+                single<AuthRepository> { StubAuthRepository(session = get(), clock = get()) }
             }
             BackendMode.Real -> {
                 // ServerClock: coreModule's MonotonicServerClock, the instance the response plugin keeps in sync.
@@ -109,6 +120,7 @@ fun dataModule(
                 single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }
                 single<WaitingRoomRepository> { get<QueueRepository>() }
                 single<MyQueuesRepository> { RealMyQueuesRepository(get(), get(), get(), get(), get()) }
+                single<AuthRepository> { RealAuthRepository(api = get(), devices = get(), session = get()) }
                 single<TicketsRepository> { notYetReal("TicketsRepository") { StubTicketsRepository() } }
                 single<DetailRepository> { notYetReal("DetailRepository") { StubDetailRepository(get()) } }
             }
