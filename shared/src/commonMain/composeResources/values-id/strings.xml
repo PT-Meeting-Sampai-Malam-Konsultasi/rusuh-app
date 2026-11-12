@@ -173,6 +173,8 @@
         <item quantity="other">%1$d antrian aktif</item>
     </plurals>
     <string name="my_queues_logo_description">Rusuh</string>
+    <string name="eticket_page_title">Tiket Saya</string>
+    <string name="eticket_qr_error">QR tidak bisa dibuat. Tampilkan kode tiket ke petugas.</string>
     <string name="my_queues_language_group">Bahasa</string>
     <string name="my_queues_language_id">ID</string>
     <string name="my_queues_language_en">EN</string>

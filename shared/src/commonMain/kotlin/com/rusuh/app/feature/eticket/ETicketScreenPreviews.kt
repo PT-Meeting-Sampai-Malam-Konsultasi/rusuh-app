@@ -85,6 +85,18 @@ internal fun ETicketOneTicketPreview() {
 }
 
 @Composable
+internal fun ETicketQrErrorPreview() {
+    val order =
+        sampleETicketOrder(1).copy(
+            tickets =
+                sampleETicketOrder(1).tickets.map {
+                    it.copy(qrPayload = "x".repeat(3000))
+                },
+        )
+    RusuhTheme { ETicketScreen(state = ETicketUiState.Content(order.toUi())) }
+}
+
+@Composable
 internal fun ETicketLongNamesPreview() {
     RusuhTheme { ETicketScreen(state = ETicketUiState.Content(sampleETicketOrder(2, long = true).toUi())) }
 }

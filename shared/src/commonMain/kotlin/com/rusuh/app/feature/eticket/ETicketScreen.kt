@@ -48,6 +48,7 @@ import rusuh_app.shared.generated.resources.eticket_loading_description
 import rusuh_app.shared.generated.resources.eticket_not_found_action
 import rusuh_app.shared.generated.resources.eticket_not_found_body
 import rusuh_app.shared.generated.resources.eticket_not_found_title
+import rusuh_app.shared.generated.resources.eticket_page_title
 
 /**
  * Callbacks the e-ticket page raises. All default to no-ops so previews can render the screen.
@@ -113,7 +114,12 @@ fun ETicketScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = RusuhBrandColors.Paper,
-        topBar = { MyQueuesHeader(language = AppLanguageOption.Indonesian) },
+        topBar = {
+            MyQueuesHeader(
+                language = AppLanguageOption.Indonesian,
+                title = stringResource(Res.string.eticket_page_title),
+            )
+        },
         bottomBar = { RusuhBottomBar(selectedTab = RusuhTab.Tiket, onTabSelected = actions.onTabSelected) },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
