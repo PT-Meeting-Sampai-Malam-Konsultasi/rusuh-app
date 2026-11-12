@@ -6,10 +6,15 @@ import com.rusuh.app.data.network.ApiClient
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.AppEnvironment
 import com.rusuh.app.data.network.buildHttpClient
+import com.rusuh.app.data.network.session.SessionManager
+import com.rusuh.app.data.remote.AuthApiService
+import com.rusuh.app.data.remote.dto.RequestOtpDto
+import com.rusuh.app.data.repository.RealAuthRepository
 import com.rusuh.app.data.repository.RealDeviceRepository
 import com.rusuh.app.data.repository.RealHomeRepository
 import com.rusuh.app.data.repository.RealMyQueuesRepository
 import com.rusuh.app.data.repository.RealQueueRepository
+import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.storage.AppPreferences
 import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.data.storage.FakeSecureStore
@@ -19,12 +24,17 @@ import com.rusuh.app.data.storage.TokenStore
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
+import com.rusuh.app.domain.model.DomainResult
+import com.rusuh.app.domain.model.OtpChallenge
+import com.rusuh.app.domain.repository.AuthRepository
 import com.rusuh.app.domain.repository.DetailRepository
 import com.rusuh.app.domain.repository.DeviceRepository
 import com.rusuh.app.domain.repository.MyQueuesRepository
 import com.rusuh.app.domain.repository.QueueRepository
 import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.StubHomeRepository
+import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
+import com.rusuh.app.feature.tickets.MyTickets
 import com.rusuh.app.feature.tickets.TicketsRepository
 import com.rusuh.app.feature.waitingroom.domain.repository.WaitingRoomRepository
 import io.ktor.client.HttpClient
@@ -45,6 +55,7 @@ import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -85,6 +96,7 @@ class DataModuleTest {
             "MyQueuesRepository" to MyQueuesRepository::class,
             "QueueRepository" to QueueRepository::class,
             "DeviceRepository" to DeviceRepository::class,
+            "AuthRepository" to AuthRepository::class,
         )
 
     /** Repositories that still fall back to their stub in [BackendMode.Real]. */
@@ -139,9 +151,90 @@ class DataModuleTest {
         assertIs<RealQueueRepository>(koin.get<QueueRepository>())
         assertIs<RealMyQueuesRepository>(koin.get<MyQueuesRepository>())
         assertIs<RealDeviceRepository>(koin.get<DeviceRepository>())
+        assertIs<RealAuthRepository>(koin.get<AuthRepository>())
         assertSame<Any>(koin.get<QueueRepository>(), koin.get<WaitingRoomRepository>(), "one queue behind both seams")
         assertTrue(warnings.isEmpty(), "no stub is used for these: $warnings")
     }
+
+    @Test
+    fun stubModeBindsTheStubAuthRepositoryAndRealModeNeverFallsBackToIt() {
+        assertIs<StubAuthRepository>(koin(AppEnvironment.Mock, BackendMode.Stub).get<AuthRepository>())
+
+        val real = koin(AppEnvironment.Staging, BackendMode.Real)
+        assertIs<RealAuthRepository>(real.get<AuthRepository>())
+        assertTrue(warnings.none { "AuthRepository" in it }, "$warnings")
+        assertTrue("AuthRepository" !in REPOSITORIES_STILL_ON_STUBS)
+    }
+
+    @Test
+    fun oneSessionManagerIsSharedByTheAuthRepositoryAndTheApp() {
+        listOf(BackendMode.Stub, BackendMode.Real).forEach { mode ->
+            val koin = koin(AppEnvironment.Mock, mode)
+
+            assertSame(koin.get<SessionManager>(), koin.get<SessionManager>())
+            assertFalse(koin.get<SessionManager>().isSignedIn.value, "$mode: nothing stored yet")
+        }
+    }
+
+    @Test
+    fun theAuthApiServiceRunsOnTheCoreHostInBothModes() =
+        runTest {
+            val stub = koin(AppEnvironment.Mock, BackendMode.Stub)
+            val challenge = stub.get<AuthApiService>().requestOtp(RequestOtpDto(email = "test.user@example.test"))
+            assertIs<ApiResult.Success<*>>(challenge)
+            assertIs<ApiResult.Success<*>>(stub.get<AuthApiService>().getMe())
+        }
+
+    @Test
+    fun theTicketsTabIsNotGatedByTheSessionYet() =
+        runTest {
+            // TODO(AUTH-00 #77): once the sign-in UI is wired, GetMyTicketsUseCase follows SessionManager.
+            val koin =
+                koinApplication {
+                    allowOverride(true)
+                    modules(
+                        module {
+                            single { AppEnvironment.Mock }
+                            single<SecureStore> { FakeSecureStore() }
+                            single<AppPreferences> { FakeAppPreferences() }
+                        },
+                        storageModule,
+                        coreModule(),
+                        dataModule(BackendMode.Stub, true) { },
+                        appModule,
+                    )
+                }.koin
+
+            assertFalse(koin.get<SessionManager>().isSignedIn.value)
+            assertIs<MyTickets.Content>(koin.get<GetMyTicketsUseCase>()())
+        }
+
+    @Test
+    fun stubModeKeepsItsPlaceholderTokensOutOfTheRealSecureStore() =
+        runTest {
+            val secure = FakeSecureStore()
+            val koin =
+                koinApplication {
+                    allowOverride(true)
+                    modules(
+                        module {
+                            single { AppEnvironment.Mock }
+                            single<SecureStore> { secure }
+                            single<AppPreferences> { FakeAppPreferences() }
+                        },
+                        storageModule,
+                        coreModule(),
+                        dataModule(BackendMode.Stub, true) { },
+                    )
+                }.koin
+            val auth = koin.get<AuthRepository>()
+            val challenge = assertIs<DomainResult.Success<OtpChallenge>>(auth.requestOtp("stub.user@example.test")).data
+
+            auth.verifyOtp(challenge.challengeId, "123456")
+
+            assertTrue(koin.get<SessionManager>().isSignedIn.value)
+            assertTrue(secure.entries.isEmpty(), "${secure.entries.keys}")
+        }
 
     @Test
     fun strictRealModeFailsLoudlyOnlyForTheRepositoriesWithoutANetworkImplementation() {

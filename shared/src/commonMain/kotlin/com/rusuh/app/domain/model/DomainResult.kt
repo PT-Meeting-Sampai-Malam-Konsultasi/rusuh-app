@@ -19,7 +19,12 @@ sealed class DomainResult<out T> {
         val traceId: String? = null,
         val extras: Map<String, JsonElement> = emptyMap(),
         val retryAfterSeconds: Int? = null,
-    ) : DomainResult<Nothing>()
+    ) : DomainResult<Nothing>() {
+        /** Without [message] and the [extras] values: server text and extra members can hold personal data. */
+        override fun toString(): String =
+            "Error(code=$code, errorCode=$errorCode, traceId=$traceId, extras=${extras.keys}, " +
+                "retryAfterSeconds=$retryAfterSeconds)"
+    }
 
     /** The call succeeded but there is nothing to show. */
     data object Empty : DomainResult<Nothing>()
