@@ -91,6 +91,8 @@ object StubResponses {
             StubRoute(HttpMethod.Post, "/auth/otp/verify", StubResponse.ok(StubJson.AUTH_VERIFY)),
             StubRoute(HttpMethod.Post, "/auth/refresh", StubResponse.ok(StubJson.AUTH_REFRESH)),
             StubRoute(HttpMethod.Get, "/me", StubResponse.ok(StubJson.ME)),
+            StubRoute(HttpMethod.Get, "/auth/profile", StubResponse.ok(StubJson.ME)),
+            StubRoute(HttpMethod.Put, "/auth/profile", StubResponse.ok(StubJson.ME)),
             StubRoute(HttpMethod.Post, "/auth/otp/request", StubResponse(202, StubJson.AUTH_OTP)),
             StubRoute(HttpMethod.Post, "/auth/logout", StubResponse(204, contentType = null)),
             StubRoute(HttpMethod.Post, "/devices", StubResponse(201, StubJson.DEVICE)),

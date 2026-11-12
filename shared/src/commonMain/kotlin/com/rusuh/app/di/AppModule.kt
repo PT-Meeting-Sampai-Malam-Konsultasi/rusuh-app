@@ -1,5 +1,6 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.domain.usecase.CreateBookingUseCase
 import com.rusuh.app.domain.usecase.GetDetailUseCase
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
@@ -29,7 +30,8 @@ val appModule =
         factory { LeaveQueueUseCase(get()) }
 
         // Tickets (Tiket tab).
-        factory { GetMyTicketsUseCase(get()) }
+        // Signed-in state comes from the session (restored from storage on cold start).
+        factory { GetMyTicketsUseCase(get(), isSignedIn = get<SessionManager>()::awaitSignedIn) }
 
         // Detail ticket page (the ServerClock is bound per backend mode in dataModule).
         factory { GetDetailUseCase(get()) }
