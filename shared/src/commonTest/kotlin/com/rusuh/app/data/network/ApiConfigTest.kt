@@ -91,9 +91,9 @@ class ApiConfigTest {
         // shortcut: the queue and pay hosts are not confirmed, so every host is the one real host for now.
         listOf(AppEnvironment.Staging, AppEnvironment.Production).forEach { env ->
             val config = ApiConfig.forEnvironment(env)
-            assertEquals("https://api.rusuh-tiket.web.id", config.baseUrl, "$env api")
-            assertEquals("https://api.rusuh-tiket.web.id", config.queueBaseUrl, "$env queue")
-            assertEquals("https://api.rusuh-tiket.web.id", config.payBaseUrl, "$env pay")
+            assertEquals("https://api.rusuh-tiket.web.id/v1", config.baseUrl, "$env api")
+            assertEquals("https://api.rusuh-tiket.web.id/v1", config.queueBaseUrl, "$env queue")
+            assertEquals("https://api.rusuh-tiket.web.id/v1", config.payBaseUrl, "$env pay")
         }
     }
 
