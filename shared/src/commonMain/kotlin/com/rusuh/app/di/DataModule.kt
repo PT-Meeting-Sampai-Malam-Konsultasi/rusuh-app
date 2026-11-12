@@ -1,6 +1,7 @@
 package com.rusuh.app.di
 
 import com.rusuh.app.data.network.session.SessionManager
+import com.rusuh.app.data.network.session.SessionManagerObserver
 import com.rusuh.app.data.platform.platformName
 import com.rusuh.app.data.remote.AuthApiService
 import com.rusuh.app.data.remote.DeviceApiService
@@ -24,6 +25,8 @@ import com.rusuh.app.domain.repository.DetailRepository
 import com.rusuh.app.domain.repository.DeviceRepository
 import com.rusuh.app.domain.repository.MyQueuesRepository
 import com.rusuh.app.domain.repository.QueueRepository
+import com.rusuh.app.domain.session.SessionObserver
+import com.rusuh.app.domain.usecase.AuthGeneration
 import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.StubHomeRepository
 import com.rusuh.app.feature.tickets.StubTicketsRepository
@@ -89,6 +92,9 @@ fun dataModule(
         single { QueueApiService(get(ApiClientQualifier.Queue)) }
         // Auth is served by the core (api) host, like the refresh call of the session layer.
         single { AuthApiService(get(ApiClientQualifier.Api)) }
+        // Auth state layer (both modes): the sign-out counter and the read-only session view the screens use.
+        single { AuthGeneration() }
+        single<SessionObserver> { SessionManagerObserver(get(), get()) }
         single<DeviceRepository> {
             RealDeviceRepository(
                 api = get(),

@@ -1,4 +1,4 @@
-@file:Suppress("MatchingDeclarationName")
+@file:Suppress("MatchingDeclarationName", "TooManyFunctions")
 
 package com.rusuh.app.feature.account
 
@@ -25,7 +25,7 @@ private fun CompactPreview(
         val density = LocalDensity.current
         CompositionLocalProvider(
             LocalDensity provides Density(density.density, fontScale ?: density.fontScale),
-        ) { AccountScreen(isSignedIn = false, signInState = state) }
+        ) { AccountScreen(body = AccountBody.SignedOut(sessionExpired = false), signInState = state) }
     }
 }
 
@@ -52,7 +52,32 @@ internal fun AccountSignInNewAccountPreview() =
 
 @Composable
 internal fun AccountSignedInPreview() {
-    RusuhTheme { AccountScreen(isSignedIn = true, signInState = SignInUiState.Email()) }
+    RusuhTheme {
+        AccountScreen(
+            body =
+                AccountBody.Profile(
+                    AccountProfileUi(name = "Sari Wulandari", email = SAMPLE_EMAIL, emailVerified = true),
+                ),
+            signInState = SignInUiState.Email(),
+        )
+    }
+}
+
+@Composable
+internal fun AccountSessionExpiredPreview() {
+    RusuhTheme {
+        AccountScreen(body = AccountBody.SignedOut(sessionExpired = true), signInState = SignInUiState.Email())
+    }
+}
+
+@Composable
+internal fun AccountProfileLoadingPreview() {
+    RusuhTheme { AccountScreen(body = AccountBody.ProfileLoading, signInState = SignInUiState.Email()) }
+}
+
+@Composable
+internal fun AccountProfileErrorPreview() {
+    RusuhTheme { AccountScreen(body = AccountBody.ProfileError, signInState = SignInUiState.Email()) }
 }
 
 // 2x font scale (accessibility): the longest steps, to check nothing clips or overlaps.

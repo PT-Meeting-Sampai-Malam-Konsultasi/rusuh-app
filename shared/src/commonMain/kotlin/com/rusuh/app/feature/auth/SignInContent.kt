@@ -47,6 +47,11 @@ import rusuh_app.shared.generated.resources.sign_in_email_headline
 import rusuh_app.shared.generated.resources.sign_in_email_hint
 import rusuh_app.shared.generated.resources.sign_in_email_label
 import rusuh_app.shared.generated.resources.sign_in_email_placeholder
+import rusuh_app.shared.generated.resources.sign_in_error_invalid
+import rusuh_app.shared.generated.resources.sign_in_error_network
+import rusuh_app.shared.generated.resources.sign_in_error_rate_limited
+import rusuh_app.shared.generated.resources.sign_in_error_rate_limited_now
+import rusuh_app.shared.generated.resources.sign_in_error_unknown
 import rusuh_app.shared.generated.resources.sign_in_expired_error
 import rusuh_app.shared.generated.resources.sign_in_expired_headline
 import rusuh_app.shared.generated.resources.sign_in_name_hint
@@ -73,9 +78,12 @@ private const val OTP_GROUP_SIZE = 3
  * edit goes through [actions]. The full variant adds its top bar, event banner and info blocks
  * around it.
  *
+ * [status] adds the in-flight state (the main button is disabled) and one inline error line above the main button.
+ *
  * [autoFocusEmail] focuses the email field on entry (wanted on the full screen, not on a tab
  * the user merely opened). Code and name steps always take focus because the user just got there.
  */
+@Suppress("LongParameterList")
 @Composable
 fun SignInContent(
     state: SignInUiState,
@@ -83,15 +91,16 @@ fun SignInContent(
     variant: SignInVariant,
     modifier: Modifier = Modifier,
     autoFocusEmail: Boolean = false,
+    status: SignInStatus = SignInStatus(),
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         when (state) {
-            is SignInUiState.Email -> EmailStep(state, actions, autoFocusEmail)
+            is SignInUiState.Email -> EmailStep(state, actions, autoFocusEmail, status)
             // One call site for both, so the input (and its focus and keyboard) is kept
             // when a wrong code arrives.
-            is SignInUiState.Code, is SignInUiState.WrongCode -> CodeStep(state, actions)
-            is SignInUiState.CodeExpired -> ExpiredStep(state, actions)
-            is SignInUiState.NewAccount -> NewAccountStep(state, actions, variant)
+            is SignInUiState.Code, is SignInUiState.WrongCode -> CodeStep(state, actions, status)
+            is SignInUiState.CodeExpired -> ExpiredStep(state, actions, status)
+            is SignInUiState.NewAccount -> NewAccountStep(state, actions, variant, status)
         }
     }
 }
@@ -101,8 +110,9 @@ private fun EmailStep(
     state: SignInUiState.Email,
     actions: SignInActions,
     autoFocus: Boolean,
+    status: SignInStatus,
 ) {
-    val canSend = state.isPrimaryEnabled()
+    val canSend = state.isPrimaryEnabled() && !status.blocksPrimary
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(autoFocus) {
@@ -127,6 +137,7 @@ private fun EmailStep(
         modifier = Modifier.focusRequester(focusRequester),
     )
     Spacer(Modifier.height(RusuhSpacing.lg))
+    StatusLine(status)
     SignInPrimaryButton(stringResource(Res.string.sign_in_send_code), canSend, actions.onSendCode)
     Spacer(Modifier.height(RusuhSpacing.md))
     HintText(stringResource(Res.string.sign_in_email_hint))
@@ -144,6 +155,7 @@ private fun EmailStep(
 private fun CodeStep(
     state: SignInUiState,
     actions: SignInActions,
+    status: SignInStatus,
 ) {
     val email: String
     val code: String
@@ -167,7 +179,7 @@ private fun CodeStep(
         }
         else -> return
     }
-    val canSubmit = state.isPrimaryEnabled()
+    val canSubmit = state.isPrimaryEnabled() && !status.blocksPrimary
     SignInHeadline(stringResource(Res.string.sign_in_code_headline))
     Spacer(Modifier.height(RusuhSpacing.lg))
     SentTo(email, actions)
@@ -192,8 +204,9 @@ private fun CodeStep(
         ErrorLine(wrongMessage)
     }
     Spacer(Modifier.height(RusuhSpacing.lg))
+    StatusLine(status)
     SignInPrimaryButton(stringResource(Res.string.sign_in_verify), canSubmit) { actions.onCodeComplete(code) }
-    ResendRow(resendInSeconds, actions)
+    ResendRow(resendInSeconds, actions, enabled = !status.isBusy)
     Spacer(Modifier.height(RusuhSpacing.md))
     val sender = SignInPolicy.SENDER_ADDRESS
     val validity = formatResendCountdown(validForSeconds)
@@ -222,6 +235,7 @@ private fun SentTo(
 private fun ResendRow(
     resendInSeconds: Int,
     actions: SignInActions,
+    enabled: Boolean,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         if (resendInSeconds > 0) {
@@ -233,7 +247,10 @@ private fun ResendRow(
                 modifier = Modifier.fillMaxWidth().padding(vertical = RusuhSpacing.md),
             )
         } else {
-            LinkText(text = stringResource(Res.string.sign_in_resend), onClick = actions.onResendCode)
+            LinkText(
+                text = stringResource(Res.string.sign_in_resend),
+                onClick = { if (enabled) actions.onResendCode() },
+            )
         }
     }
 }
@@ -242,6 +259,7 @@ private fun ResendRow(
 private fun ExpiredStep(
     state: SignInUiState.CodeExpired,
     actions: SignInActions,
+    status: SignInStatus,
 ) {
     SignInHeadline(stringResource(Res.string.sign_in_expired_headline))
     Spacer(Modifier.height(RusuhSpacing.lg))
@@ -261,7 +279,8 @@ private fun ExpiredStep(
     Spacer(Modifier.height(RusuhSpacing.md))
     ErrorLine(stringResource(Res.string.sign_in_expired_error, SignInPolicy.CODE_VALID_MINUTES))
     Spacer(Modifier.height(RusuhSpacing.lg))
-    SignInPrimaryButton(stringResource(Res.string.sign_in_send_new_code), true, actions.onResendCode)
+    StatusLine(status)
+    SignInPrimaryButton(stringResource(Res.string.sign_in_send_new_code), !status.blocksPrimary, actions.onResendCode)
 }
 
 @Composable
@@ -269,8 +288,9 @@ private fun NewAccountStep(
     state: SignInUiState.NewAccount,
     actions: SignInActions,
     variant: SignInVariant,
+    status: SignInStatus,
 ) {
-    val canContinue = state.isPrimaryEnabled()
+    val canContinue = state.isPrimaryEnabled() && !status.blocksPrimary
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
@@ -314,6 +334,7 @@ private fun NewAccountStep(
         onCheckedChange = actions.onConsentChange,
     )
     Spacer(Modifier.height(RusuhSpacing.xl))
+    StatusLine(status)
     SignInPrimaryButton(
         text =
             stringResource(
@@ -322,4 +343,22 @@ private fun NewAccountStep(
         enabled = canContinue,
         onClick = actions.onCreateAccount,
     )
+}
+
+/** The inline error of [status] (if any) with the space below it; nothing when there is none. */
+@Composable
+private fun StatusLine(status: SignInStatus) {
+    val error = status.error ?: return
+    val message =
+        when (error) {
+            SignInError.Network -> stringResource(Res.string.sign_in_error_network)
+            is SignInError.RateLimited ->
+                error.secondsLeft?.takeIf { it > 0 }?.let {
+                    stringResource(Res.string.sign_in_error_rate_limited, formatResendCountdown(it))
+                } ?: stringResource(Res.string.sign_in_error_rate_limited_now)
+            SignInError.InvalidInput -> stringResource(Res.string.sign_in_error_invalid)
+            SignInError.Unknown -> stringResource(Res.string.sign_in_error_unknown)
+        }
+    ErrorLine(message)
+    Spacer(Modifier.height(RusuhSpacing.lg))
 }
