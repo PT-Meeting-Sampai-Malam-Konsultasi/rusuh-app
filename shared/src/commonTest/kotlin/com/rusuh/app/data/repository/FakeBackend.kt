@@ -46,7 +46,7 @@ class Seen(
 )
 
 /**
- * A scripted backend on a Ktor MockEngine. `on("GET /events", reply...)` answers calls to that route in order and
+ * A scripted backend on a Ktor MockEngine. `on("GET /core/events", reply...)` answers calls to that route in order and
  * repeats the last reply; a route without a script answers like the real host today (404). The recorded requests are
  * in [seen].
  */

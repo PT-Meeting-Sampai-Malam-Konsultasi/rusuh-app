@@ -45,7 +45,7 @@ class StubEngineTest {
     @Test
     fun servesTheDefaultResponseOfAParameterisedPath() =
         runTest {
-            val result = api.get<JsonObject>("/events/evt_2026_gbk/categories")
+            val result = api.get<JsonObject>("/core/events/evt_2026_gbk/categories")
 
             assertEquals(200, assertIs<ApiResult.Success<JsonObject>>(result).code)
             assertEquals("evt_2026_gbk", result.data.text("eventId"))
@@ -55,8 +55,8 @@ class StubEngineTest {
     @Test
     fun aLiteralSegmentBeatsAParameter() =
         runTest {
-            val active = assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/bookings/active"))
-            val byId = assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/bookings/bk_01JB2Y6Z8Q"))
+            val active = assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/core/bookings/active"))
+            val byId = assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/core/bookings/bk_01JB2Y6Z8Q"))
 
             assertEquals(true, "items" in active.data)
             assertEquals("PAID", byId.data.text("status"))
@@ -66,18 +66,18 @@ class StubEngineTest {
     @Test
     fun statusFollowsTheRouteNotJustTheBody() =
         runTest {
-            assertEquals(201, assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/bookings")).code)
+            assertEquals(201, assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/core/bookings")).code)
             assertEquals(202, assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/auth/otp")).code)
         }
 
     @Test
     fun aKnownPathUnderAnotherMethodIsA405MissNotARealNotFound() =
         runTest {
-            val response = api.client.request("events") { method = HttpMethod.Post }
+            val response = api.client.request("core/events") { method = HttpMethod.Post }
 
             assertEquals(405, response.status.value)
             assertEquals("true", response.headers[StubEngine.MISS_HEADER])
-            val result = assertIs<ApiResult.Error>(api.post<JsonObject>("/events"))
+            val result = assertIs<ApiResult.Error>(api.post<JsonObject>("/core/events"))
             assertEquals(StubEngine.MISS_CODE, result.problem?.rawCode)
         }
 
@@ -90,17 +90,17 @@ class StubEngineTest {
             assertEquals(StubEngine.MISS_CODE, result.problem?.rawCode)
             assertEquals(true, result.problem?.detail.orEmpty().contains("GET /nope/1"))
             assertEquals("true", api.client.get("nope/1").headers[StubEngine.MISS_HEADER])
-            assertEquals(null, api.client.get("events").headers[StubEngine.MISS_HEADER])
-            stub.assertRequestLine("GET /nope/1", "GET /nope/1", "GET /events")
+            assertEquals(null, api.client.get("core/events").headers[StubEngine.MISS_HEADER])
+            stub.assertRequestLine("GET /nope/1", "GET /nope/1", "GET /core/events")
         }
 
     @Test
     fun aScriptedParameterRouteDoesNotShadowAMoreSpecificDefault() =
         runTest {
-            stub.script(HttpMethod.Get, "/bookings/{bookingId}", StubError.NotFound)
+            stub.script(HttpMethod.Get, "/core/bookings/{bookingId}", StubError.NotFound)
 
-            val active = api.get<JsonObject>("/bookings/active")
-            val byId = api.get<JsonObject>("/bookings/bk_1")
+            val active = api.get<JsonObject>("/core/bookings/active")
+            val byId = api.get<JsonObject>("/core/bookings/bk_1")
 
             assertIs<ApiResult.Success<JsonObject>>(active)
             assertEquals(404, assertIs<ApiResult.Error>(byId).code)
@@ -109,15 +109,15 @@ class StubEngineTest {
     @Test
     fun aScriptWinsATieWithTheDefaultRoute() =
         runTest {
-            stub.script(HttpMethod.Get, "/events", StubError.ServiceUnavailable)
+            stub.script(HttpMethod.Get, "/core/events", StubError.ServiceUnavailable)
 
-            assertEquals(503, assertIs<ApiResult.Error>(api.get<JsonObject>("/events")).code)
+            assertEquals(503, assertIs<ApiResult.Error>(api.get<JsonObject>("/core/events")).code)
         }
 
     @Test
     fun pathParametersArePercentDecodedAndQueriesIgnored() =
         runTest {
-            val result = api.get<JsonObject>("/tickets/tk%20a%2Fb?status=used&page=2")
+            val result = api.get<JsonObject>("/core/tickets/tk%20a%2Fb?status=used&page=2")
 
             assertIs<ApiResult.Success<JsonObject>>(result)
             val request = stub.requests.single()
@@ -135,9 +135,9 @@ class StubEngineTest {
     @Test
     fun paymentAndBookingActionsAreStubbed() =
         runTest {
-            val cancel = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/bookings/bk_1/cancel"))
-            val snap = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/payments/bk_1/snap"))
-            val device = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/devices"))
+            val cancel = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/core/bookings/bk_1/cancel"))
+            val snap = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/core/payments/bk_1/snap"))
+            val device = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/queue/devices"))
 
             assertEquals("CANCELLED", cancel.data.text("status"))
             assertEquals(201, snap.code)
@@ -150,7 +150,7 @@ class StubEngineTest {
         runTest {
             val quiet = StubEngine()
 
-            quiet.apiClient().get<JsonObject>("/events")
+            quiet.apiClient().get<JsonObject>("/core/events")
 
             assertEquals(emptyList(), quiet.requests)
         }
@@ -161,7 +161,7 @@ class StubEngineTest {
             val bounded = StubEngine(recordRequests = true, maxRecordedRequests = 3)
             val client = bounded.apiClient()
 
-            repeat(5) { client.get<JsonObject>("/tickets/tk_$it") }
+            repeat(5) { client.get<JsonObject>("/core/tickets/tk_$it") }
 
             assertEquals(listOf("tk_2", "tk_3", "tk_4"), bounded.requests.map { it.pathParams.getValue("ticketId") })
         }
@@ -198,12 +198,14 @@ class StubEngineTest {
     @Test
     fun timesAreRelativeToTheInjectedClock() =
         runTest {
-            val first = assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/events/evt_2026_gbk/categories"))
+            val first =
+                assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/core/events/evt_2026_gbk/categories"))
             assertEquals("2026-11-14T10:40:00Z", first.data.text("serverNow"))
             assertEquals("2026-11-14T10:45:00Z", first.data.text("expiresAt"))
 
             stub.clock.advanceBy(2.minutes)
-            val later = assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/events/evt_2026_gbk/categories"))
+            val later =
+                assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/core/events/evt_2026_gbk/categories"))
 
             assertEquals("2026-11-14T10:42:00Z", later.data.text("serverNow"))
             assertEquals("2026-11-14T10:47:00Z", later.data.text("expiresAt"))
@@ -230,9 +232,9 @@ class StubEngineTest {
     @Test
     fun conflictProblemKeepsItsExtras() =
         runTest {
-            stub.script(HttpMethod.Post, "/bookings", StubError.QuantityOverReservation)
+            stub.script(HttpMethod.Post, "/core/bookings", StubError.QuantityOverReservation)
 
-            val result = assertIs<ApiResult.Error>(api.post<JsonObject>("/bookings"))
+            val result = assertIs<ApiResult.Error>(api.post<JsonObject>("/core/bookings"))
 
             assertEquals(409, result.code)
             assertEquals(ErrorCode.QUANTITY_OVER_RESERVATION, result.problem?.code)
@@ -257,12 +259,12 @@ class StubEngineTest {
         runTest {
             stub.script(
                 HttpMethod.Get,
-                "/events",
+                "/core/events",
                 listOf(StubError.ServiceUnavailable.withRetryAfter(5), StubResponse.ok(StubJson.EVENTS)),
             )
 
-            val down = assertIs<ApiResult.Error>(api.get<JsonObject>("/events"))
-            val up = api.get<JsonObject>("/events")
+            val down = assertIs<ApiResult.Error>(api.get<JsonObject>("/core/events"))
+            val up = api.get<JsonObject>("/core/events")
 
             assertEquals(503, down.code)
             assertEquals(5, down.retryAfterSeconds)
@@ -272,33 +274,33 @@ class StubEngineTest {
     @Test
     fun logRecordsMethodPathQueryHeadersAndBody() =
         runTest {
-            api.post<JsonObject>("/events/evt_2026_gbk/attendees/validate") {
+            api.post<JsonObject>("/core/events/evt_2026_gbk/attendees/validate") {
                 idempotencyKey("key-1")
                 jsonBody(Attendee("Rina Wulandari"))
             }
-            api.get<JsonObject>("/tickets")
+            api.get<JsonObject>("/core/tickets")
 
             val first =
                 stub.assertRequest(
                     0,
                     HttpMethod.Post,
-                    "/events/evt_2026_gbk/attendees/validate",
+                    "/core/events/evt_2026_gbk/attendees/validate",
                     mapOf("Idempotency-Key" to "key-1", "Accept" to "application/json"),
                 )
             assertEquals("""{"fullName":"Rina Wulandari"}""", first.body)
-            stub.assertRequest(1, HttpMethod.Get, "/tickets")
-            stub.assertRequestLine("POST /events/evt_2026_gbk/attendees/validate", "GET /tickets")
+            stub.assertRequest(1, HttpMethod.Get, "/core/tickets")
+            stub.assertRequestLine("POST /core/events/evt_2026_gbk/attendees/validate", "GET /core/tickets")
         }
 
     @Test
     fun resetClearsScriptsAndLog() =
         runTest {
-            stub.script(HttpMethod.Get, "/events", StubError.ServiceUnavailable)
-            api.get<JsonObject>("/events")
+            stub.script(HttpMethod.Get, "/core/events", StubError.ServiceUnavailable)
+            api.get<JsonObject>("/core/events")
 
             stub.reset()
 
             assertEquals(emptyList(), stub.requests)
-            assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/events"))
+            assertIs<ApiResult.Success<JsonObject>>(api.get<JsonObject>("/core/events"))
         }
 }

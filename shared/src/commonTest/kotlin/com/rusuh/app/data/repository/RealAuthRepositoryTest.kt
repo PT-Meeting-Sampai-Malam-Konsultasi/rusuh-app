@@ -39,7 +39,7 @@ class RealAuthRepositoryTest {
     private val otp = "POST /auth/otp"
     private val verify = "POST /auth/otp/verify"
     private val logout = "POST /auth/logout"
-    private val profile = "GET /me"
+    private val profile = "GET /auth/profile"
     private val refresh = "POST /auth/refresh"
 
     private fun TestScope.harness(
@@ -71,8 +71,7 @@ class RealAuthRepositoryTest {
             assertEquals(otp, seen.line)
             assertEquals("test.user@example.test", seen.json().getValue("email").jsonPrimitive.content)
             assertEquals("Test User", seen.json().getValue("fullName").jsonPrimitive.content)
-            assertEquals("2026-10", seen.json().getValue("consentVersion").jsonPrimitive.content)
-            assertEquals(setOf("email", "fullName", "consentVersion", "locale"), seen.json().keys)
+            assertEquals(setOf("email", "fullName", "locale"), seen.json().keys)
             assertEquals("en", seen.json().getValue("locale").jsonPrimitive.content)
             assertNull(seen.bearer(), "the code request is session-less")
             assertEquals(1, h.devices.calls, "the device token is made sure first")
@@ -86,7 +85,7 @@ class RealAuthRepositoryTest {
 
             h.repository.requestOtp("test.user@example.test", fullName = "  ")
 
-            assertEquals(setOf("email", "consentVersion"), h.backend.seen.single().json().keys)
+            assertEquals(setOf("email"), h.backend.seen.single().json().keys)
         }
 
     @Test
@@ -740,7 +739,7 @@ class RealAuthRepositoryTest {
             assertEquals("usr_test_1", user.userId)
             assertEquals("test.user@example.test", user.email)
             assertEquals("Bearer access-1", h.backend.seen.single().bearer())
-            assertEquals(0, h.backend.callsTo("GET /auth/profile"))
+            assertEquals(1, h.backend.callsTo("GET /auth/profile"))
         }
 
     @Test

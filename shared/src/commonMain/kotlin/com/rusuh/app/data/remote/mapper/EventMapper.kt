@@ -24,8 +24,8 @@ private object EventStates {
 private const val MILLIS_PER_MINUTE = 60_000L
 
 /**
- * Maps one event of `GET /events` to the Home card model, or null when it cannot be shown: a blank id or name, or a
- * state this app version does not know (a new server state must not show a wrong badge). [nowMillis] is the SERVER
+ * Maps an event of `GET /core/events` to the Home card model, or null when it cannot be shown because its id or name is
+ * blank or its state is unknown. [nowMillis] is the SERVER
  * time (the response's `serverNow`), used for the coming-soon countdown; null (unknown) shows the event date instead.
  * Times are shown in the venue's zone.
  *

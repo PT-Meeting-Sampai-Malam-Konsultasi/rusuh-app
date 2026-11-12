@@ -55,7 +55,7 @@ val appModule =
         factory { VerifyOtpUseCase(get(), get()) }
         factory { SignOutUseCase(get(), get(), get()) }
         factory { GetProfileUseCase(get(), get()) }
-        factory { SaveDisplayNameUseCase(get()) }
+        factory { SaveDisplayNameUseCase(get(), get()) }
         factory { ObserveSessionUseCase(get()) }
         factory { SignInViewModel(get(), get(), get(), get(), get()) }
         factory { AccountViewModel(get(), get(), get()) }

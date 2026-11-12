@@ -133,11 +133,23 @@ class GetProfileUseCase(
 /** Keeps the name typed in the new-account step on this device (shortcut, see [DisplayNameStore]). */
 class SaveDisplayNameUseCase(
     private val displayNames: DisplayNameStore,
+    private val repository: AuthRepository,
 ) {
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
     suspend operator fun invoke(
         userId: String,
         name: String,
-    ) = displayNames.set(userId, name.trim())
+    ) {
+        val trimmed = name.trim()
+        displayNames.set(userId, trimmed)
+        try {
+            repository.updateProfile(trimmed)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            // The local name remains available if the server cannot save it.
+        }
+    }
 }
 
 /** The session as the screens see it. */

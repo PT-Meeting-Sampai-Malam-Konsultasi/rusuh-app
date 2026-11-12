@@ -24,7 +24,7 @@ class RealHomeRepositoryTest {
         now: Long = 0L,
     ) = RealHomeRepository(EventApiService(backend.api), { language }, TestServerClock(now))
 
-    private fun backendWith(vararg replies: Reply) = FakeBackend().also { it.on("GET /events", *replies) }
+    private fun backendWith(vararg replies: Reply) = FakeBackend().also { it.on("GET /core/events", *replies) }
 
     private suspend fun events(language: AppLanguage = AppLanguage.Indonesian): List<HomeEventItem> =
         repository(backendWith(Reply.ok(EVENTS_JSON)), language).getEvents()
@@ -263,6 +263,6 @@ class RealHomeRepositoryTest {
             val backend = backendWith(Reply.ok(EVENTS_JSON))
             repository(backend).getEvents()
 
-            assertEquals(listOf("GET /events"), backend.seen.map { it.line })
+            assertEquals(listOf("GET /core/events"), backend.seen.map { it.line })
         }
 }
