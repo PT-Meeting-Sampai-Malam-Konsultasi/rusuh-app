@@ -29,7 +29,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.rusuh.app.feature.queues.AppLanguageOption
 import com.rusuh.app.feature.queues.MyQueuesHeader
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
@@ -116,7 +115,7 @@ fun TicketsScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = RusuhBrandColors.Paper,
-        topBar = { MyQueuesHeader(language = AppLanguageOption.Indonesian) },
+        topBar = { MyQueuesHeader() },
         bottomBar = { RusuhBottomBar(selectedTab = RusuhTab.Tiket, onTabSelected = actions.onTabSelected) },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {

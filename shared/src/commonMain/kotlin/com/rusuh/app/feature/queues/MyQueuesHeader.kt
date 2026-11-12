@@ -2,6 +2,7 @@ package com.rusuh.app.feature.queues
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,11 +30,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
+import com.rusuh.app.AppLanguageState
+import com.rusuh.app.LocalAppLanguage
+import com.rusuh.app.data.network.AppLanguage
 import com.rusuh.app.ui.theme.RusuhBrandColors
 import com.rusuh.app.ui.theme.RusuhBrandMetrics
 import com.rusuh.app.ui.theme.RusuhShapes
 import com.rusuh.app.ui.theme.RusuhSpacing
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.my_queues_language_en
 import rusuh_app.shared.generated.resources.my_queues_language_group
@@ -42,7 +48,12 @@ import rusuh_app.shared.generated.resources.my_queues_logo_description
 /** App bar: RUSUH! logo (pink bang) on the left, ID|EN toggle on the right, ink rule below. */
 @Composable
 internal fun MyQueuesHeader(
-    language: AppLanguageOption,
+    language: AppLanguageOption =
+        if (LocalAppLanguage.current == AppLanguage.English) {
+            AppLanguageOption.English
+        } else {
+            AppLanguageOption.Indonesian
+        },
     title: String? = null,
 ) {
     Column(
@@ -106,7 +117,15 @@ private fun Modifier.logoDescription(): Modifier {
  * control that does nothing.
  */
 @Composable
-internal fun LanguageToggle(selected: AppLanguageOption) {
+internal fun LanguageToggle(
+    selected: AppLanguageOption =
+        if (LocalAppLanguage.current == AppLanguage.English) {
+            AppLanguageOption.English
+        } else {
+            AppLanguageOption.Indonesian
+        },
+) {
+    val state: AppLanguageState = koinInject()
     val groupDescription = stringResource(Res.string.my_queues_language_group)
     Row(
         modifier =
@@ -132,6 +151,15 @@ internal fun LanguageToggle(selected: AppLanguageOption) {
                 color = if (isSelected) RusuhBrandColors.Paper else RusuhBrandColors.Ink,
                 modifier =
                     Modifier
+                        .clickable {
+                            state.select(
+                                if (option == AppLanguageOption.English) {
+                                    AppLanguage.English
+                                } else {
+                                    AppLanguage.Indonesian
+                                },
+                            )
+                        }
                         .background(if (isSelected) RusuhBrandColors.Ink else Color.Transparent, RusuhShapes.pill)
                         .padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.xs),
             )

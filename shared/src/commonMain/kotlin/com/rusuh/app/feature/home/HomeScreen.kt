@@ -125,7 +125,7 @@ fun HomeScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = RusuhColors.Paper,
         contentColor = RusuhColors.Ink,
-        topBar = { HomeAppBar(selectedLanguage = HomeLanguage.ID) },
+        topBar = { HomeAppBar() },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         HomeContent(

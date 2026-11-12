@@ -124,7 +124,7 @@ fun MyQueuesScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         // The header pads the status bar itself and the bottom bar pads the
         // navigation bar itself, so the Scaffold's own insets are never added on top.
-        topBar = { MyQueuesHeader(language = AppLanguageOption.Indonesian) },
+        topBar = { MyQueuesHeader() },
         bottomBar = {
             RusuhBottomBar(
                 selectedTab = RusuhTab.Antrian,

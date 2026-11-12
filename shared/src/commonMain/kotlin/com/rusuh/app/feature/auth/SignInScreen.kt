@@ -34,7 +34,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.rusuh.app.feature.queues.AppLanguageOption
 import com.rusuh.app.feature.queues.LanguageToggle
 import com.rusuh.app.ui.components.brutalBox
 import com.rusuh.app.ui.theme.RusuhBrandTextStyles
@@ -127,7 +126,7 @@ private fun SignInTopBar(onBack: () -> Unit) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
-            Box(Modifier.padding(end = RusuhSpacing.md)) { LanguageToggle(selected = AppLanguageOption.Indonesian) }
+            Box(Modifier.padding(end = RusuhSpacing.md)) { LanguageToggle() }
         }
         Box(Modifier.fillMaxWidth().height(RusuhSpacing.borderHeavy).background(RusuhColors.BrandInk))
     }
