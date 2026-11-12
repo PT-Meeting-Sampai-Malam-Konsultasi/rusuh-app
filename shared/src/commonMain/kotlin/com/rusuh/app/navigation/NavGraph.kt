@@ -39,6 +39,8 @@ import com.rusuh.app.feature.auth.signInActions
 import com.rusuh.app.feature.detail.DetailRoute
 import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.detail.DetailViewModelHolder
+import com.rusuh.app.feature.eticket.ETicketRoute
+import com.rusuh.app.feature.eticket.ETicketViewModel
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesRoute
@@ -108,6 +110,21 @@ fun RusuhNavGraph(navController: NavHostController) {
                 },
                 // TODO(FR-16-M1 #81): no payment route yet; do not navigate.
                 onPayment = {},
+            )
+        }
+
+        // E-ticket: pushed over the Tiket tab, which keeps its bottom bar (Tiket selected); Back returns to the tab.
+        composable(
+            route = Screen.ETicket.route,
+            arguments = listOf(navArgument(Screen.ETicket.ARG_ORDER_ID) { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getString(Screen.ETicket.ARG_ORDER_ID).orEmpty()
+            val koin = getKoin()
+            val viewModel = remember(orderId) { koin.get<ETicketViewModel> { parametersOf(orderId) } }
+            ETicketRoute(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onTabSelected = { tab -> navController.switchTab(tab) },
             )
         }
 
@@ -226,8 +243,7 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
             viewModel.effect.collect { effect ->
                 when (effect) {
                     TicketsEffect.GoToEvents -> navController.switchTab(RusuhTab.Event)
-                    // TODO(FR-22-M2 #71): navigate to the e-ticket page once the destination exists.
-                    is TicketsEffect.OpenETicket -> Unit
+                    is TicketsEffect.OpenETicket -> navController.navigate(Screen.ETicket.routeFor(effect.orderId))
                     // The Account tab hosts the compact login (decision 2026-11-12).
                     // shortcut: after signing in the user stays on the Account page and taps Tiket again.
                     TicketsEffect.OpenSignIn -> navController.switchTab(RusuhTab.Akun)
