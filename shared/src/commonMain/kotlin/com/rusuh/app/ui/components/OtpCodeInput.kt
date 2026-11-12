@@ -2,12 +2,14 @@
 
 package com.rusuh.app.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
@@ -57,7 +59,8 @@ import rusuh_app.shared.generated.resources.otp_input_progress
  * input beyond [length] is ignored. [onComplete] fires on the edit that yields [length]
  * digits, once per completed value (again only after the value changed away and back).
  * Paste works through the invisible text field laid over the boxes (long-press to paste);
- * non-digits are dropped. The keyboard is numeric. [autoFocus] requests focus and shows the
+ * non-digits are dropped. [separatorAfter] draws a decorative hyphen after that many boxes
+ * (Figma "482-091"); it is not part of the value. The keyboard is numeric. [autoFocus] requests focus and shows the
  * keyboard when the input enters the composition.
  *
  * Accessibility: the boxes are hidden from the tree and the whole control is one text field
@@ -75,6 +78,7 @@ fun OtpCodeInput(
     state: OtpCodeState = OtpCodeState.Default,
     errorMessage: String? = null,
     autoFocus: Boolean = false,
+    separatorAfter: Int? = null,
     onComplete: (String) -> Unit = {},
 ) {
     val digits = sanitizeOtpInput(value, length)
@@ -141,11 +145,31 @@ fun OtpCodeInput(
                                 state = state,
                                 modifier = Modifier.weight(1f),
                             )
+                            if (separatorAfter != null && index == separatorAfter - 1 && index < length - 1) {
+                                OtpSeparator()
+                            }
                         }
                     }
                     Box(Modifier.matchParentSize()) { inner() }
                 }
             },
+        )
+    }
+}
+
+/** Hyphen between the two groups of boxes; centred on the boxes, not on the shadow strip. */
+@Composable
+private fun OtpSeparator() {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.height(RusuhSpacing.otpBoxHeight),
+    ) {
+        // The hyphen is drawn, not typed copy: a short ink bar.
+        Box(
+            Modifier
+                .width(RusuhSpacing.otpSeparatorWidth)
+                .height(RusuhSpacing.borderHeavy)
+                .background(RusuhColors.BrandInk),
         )
     }
 }

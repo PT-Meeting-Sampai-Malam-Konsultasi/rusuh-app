@@ -121,6 +121,12 @@ object RusuhSpacing {
     /** Height of one OTP digit box (width flexes so six boxes fill the row). */
     val otpBoxHeight = 56.dp
 
+    /** Diameter of the red "!" disc before an error message. */
+    val errorIcon = 18.dp
+
+    /** Width of the hyphen between the two OTP box groups. */
+    val otpSeparatorWidth = 8.dp
+
     /** Side length of the consent checkbox square (the row around it is 44dp+). */
     val checkboxSize = 24.dp
 

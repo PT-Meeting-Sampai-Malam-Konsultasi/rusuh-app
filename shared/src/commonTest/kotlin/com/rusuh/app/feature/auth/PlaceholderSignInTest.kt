@@ -73,10 +73,48 @@ class PlaceholderSignInTest {
     fun tickCountsDownAndStopsAtZero() {
         val signIn = codeStep()
         signIn.tick()
-        assertEquals(RESEND_COOLDOWN_SECONDS - 1, assertIs<SignInUiState.Code>(signIn.state).resendInSeconds)
+        val first = assertIs<SignInUiState.Code>(signIn.state)
+        assertEquals(RESEND_COOLDOWN_SECONDS - 1, first.resendInSeconds)
+        assertEquals(SignInPolicy.CODE_VALID_SECONDS - 1, first.validForSeconds)
         repeat(RESEND_COOLDOWN_SECONDS + 5) { signIn.tick() }
         assertEquals(0, assertIs<SignInUiState.Code>(signIn.state).resendInSeconds)
+        assertEquals(true, signIn.isCountingDown)
+    }
+
+    @Test
+    fun codeExpiresWhenValidityRunsOut() {
+        val signIn = codeStep()
+        repeat(SignInPolicy.CODE_VALID_SECONDS) { signIn.tick() }
+        assertIs<SignInUiState.CodeExpired>(signIn.state)
         assertEquals(false, signIn.isCountingDown)
+    }
+
+    @Test
+    fun validityCarriesIntoWrongCodeAndBack() {
+        val signIn = codeStep()
+        repeat(10) { signIn.tick() }
+        signIn.actions.onCodeComplete("111111")
+        val wrong = assertIs<SignInUiState.WrongCode>(signIn.state)
+        assertEquals(SignInPolicy.CODE_VALID_SECONDS - 10, wrong.validForSeconds)
+        signIn.actions.onCodeChange("11111")
+        assertEquals(SignInPolicy.CODE_VALID_SECONDS - 10, assertIs<SignInUiState.Code>(signIn.state).validForSeconds)
+    }
+
+    @Test
+    fun creatingTheAccountEndsTheFlowSignedIn() {
+        val signIn = codeStep()
+        signIn.actions.onCodeComplete("123456")
+        signIn.actions.onFullNameChange("Sari Wulandari")
+        assertEquals(false, signIn.isSignedIn)
+        signIn.actions.onCreateAccount()
+        assertNull(signIn.state)
+        assertEquals(true, signIn.isSignedIn)
+    }
+
+    @Test
+    fun startOpenBeginsOnEmail() {
+        assertIs<SignInUiState.Email>(PlaceholderSignIn(startOpen = true).state)
+        assertNull(PlaceholderSignIn().state)
     }
 
     @Test
@@ -108,7 +146,7 @@ class PlaceholderSignInTest {
     }
 
     @Test
-    fun dismissClosesSheet() {
+    fun dismissClosesFlow() {
         val signIn = codeStep()
         signIn.actions.onDismiss()
         assertNull(signIn.state)
