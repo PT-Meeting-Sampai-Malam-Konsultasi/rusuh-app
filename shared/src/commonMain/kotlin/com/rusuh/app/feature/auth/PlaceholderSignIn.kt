@@ -5,7 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 
@@ -48,7 +48,7 @@ class PlaceholderSignIn(
             when (val current = state) {
                 is SignInUiState.Code ->
                     if (current.validForSeconds <= 1) {
-                        SignInUiState.CodeExpired(current.email)
+                        SignInUiState.CodeExpired(current.email, current.code)
                     } else {
                         current.copy(
                             resendInSeconds = (current.resendInSeconds - 1).coerceAtLeast(0),
@@ -57,7 +57,7 @@ class PlaceholderSignIn(
                     }
                 is SignInUiState.WrongCode ->
                     if (current.validForSeconds <= 1) {
-                        SignInUiState.CodeExpired(current.email)
+                        SignInUiState.CodeExpired(current.email, current.code)
                     } else {
                         current.copy(
                             resendInSeconds = (current.resendInSeconds - 1).coerceAtLeast(0),
@@ -72,7 +72,19 @@ class PlaceholderSignIn(
     internal val isCountingDown: Boolean
         get() = state is SignInUiState.Code || state is SignInUiState.WrongCode
 
-    private var attemptsLeft = SignInPolicy.MAX_ATTEMPTS
+    internal var attemptsLeft = SignInPolicy.MAX_ATTEMPTS
+        private set
+
+    /** Puts back a saved flow (see [PlaceholderSignInSaver]). */
+    internal fun restore(
+        restoredState: SignInUiState?,
+        signedIn: Boolean,
+        attempts: Int,
+    ) {
+        state = restoredState
+        isSignedIn = signedIn
+        attemptsLeft = attempts
+    }
 
     val actions: SignInActions =
         SignInActions(
@@ -142,7 +154,7 @@ class PlaceholderSignIn(
         state =
             when {
                 code == PLACEHOLDER_NEW_ACCOUNT_CODE -> SignInUiState.NewAccount(email)
-                code == PLACEHOLDER_EXPIRED_CODE || attemptsLeft <= 0 -> SignInUiState.CodeExpired(email)
+                code == PLACEHOLDER_EXPIRED_CODE || attemptsLeft <= 0 -> SignInUiState.CodeExpired(email, code)
                 else -> SignInUiState.WrongCode(email, code, attemptsLeft, timers.first, timers.second)
             }
     }
@@ -154,7 +166,8 @@ class PlaceholderSignIn(
  */
 @Composable
 fun rememberPlaceholderSignIn(startOpen: Boolean = false): PlaceholderSignIn {
-    val signIn = remember { PlaceholderSignIn(startOpen) }
+    // Saveable so a tab switch (or process death) keeps the step the user was on.
+    val signIn = rememberSaveable(saver = PlaceholderSignInSaver) { PlaceholderSignIn(startOpen) }
     val counting = signIn.isCountingDown
     LaunchedEffect(counting) {
         while (counting) {

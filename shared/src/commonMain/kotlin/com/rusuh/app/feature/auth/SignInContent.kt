@@ -174,24 +174,22 @@ private fun CodeStep(
     Spacer(Modifier.height(RusuhSpacing.xl))
     FieldLabel(stringResource(Res.string.sign_in_code_label))
     Spacer(Modifier.height(RusuhSpacing.md))
+    val wrongMessage =
+        attemptsLeft?.let {
+            pluralStringResource(Res.plurals.sign_in_wrong_attempts, it, it, SignInPolicy.LOCKOUT_MINUTES)
+        }
     OtpCodeInput(
         value = code,
         onValueChange = actions.onCodeChange,
         onComplete = actions.onCodeComplete,
-        state = if (attemptsLeft != null) OtpCodeState.Error else OtpCodeState.Default,
+        state = if (wrongMessage != null) OtpCodeState.Error else OtpCodeState.Default,
+        errorMessage = wrongMessage,
         autoFocus = true,
         separatorAfter = OTP_GROUP_SIZE,
     )
-    if (attemptsLeft != null) {
+    if (wrongMessage != null) {
         Spacer(Modifier.height(RusuhSpacing.md))
-        ErrorLine(
-            pluralStringResource(
-                Res.plurals.sign_in_wrong_attempts,
-                attemptsLeft,
-                attemptsLeft,
-                SignInPolicy.LOCKOUT_MINUTES,
-            ),
-        )
+        ErrorLine(wrongMessage)
     }
     Spacer(Modifier.height(RusuhSpacing.lg))
     SignInPrimaryButton(stringResource(Res.string.sign_in_verify), canSubmit) { actions.onCodeComplete(code) }
@@ -251,12 +249,13 @@ private fun ExpiredStep(
     Spacer(Modifier.height(RusuhSpacing.xl))
     FieldLabel(stringResource(Res.string.sign_in_code_label))
     Spacer(Modifier.height(RusuhSpacing.md))
-    // Empty and disabled: nothing useful for a screen reader.
+    // The old code, disabled and struck through; hidden from a screen reader (the error says it all).
     OtpCodeInput(
-        value = "",
+        value = state.code,
         onValueChange = {},
         state = OtpCodeState.Disabled,
         separatorAfter = OTP_GROUP_SIZE,
+        strikethrough = true,
         modifier = Modifier.clearAndSetSemantics {},
     )
     Spacer(Modifier.height(RusuhSpacing.md))

@@ -101,6 +101,63 @@ class PlaceholderSignInTest {
     }
 
     @Test
+    fun wrongCodeExpiresWhenValidityRunsOutAndKeepsTheCode() {
+        val signIn = codeStep()
+        signIn.actions.onCodeComplete("111111")
+        assertIs<SignInUiState.WrongCode>(signIn.state)
+        repeat(SignInPolicy.CODE_VALID_SECONDS) { signIn.tick() }
+        assertEquals("111111", assertIs<SignInUiState.CodeExpired>(signIn.state).code)
+    }
+
+    @Test
+    fun expiredStepCarriesTheLastCode() {
+        val special = codeStep()
+        special.actions.onCodeComplete("000000")
+        assertEquals("000000", assertIs<SignInUiState.CodeExpired>(special.state).code)
+        val attempts = codeStep()
+        repeat(SignInPolicy.MAX_ATTEMPTS) { attempts.actions.onCodeComplete("99999$it") }
+        assertEquals("999994", assertIs<SignInUiState.CodeExpired>(attempts.state).code)
+        val timedOut = codeStep()
+        timedOut.actions.onCodeChange("4820")
+        repeat(SignInPolicy.CODE_VALID_SECONDS) { timedOut.tick() }
+        assertEquals("4820", assertIs<SignInUiState.CodeExpired>(timedOut.state).code)
+    }
+
+    @Test
+    fun changeEmailFromNewAccountAndExpiredKeepsTheEmail() {
+        val newAccount = codeStep()
+        newAccount.actions.onCodeComplete("123456")
+        newAccount.actions.onChangeEmail()
+        assertEquals("nama@email.com", assertIs<SignInUiState.Email>(newAccount.state).email)
+        val expired = codeStep()
+        expired.actions.onCodeComplete("000000")
+        expired.actions.onChangeEmail()
+        assertEquals("nama@email.com", assertIs<SignInUiState.Email>(expired.state).email)
+    }
+
+    @Test
+    fun createAccountOutsideNewAccountDoesNotSignIn() {
+        val signIn = codeStep()
+        signIn.actions.onCreateAccount()
+        assertIs<SignInUiState.Code>(signIn.state)
+        assertEquals(false, signIn.isSignedIn)
+    }
+
+    @Test
+    fun savedFlowSurvivesEveryStep() {
+        val states =
+            listOf(
+                null,
+                SignInUiState.Email("a@b.co"),
+                SignInUiState.Code("a@b.co", "123", 42, 291),
+                SignInUiState.WrongCode("a@b.co", "654321", 2, 7, 280),
+                SignInUiState.CodeExpired("a@b.co", "482019"),
+                SignInUiState.NewAccount("a@b.co", "Sari", true),
+            )
+        states.forEach { assertEquals(it, decodeSignInState(encodeSignInState(it))) }
+    }
+
+    @Test
     fun creatingTheAccountEndsTheFlowSignedIn() {
         val signIn = codeStep()
         signIn.actions.onCodeComplete("123456")

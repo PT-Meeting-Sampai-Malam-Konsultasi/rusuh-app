@@ -41,15 +41,21 @@ fun SignInUiState.isPrimaryEnabled(): Boolean =
     }
 
 /**
- * Character ranges of each of [parts] inside [text] (first occurrence, parts that do not occur
- * are skipped). Lets a localized sentence with placeholders emphasise the substituted values
- * without splitting the string resource.
+ * Character ranges of each of [parts] inside [text] (first occurrence, a repeated part takes the
+ * next one; parts that do not occur are skipped). Lets a localized sentence with placeholders
+ * emphasise the substituted values without splitting the string resource.
  */
 fun findPartRanges(
     text: String,
     parts: List<String>,
-): List<IntRange> =
-    parts.mapNotNull { part ->
-        val start = text.indexOf(part)
-        if (part.isEmpty() || start < 0) null else start until start + part.length
+): List<IntRange> {
+    val found = mutableListOf<IntRange>()
+    parts.forEach { part ->
+        if (part.isEmpty()) return@forEach
+        // A part repeated in the list takes the next occurrence, not the same one again.
+        var start = text.indexOf(part)
+        while (start >= 0 && found.any { it.first == start }) start = text.indexOf(part, start + 1)
+        if (start >= 0) found += start until start + part.length
     }
+    return found
+}

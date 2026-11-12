@@ -20,12 +20,15 @@ class SignInFormatTest {
         assertEquals("4:51", formatResendCountdown(SignInPolicy.CODE_VALID_SECONDS - 9))
     }
 
+    // Pins the numbers the copy shows. The strings take them as placeholders, so a change here
+    // must be a deliberate decision (design says 5 and 15 minutes, ADR-0006 says 10 minutes valid).
     @Test
-    fun policyNumbersAreConsistent() {
-        assertEquals(SignInPolicy.CODE_VALID_MINUTES * 60, SignInPolicy.CODE_VALID_SECONDS)
-        assertTrue(SignInPolicy.LOCKOUT_MINUTES > 0)
-        assertTrue(SignInPolicy.MAX_ATTEMPTS > 1)
-        assertTrue(RESEND_COOLDOWN_SECONDS < SignInPolicy.CODE_VALID_SECONDS)
+    fun policyNumbersMatchTheDesignUntilTheTeamDecides() {
+        assertEquals(5, SignInPolicy.CODE_VALID_MINUTES)
+        assertEquals(15, SignInPolicy.LOCKOUT_MINUTES)
+        assertEquals(5, SignInPolicy.MAX_ATTEMPTS)
+        assertEquals(60, RESEND_COOLDOWN_SECONDS)
+        assertEquals(300, SignInPolicy.CODE_VALID_SECONDS)
     }
 
     @Test
@@ -45,6 +48,9 @@ class SignInFormatTest {
     fun findsPartRanges() {
         assertEquals(listOf(5..9), findPartRanges("Kode a@b.c ok", listOf("a@b.c")))
         assertEquals(emptyList(), findPartRanges("abc", listOf("x", "")))
+        // A repeated part takes the next occurrence, not the same one twice.
+        assertEquals(listOf(0..1, 3..4), findPartRanges("ab ab", listOf("ab", "ab")))
+        assertEquals(listOf(0..1), findPartRanges("ab", listOf("ab", "ab")))
     }
 
     @Test
