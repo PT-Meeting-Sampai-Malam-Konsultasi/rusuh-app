@@ -36,7 +36,7 @@ jobs:
     steps:
       - name: Skip when Firebase secrets are missing
         if: env.HAS_FIREBASE != 'true'
-        run: echo "FIREBASE_SERVICE_ACCOUNT_JSON / FIREBASE_APP_ID are not set: skipping distribution."
+        run: echo "FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_APP_ID is not set, skipping distribution."
       - uses: actions/checkout@v4
         if: env.HAS_FIREBASE == 'true'
       - uses: actions/setup-java@v4
