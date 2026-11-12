@@ -22,7 +22,7 @@ class NetworkConfigTest {
 
         assertEquals(AppEnvironment.Staging, startup.environment)
         assertEquals(BackendMode.Real, startup.backendMode)
-        assertEquals("https://api.rusuh-tiket.web.id", ApiConfig.forEnvironment(startup.environment).baseUrl)
+        assertEquals("https://api.rusuh-tiket.web.id/v1", ApiConfig.forEnvironment(startup.environment).baseUrl)
     }
 
     @Test
@@ -34,7 +34,7 @@ class NetworkConfigTest {
                 assertEquals(AppEnvironment.Production, startup.environment, "mockApi=$mockApi override=$override")
                 assertEquals(BackendMode.Real, startup.backendMode, "mockApi=$mockApi override=$override")
                 assertEquals(
-                    "https://api.rusuh-tiket.web.id",
+                    "https://api.rusuh-tiket.web.id/v1",
                     ApiConfig.forEnvironment(startup.environment).baseUrl,
                 )
             }
