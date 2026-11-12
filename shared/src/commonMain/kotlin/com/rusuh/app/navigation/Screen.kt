@@ -1,6 +1,7 @@
 package com.rusuh.app.navigation
 
 import com.rusuh.app.ui.components.RusuhTab
+import io.ktor.http.encodeURLParameter
 
 /** Defines app screens with their navigation routes. */
 sealed class Screen(val route: String) {
@@ -54,7 +55,8 @@ sealed class Screen(val route: String) {
         const val ARG_EVENT_ID = "eventId"
 
         /** Build the concrete route, with or without the event the user continues to. */
-        fun routeFor(eventId: String? = null): String = if (eventId == null) "sign-in" else "sign-in?eventId=$eventId"
+        fun routeFor(eventId: String? = null): String =
+            if (eventId == null) "sign-in" else "sign-in?eventId=${eventId.encodeURLParameter()}"
     }
 }
 

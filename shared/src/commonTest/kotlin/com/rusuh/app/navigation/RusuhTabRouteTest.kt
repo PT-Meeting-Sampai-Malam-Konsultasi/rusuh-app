@@ -18,6 +18,7 @@ class RusuhTabRouteTest {
         assertEquals(Screen.Account.route, RusuhTab.Akun.destinationRoute())
         assertEquals("sign-in", Screen.SignIn.routeFor())
         assertEquals("sign-in?eventId=e1", Screen.SignIn.routeFor("e1"))
+        assertEquals("sign-in?eventId=a%26b%20c", Screen.SignIn.routeFor("a&b c"))
     }
 
     @Test

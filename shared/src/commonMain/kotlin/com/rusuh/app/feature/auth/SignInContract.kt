@@ -62,9 +62,11 @@ sealed interface SignInUiState {
         val validForSeconds: Int = SignInPolicy.CODE_VALID_SECONDS,
     ) : SignInUiState
 
-    /** The code is no longer valid (timed out or used up); a new one must be requested. */
+    /** The code is no longer valid (timed out or used up); a new one must be requested. [code] is the
+     * last code entered, shown struck through in disabled boxes (empty when none was entered). */
     data class CodeExpired(
         val email: String,
+        val code: String = "",
     ) : SignInUiState
 
     /** First sign-in for [email]: ask for a full name and consent before creating the account. */

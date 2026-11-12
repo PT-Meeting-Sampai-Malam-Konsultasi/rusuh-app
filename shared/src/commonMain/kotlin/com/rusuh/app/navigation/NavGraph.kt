@@ -120,16 +120,23 @@ fun RusuhNavGraph(navController: NavHostController) {
             //  waiting-room entry point (navigate(Screen.SignIn.routeFor(eventId))); until then
             //  nothing pushes this route and the banner shows a placeholder event.
             val signIn = rememberPlaceholderSignIn(startOpen = true)
+            // The flow clears its state when it finishes; keep showing the last step while the
+            // screen animates out, so it does not flash the Email step or reopen the keyboard.
+            val lastState = remember { LastState() }
+            signIn.state?.let { lastState.value = it }
             SignInScreen(
-                state = signIn.state ?: SignInUiState.Email(),
+                state = lastState.value,
                 event = PLACEHOLDER_SIGN_IN_EVENT,
                 actions =
                     signIn.actions.copy(
-                        onDismiss = { navController.popBackStack() },
+                        onDismiss = { navController.popIfCurrent(Screen.SignIn.route) },
                         // TODO(AUTH-00 #103): continue to the queue / Detail once signed in.
                         onCreateAccount = {
-                            signIn.actions.onCreateAccount()
-                            navController.popBackStack()
+                            // Only the first tap counts: the flow leaves NewAccount right away.
+                            if (signIn.state is SignInUiState.NewAccount) {
+                                signIn.actions.onCreateAccount()
+                                navController.popIfCurrent(Screen.SignIn.route)
+                            }
                         },
                     ),
             )
@@ -238,6 +245,19 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
             onTabSelected = onTabSelected,
         )
     }
+}
+
+/** Holder for the last non-null login step; written during composition on purpose (not snapshot state). */
+private class LastState(
+    var value: SignInUiState = SignInUiState.Email(),
+)
+
+/**
+ * Pops only while [route] is still the current destination, so a double tap (or a tap during the
+ * exit animation) cannot pop the screen below as well.
+ */
+private fun NavHostController.popIfCurrent(route: String) {
+    if (currentDestination?.route == route) popBackStack()
 }
 
 /**

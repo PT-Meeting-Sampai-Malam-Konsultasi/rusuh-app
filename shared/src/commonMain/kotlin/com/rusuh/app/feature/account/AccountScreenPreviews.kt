@@ -3,6 +3,9 @@
 package com.rusuh.app.feature.account
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import com.rusuh.app.feature.auth.SignInUiState
 import com.rusuh.app.ui.theme.RusuhTheme
 
@@ -11,9 +14,19 @@ import com.rusuh.app.ui.theme.RusuhTheme
 
 private const val SAMPLE_EMAIL = "nama@email.com"
 
+private const val LARGE_FONT_SCALE = 2f
+
 @Composable
-private fun CompactPreview(state: SignInUiState) {
-    RusuhTheme { AccountScreen(isSignedIn = false, signInState = state) }
+private fun CompactPreview(
+    state: SignInUiState,
+    fontScale: Float? = null,
+) {
+    RusuhTheme {
+        val density = LocalDensity.current
+        CompositionLocalProvider(
+            LocalDensity provides Density(density.density, fontScale ?: density.fontScale),
+        ) { AccountScreen(isSignedIn = false, signInState = state) }
+    }
 }
 
 @Composable
@@ -30,7 +43,8 @@ internal fun AccountSignInWrongCodePreview() =
     )
 
 @Composable
-internal fun AccountSignInCodeExpiredPreview() = CompactPreview(SignInUiState.CodeExpired(email = SAMPLE_EMAIL))
+internal fun AccountSignInCodeExpiredPreview() =
+    CompactPreview(SignInUiState.CodeExpired(email = SAMPLE_EMAIL, code = "482019"))
 
 @Composable
 internal fun AccountSignInNewAccountPreview() =
@@ -40,3 +54,19 @@ internal fun AccountSignInNewAccountPreview() =
 internal fun AccountSignedInPreview() {
     RusuhTheme { AccountScreen(isSignedIn = true, signInState = SignInUiState.Email()) }
 }
+
+// 2x font scale (accessibility): the longest steps, to check nothing clips or overlaps.
+
+@Composable
+internal fun AccountSignInEmailLargeFontPreview() = CompactPreview(SignInUiState.Email(SAMPLE_EMAIL), LARGE_FONT_SCALE)
+
+@Composable
+internal fun AccountSignInWrongCodeLargeFontPreview() =
+    CompactPreview(
+        SignInUiState.WrongCode(email = SAMPLE_EMAIL, code = "482091", attemptsLeft = 2, validForSeconds = 291),
+        LARGE_FONT_SCALE,
+    )
+
+@Composable
+internal fun AccountSignInNewAccountLargeFontPreview() =
+    CompactPreview(SignInUiState.NewAccount(email = SAMPLE_EMAIL, fullName = "Sari Wulandari"), LARGE_FONT_SCALE)
