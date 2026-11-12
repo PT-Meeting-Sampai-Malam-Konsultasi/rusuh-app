@@ -22,11 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.components.brutalBox
 import com.rusuh.app.ui.theme.RusuhBrandTextStyles
 import com.rusuh.app.ui.theme.RusuhColors
@@ -217,46 +217,52 @@ private fun Hairline() {
     Box(Modifier.fillMaxWidth().height(RusuhSpacing.borderThin).background(RusuhColors.BrandHairline))
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccountButtons(actions: AccountProfileActions) {
-    Row(
+    // FlowRow: at large font or narrow width the link drops to its own line instead of squeezing.
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xxl),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.xl),
         modifier = Modifier.padding(end = RusuhSpacing.shadowMd, bottom = RusuhSpacing.shadowMd),
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier =
                 Modifier
-                    .heightIn(min = MIN_TARGET)
+                    .heightIn(min = RusuhSpacing.ctaHeight)
                     .brutalBox(fill = RusuhColors.BrandCream, shadow = RusuhColors.BrandInk)
                     .clickable(role = Role.Button, onClick = actions.onSignOut)
                     .padding(horizontal = RusuhSpacing.xxl, vertical = RusuhSpacing.lg),
         ) {
             Text(
                 text = stringResource(Res.string.account_sign_out),
-                style = RusuhBrandTextStyles.subtitle.display(),
+                style = RusuhBrandTextStyles.cta.display(),
                 color = RusuhColors.BrandInk,
                 textAlign = TextAlign.Center,
             )
         }
-        // TODO(ACCOUNT-00 #104): no delete-account endpoint in the contract yet; inert for now.
+        // TODO(ACCOUNT-00 #104): no delete-account endpoint in the contract yet: null callback = plain text.
         UnderlinedLink(text = stringResource(Res.string.account_delete), onClick = actions.onDeleteAccount)
     }
 }
 
+// TODO(ACCOUNT-00 #104): SectionHeader/UnderlinedLink duplicate StepHeader/LinkText; share after the login PR.
 @Composable
 private fun UnderlinedLink(
     text: String,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
 ) {
+    val base = Modifier.heightIn(min = RusuhSpacing.actionMinHeight)
     Box(
         contentAlignment = Alignment.Center,
         modifier =
-            Modifier
-                .heightIn(min = MIN_TARGET)
-                .clickable(role = Role.Button, onClick = onClick)
-                .padding(horizontal = RusuhSpacing.xs),
+            if (onClick != null) {
+                base.clickable(role = Role.Button, onClick = onClick).padding(horizontal = RusuhSpacing.xs)
+            } else {
+                // No action yet: same look, but TalkBack announces it as disabled, no ripple or button role.
+                base.padding(horizontal = RusuhSpacing.xs).semantics { disabled() }
+            },
     ) {
         Text(
             text = text,
@@ -266,5 +272,3 @@ private fun UnderlinedLink(
         )
     }
 }
-
-private val MIN_TARGET = 44.dp
