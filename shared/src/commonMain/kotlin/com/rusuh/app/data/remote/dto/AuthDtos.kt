@@ -4,15 +4,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Body of `POST /auth/otp`. shortcut: `consentVersion` is deliberately NOT a member: the live server rejects it
- * (400 `"consentVersion" is not allowed`, verified 2026-11-12) although the contract file lists it as optional.
- * Add it back (and to `AuthRepository.requestOtp`) when the backend accepts it. `toString` hides the email and the
- * name (personal data, never logged).
+ * Consent text version sent with every code request. shortcut: taken from the example of the Apidog contract
+ * (`consentVersion`, required); to be confirmed with the backend and legal.
+ */
+const val CONSENT_VERSION = "2026-10"
+
+/**
+ * Body of `POST /auth/otp`. `consentVersion` is required by the contract. `toString` hides the email and the name
+ * (personal data, never logged).
  */
 @Serializable
 data class RequestOtpDto(
     @SerialName("email") val email: String = "",
     @SerialName("fullName") val fullName: String? = null,
+    @SerialName("consentVersion") val consentVersion: String = CONSENT_VERSION,
     @SerialName("locale") val locale: String? = null,
 ) {
     override fun toString(): String = "RequestOtpDto(<redacted>)"
@@ -56,13 +61,4 @@ data class SessionDto(
     @SerialName("user") val user: UserDto = UserDto(),
 ) {
     override fun toString(): String = "SessionDto(isNewAccount=$isNewAccount, <redacted>)"
-}
-
-/** Body of `PUT /auth/profile`. */
-@Serializable
-data class UpdateProfileDto(
-    @SerialName("fullName") val fullName: String = "",
-    @SerialName("locale") val locale: String? = null,
-) {
-    override fun toString(): String = "UpdateProfileDto(<redacted>)"
 }

@@ -493,13 +493,13 @@ class SessionRefreshTest {
             val f = Fixture(refresher = { RefreshOutcome.Refreshed("new", "refresh-2") }) { unauthorized() }
             f.signIn()
 
-            listOf("/auth/otp", "/auth/otp/verify", "/auth/otp/request", "/auth/refresh", "/devices").forEach {
+            listOf("/auth/otp", "/auth/otp/verify", "/auth/refresh", "/devices").forEach {
                 val result = f.http.api.post<Unit>(it)
                 assertEquals(401, assertIs<ApiResult.Error>(result).code)
             }
 
             assertTrue(f.refreshCalls.isEmpty())
-            assertEquals(5, f.http.engine.requestHistory.size)
+            assertEquals(4, f.http.engine.requestHistory.size)
             assertTrue(f.http.engine.requestHistory.all { it.bearer() == null })
             assertFalse(f.events.expired.value)
             assertEquals("refresh-1", f.store.getRefreshToken())
@@ -508,7 +508,7 @@ class SessionRefreshTest {
     @Test
     fun logoutAndProfileAreNotSessionless() =
         runTest {
-            listOf("/auth/logout", "/auth/profile").forEach { path ->
+            listOf("/auth/logout", "/me").forEach { path ->
                 val f =
                     Fixture(refresher = { RefreshOutcome.Refreshed("new", "refresh-2") }) {
                         if (it.bearer() == "Bearer new") ok() else unauthorized()

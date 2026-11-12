@@ -1,6 +1,5 @@
 package com.rusuh.app.di
 
-import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.domain.usecase.CreateBookingUseCase
 import com.rusuh.app.domain.usecase.GetDetailUseCase
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
@@ -30,8 +29,9 @@ val appModule =
         factory { LeaveQueueUseCase(get()) }
 
         // Tickets (Tiket tab).
-        // Signed-in state comes from the session (restored from storage on cold start).
-        factory { GetMyTicketsUseCase(get(), isSignedIn = get<SessionManager>()::awaitSignedIn) }
+        // TODO(AUTH-00 #77): pass `isSignedIn = get<SessionManager>()::awaitSignedIn` once the sign-in UI exists. Until
+        // then the tab keeps its default (signed in), exactly as before auth, or it would show signed out for everyone.
+        factory { GetMyTicketsUseCase(get()) }
 
         // Detail ticket page (the ServerClock is bound per backend mode in dataModule).
         factory { GetDetailUseCase(get()) }

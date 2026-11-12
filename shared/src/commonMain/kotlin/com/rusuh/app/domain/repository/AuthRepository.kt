@@ -14,8 +14,8 @@ import com.rusuh.app.domain.model.UserLocale
 interface AuthRepository {
     /**
      * Sends a code to [email]. [fullName] is needed only when the email has no account yet; [locale] defaults on
-     * the server (the consent version is not sent yet, see `RequestOtpDto`). The answer never reveals whether the
-     * email has an account.
+     * the server; the consent version is added by the implementation. The answer never reveals whether the email has an
+     * account.
      */
     suspend fun requestOtp(
         email: String,
@@ -33,18 +33,13 @@ interface AuthRepository {
     ): DomainResult<AuthSession>
 
     /**
-     * Signs out. The server revocation is best effort; the local session (tokens, signed-in state) is ALWAYS cleared,
-     * also when the call fails, is cancelled, or storage misbehaves. The returned result is the server call's, for
-     * diagnostics: navigate to signed-out regardless.
+     * Signs out: the app is signed out in memory at once (the local session is cleared first, then the server
+     * revocation is tried with a bounded wait, so offline logout is instant). Skipped server call when not signed in.
+     * The result is the server call's, for diagnostics, except [DomainResult.TechnicalError] when clearing storage
+     * failed: a refresh token may then remain on disk, so offer a retry.
      */
     suspend fun logout(): DomainResult<Unit>
 
     /** The signed-in account (prefill and the new-account name check). */
     suspend fun me(): DomainResult<AuthUser>
-
-    /** Sets the display name (and optionally the language) of the signed-in account. */
-    suspend fun updateProfile(
-        fullName: String,
-        locale: UserLocale? = null,
-    ): DomainResult<AuthUser>
 }

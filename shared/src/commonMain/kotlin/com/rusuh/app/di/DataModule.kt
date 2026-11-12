@@ -15,6 +15,7 @@ import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
 import com.rusuh.app.data.repository.StubQueueRepository
+import com.rusuh.app.data.storage.InMemoryTokenStore
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
@@ -64,8 +65,9 @@ val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("TicketsRepository", "Det
  *   (singletons); without it, resolving throws [RealRepositoryNotAvailableException]. When a feature ticket builds
  *   a real repository, bind it in place of the `notYetReal(...)` line of that repository below.
  *
- * The ApiServices, the `DeviceRepository` and the [SessionManager] are bound in both modes: in stub mode the
- * ApiServices run on the [StubEngine]. `AuthRepository` is the network one in Real and a hand-written demo
+ * The ApiServices and the `DeviceRepository` are bound in both modes: in stub mode the ApiServices run on the
+ * [StubEngine]. The [SessionManager] is bound per mode (Real: the secure `TokenStore`; Stub: an in-memory one).
+ * `AuthRepository` is the network one in Real and a hand-written demo
  * (`StubAuthRepository`, code 123456) in Stub; both drive the same [SessionManager].
  *
  * Load it after `coreModule()`. A function, not a `val`, for the same reason as `coreModule()`.
@@ -87,7 +89,6 @@ fun dataModule(
         single { QueueApiService(get(ApiClientQualifier.Queue)) }
         // Auth is served by the core (api) host, like the refresh call of the session layer.
         single { AuthApiService(get(ApiClientQualifier.Api)) }
-        single { SessionManager(tokenStore = get(), events = get()) } onClose { it?.close() }
         single<DeviceRepository> {
             RealDeviceRepository(
                 api = get(),
@@ -101,6 +102,9 @@ fun dataModule(
 
         when (mode) {
             BackendMode.Stub -> {
+                // In-memory tokens: the placeholder tokens of the stub never reach the real secure store, and a stub
+                // run always starts signed out.
+                single { SessionManager(tokenStore = InMemoryTokenStore(), events = get()) } onClose { it?.close() }
                 single { StubClock.ticking() }
                 single<ServerClock> { get<StubClock>() }
                 single { StubEngine(get()) }
@@ -115,6 +119,7 @@ fun dataModule(
                 single<AuthRepository> { StubAuthRepository(session = get(), clock = get()) }
             }
             BackendMode.Real -> {
+                single { SessionManager(tokenStore = get(), events = get()) } onClose { it?.close() }
                 // ServerClock: coreModule's MonotonicServerClock, the instance the response plugin keeps in sync.
                 single<HomeRepository> { RealHomeRepository(get(), get(), get()) }
                 single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }

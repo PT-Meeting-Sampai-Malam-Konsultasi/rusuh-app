@@ -9,20 +9,22 @@ import com.rusuh.app.domain.model.ErrorCode
 import com.rusuh.app.domain.model.OtpChallenge
 import com.rusuh.app.domain.model.UserLocale
 import com.rusuh.app.domain.repository.AuthRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Demo [AuthRepository] for [com.rusuh.app.di.BackendMode.Stub]: no network, in-memory accounts, and a REAL
- * [SessionManager] (placeholder tokens), so the signed-in state, logout and the session-expiry flow behave as in
+ * [SessionManager] over an in-memory token store (placeholder tokens, never written to the secure store), so the
+ * signed-in state, logout and the session-expiry flow behave as in
  * the real app.
  *
- * Codes: [CODE_OK] signs in, [CODE_EXPIRED] answers 410 CHALLENGE_EXPIRED, any other code is a 409 WRONG_CODE with
+ * Codes: [CODE_OK] signs in, [CODE_EXPIRED] answers 410 CHALLENGE_EXPIRED, any other code is a 400 WRONG_CODE with
  * `attemptsLeft` counting down from [MAX_ATTEMPTS]; at zero the challenge is locked (410 CHALLENGE_LOCKED). An
  * unknown challenge id is a 410 CHALLENGE_EXPIRED. The first sign-in of an email creates its account
  * (`isNewAccount = true`); without a `fullName` at request time the user has no name, so the UI asks for it and
- * calls [updateProfile]. Later sign-ins of that email are `isNewAccount = false`.
+ * requests a new code with the name. Later sign-ins of that email are `isNewAccount = false`.
  *
  * shortcut: not persisted (a new process forgets the accounts), no resend cooldown or rate limit.
  */
@@ -72,10 +74,17 @@ class StubAuthRepository(
             }
         }
 
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
     override suspend fun logout(): DomainResult<Unit> {
         lock.withLock { currentEmail = null }
-        session.endSession()
-        return DomainResult.Success(Unit)
+        return try {
+            session.endSession()
+            DomainResult.Success(Unit)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            DomainResult.TechnicalError // same as the real repository when the local clear fails
+        }
     }
 
     override suspend fun me(): DomainResult<AuthUser> =
@@ -83,30 +92,16 @@ class StubAuthRepository(
             currentEmail?.let { accounts[it] }?.let { DomainResult.Success(it) } ?: problem(401, ErrorCode.UNAUTHORIZED)
         }
 
-    override suspend fun updateProfile(
-        fullName: String,
-        locale: UserLocale?,
-    ): DomainResult<AuthUser> =
-        lock.withLock {
-            val email = currentEmail ?: return@withLock problem(401, ErrorCode.UNAUTHORIZED)
-            if (fullName.isBlank()) return@withLock problem(400, ErrorCode.VALIDATION_FAILED)
-            val updated =
-                accounts.getValue(
-                    email,
-                ).let { it.copy(fullName = fullName.trim(), locale = locale ?: it.locale) }
-            accounts[email] = updated
-            DomainResult.Success(updated)
-        }
-
     private fun wrongCode(challenge: Challenge): DomainResult<Nothing> {
         challenge.attemptsLeft--
         return if (challenge.attemptsLeft <= 0) {
             problem(410, ErrorCode.CHALLENGE_LOCKED)
         } else {
-            problem(409, ErrorCode.WRONG_CODE, mapOf("attemptsLeft" to JsonPrimitive(challenge.attemptsLeft)))
+            problem(400, ErrorCode.WRONG_CODE, mapOf("attemptsLeft" to JsonPrimitive(challenge.attemptsLeft)))
         }
     }
 
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
     private suspend fun signIn(
         challengeId: String,
         challenge: Challenge,
@@ -117,9 +112,15 @@ class StubAuthRepository(
             existing
                 ?: AuthUser("usr_stub_${accounts.size + 1}", challenge.email, challenge.fullName, challenge.locale)
                     .also { accounts[challenge.email] = it }
-        currentEmail = challenge.email
-        session.startSession("stub-access-$counter", "stub-refresh-$counter")
-        return DomainResult.Success(AuthSession(user, isNewAccount = existing == null, EXPIRES_IN_SECONDS))
+        return try {
+            session.startSession("stub-access-$counter", "stub-refresh-$counter")
+            currentEmail = challenge.email
+            DomainResult.Success(AuthSession(user, isNewAccount = existing == null, EXPIRES_IN_SECONDS))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            DomainResult.TechnicalError // same as the real repository when the tokens cannot be stored
+        }
     }
 
     private fun problem(

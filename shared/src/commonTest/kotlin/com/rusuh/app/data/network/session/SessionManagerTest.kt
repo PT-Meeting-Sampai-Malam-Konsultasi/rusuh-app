@@ -2,6 +2,7 @@ package com.rusuh.app.data.network.session
 
 import com.rusuh.app.data.storage.FakeSecureStore
 import com.rusuh.app.data.storage.SecureTokenStore
+import com.rusuh.app.data.storage.TokenStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -12,6 +13,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+
+/** Not an Exception: the restore must survive any Throwable. */
+private class StorageDied : Throwable("keystore died")
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionManagerTest {
@@ -169,6 +174,50 @@ class SessionManagerTest {
             runCurrent()
 
             assertTrue(f.manager.isSignedIn.value)
+        }
+
+    @Test
+    fun startSessionWithoutARefreshTokenRemovesTheStoredOne() =
+        runTest {
+            val f = fixture(refreshToken = "refresh-old")
+
+            f.manager.startSession("access-1", null)
+
+            assertEquals(null, f.tokens.getRefreshToken())
+            assertTrue(f.manager.isSignedIn.value)
+        }
+
+    @Test
+    fun awaitSignedInGivesUpWhenTheStorageReadHangs() =
+        runTest {
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val tokens =
+                object : TokenStore by SecureTokenStore(FakeSecureStore()) {
+                    override suspend fun getRefreshToken(): String? {
+                        gate.await()
+                        return "refresh-1"
+                    }
+                }
+            val manager = SessionManager(tokens, SessionEvents(), backgroundScope, restoreTimeout = 2.seconds)
+
+            assertFalse(manager.awaitSignedIn(), "documented fallback: signed out until the read finishes")
+            assertFalse(manager.isRestored.value)
+
+            gate.complete(Unit)
+            assertTrue(manager.awaitSignedIn())
+        }
+
+    @Test
+    fun aStorageReadThatThrowsAnythingIsSignedOutNotAHang() =
+        runTest {
+            val tokens =
+                object : TokenStore by SecureTokenStore(FakeSecureStore()) {
+                    override suspend fun getRefreshToken(): String? = throw StorageDied()
+                }
+            val manager = SessionManager(tokens, SessionEvents(), backgroundScope)
+
+            assertFalse(manager.awaitSignedIn())
+            assertTrue(manager.isRestored.value)
         }
 
     @Test
