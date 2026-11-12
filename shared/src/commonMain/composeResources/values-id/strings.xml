@@ -279,4 +279,13 @@
     <string name="sign_in_info_2_body">Email baru otomatis dibuatkan akun begitu kodenya benar.</string>
     <string name="sign_in_info_3_title">Satu akun, banyak antrian</string>
     <string name="sign_in_info_3_body">Antre beberapa event sekaligus, semua tercatat di akun yang sama.</string>
+    <string name="account_sign_in_section">Masuk</string>
+    <string name="account_change_email">Ganti email</string>
+    <string name="account_email_label">Email</string>
+    <string name="account_verified">Terverifikasi</string>
+    <string name="account_email_row_description">Email %1$s, %2$s</string>
+    <string name="account_login_method_label">Cara masuk</string>
+    <string name="account_login_method_value">Kode 6 digit ke email ini. Tanpa kata sandi.</string>
+    <string name="account_sign_out">Keluar</string>
+    <string name="account_delete">Hapus akun</string>
 </resources>
