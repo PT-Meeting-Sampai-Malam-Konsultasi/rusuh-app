@@ -2,6 +2,7 @@ name: Android Build
 on:
   push: { branches: [main] }
   pull_request: { branches: [main] }
+  workflow_dispatch:
 concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
@@ -22,3 +23,49 @@ jobs:
         with:
           name: app-debug-apk
           path: androidApp/build/outputs/apk/debug/*.apk
+
+  # Sends an offline demo build (in-process stub backend, works on any phone) to Firebase App Distribution.
+  # Runs on pushes to main and on manual dispatch. It does nothing until the repo secrets exist, so it can never
+  # break CI. Setup and key rotation: docs/firebase-distribution.md.
+  distribute:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HAS_FIREBASE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' && secrets.FIREBASE_APP_ID != '' }}
+    steps:
+      - name: Skip when Firebase secrets are missing
+        if: env.HAS_FIREBASE != 'true'
+        run: echo "FIREBASE_SERVICE_ACCOUNT_JSON / FIREBASE_APP_ID are not set: skipping distribution."
+      - uses: actions/checkout@v4
+        if: env.HAS_FIREBASE == 'true'
+      - uses: actions/setup-java@v4
+        if: env.HAS_FIREBASE == 'true'
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        if: env.HAS_FIREBASE == 'true'
+      - name: Build offline demo APK (debug, stub backend)
+        if: env.HAS_FIREBASE == 'true'
+        run: ./gradlew :androidApp:assembleDebug -PbackendMode=Stub --stacktrace
+      - name: Upload to Firebase App Distribution
+        if: env.HAS_FIREBASE == 'true'
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_GROUPS: ${{ vars.FIREBASE_TESTER_GROUPS || 'rusuh-devs' }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          CREDS="$RUNNER_TEMP/firebase-service-account.json"
+          trap 'rm -f "$CREDS"' EXIT
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$CREDS"
+          export GOOGLE_APPLICATION_CREDENTIALS="$CREDS"
+          APK="$(ls androidApp/build/outputs/apk/debug/*.apk | head -n 1)"
+          FIRST_LINE="$(printf '%s' "${COMMIT_MESSAGE:-manual run}" | head -n 1)"
+          NOTES="Offline demo build (stub data, no backend needed). ${COMMIT_SHA:0:7}: ${FIRST_LINE}"
+          npx --yes firebase-tools@13 appdistribution:distribute "$APK" \
+            --app "$FIREBASE_APP_ID" \
+            --groups "$FIREBASE_GROUPS" \
+            --release-notes "$NOTES"
