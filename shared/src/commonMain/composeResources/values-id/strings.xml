@@ -263,4 +263,13 @@
     <string name="sign_in_consent">Saya setuju dengan Ketentuan Layanan dan Kebijakan Privasi Rusuh.</string>
     <string name="sign_in_account_notice">Akun hanya menyimpan email dan nama Anda. Tidak perlu NIK untuk masuk.</string>
     <string name="sign_in_create_account">Buat akun</string>
+    <string name="account_sign_in_section">Masuk</string>
+    <string name="account_change_email">Ganti email</string>
+    <string name="account_email_label">Email</string>
+    <string name="account_verified">Terverifikasi</string>
+    <string name="account_email_row_description">Email %1$s, %2$s</string>
+    <string name="account_login_method_label">Cara masuk</string>
+    <string name="account_login_method_value">Kode 6 digit ke email ini. Tanpa kata sandi.</string>
+    <string name="account_sign_out">Keluar</string>
+    <string name="account_delete">Hapus akun</string>
 </resources>
