@@ -26,8 +26,6 @@ const val ORDER_WINDOW_SECONDS = 5 * 60
  * @param eventSubtitle tagline under the title; null hides it.
  * @param eventMeta pre-formatted date · time · venue line, already localized.
  * @param categories the seat categories offered for this event (`getCategories`).
- * @param accountName the account's name; "Saya sendiri" prefills the attendee name with it.
- *   The account has NO NIK, so the NIK is always typed.
  * @param accountEmail read-only e-ticket destination (the account email).
  * @param adminFeeRupiah "Biaya layanan": ONE fixed fee per ORDER, not per ticket (ADR-0010).
  * @param reservedUnits units the queue admission reserved; the order is capped at
@@ -40,7 +38,6 @@ data class DetailContent(
     val eventSubtitle: String?,
     val eventMeta: String,
     val categories: List<SeatCategoryUi>,
-    val accountName: String,
     val accountEmail: String,
     val adminFeeRupiah: Long,
     val reservedUnits: Int = MAX_TICKETS_PER_ORDER,
@@ -94,7 +91,7 @@ sealed interface DetailUiState {
 
 /** User intents emitted by the stateless [DetailScreen] and handled by [DetailViewModel]. */
 sealed interface DetailIntent : MviIntent {
-    /** Initial load of the event, categories and account profile. */
+    /** Initial load of the event and categories. */
     data object Load : DetailIntent
 
     /** Reload after a failed load. */
@@ -118,9 +115,6 @@ sealed interface DetailIntent : MviIntent {
 
     data class DecrementCategory(val categoryId: String) : DetailIntent
 
-    /** Switch ticket [index] between "Saya sendiri" and "Orang lain". */
-    data class AttendeeKindChanged(val index: Int, val kind: AttendeeKind) : DetailIntent
-
     data class AttendeeNameChanged(val index: Int, val name: String) : DetailIntent
 
     data class AttendeeNikChanged(val index: Int, val nik: String) : DetailIntent
@@ -128,9 +122,6 @@ sealed interface DetailIntent : MviIntent {
     /** The countdown ticked: recompute remaining time from the server clock. */
     data object Tick : DetailIntent
 }
-
-/** Who a ticket is for. */
-enum class AttendeeKind { Self, Other }
 
 /**
  * One attendee slot (one per ticket). [nik] holds digits only; the screen groups them for display.
@@ -142,7 +133,6 @@ enum class AttendeeKind { Self, Other }
 data class AttendeeForm(
     val id: Long = 0L,
     val categoryId: String = "",
-    val kind: AttendeeKind = AttendeeKind.Other,
     val name: String = "",
     val nik: String = "",
 )
@@ -206,20 +196,6 @@ internal fun DetailFormState.withQuantity(
         }
     }
 }
-
-/** Switches ticket [index] between self/other. "Saya sendiri" prefills ONLY the name. */
-internal fun DetailFormState.withKind(
-    index: Int,
-    kind: AttendeeKind,
-    accountName: String,
-): DetailFormState =
-    updateAttendee(index) { current ->
-        when {
-            kind == current.kind -> current
-            kind == AttendeeKind.Self -> current.copy(kind = kind, name = accountName)
-            else -> current.copy(kind = kind, name = if (current.name == accountName) "" else current.name)
-        }
-    }
 
 internal fun DetailFormState.withName(
     index: Int,

@@ -1,5 +1,6 @@
 package com.rusuh.app.feature.tickets
 
+import com.rusuh.app.feature.eticket.ETicketOrder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -35,6 +36,8 @@ class TicketsViewModelTest {
             }
             return StubTicketsRepository().getMyOrders()
         }
+
+        override suspend fun getOrderTickets(orderId: String): ETicketOrder? = null
     }
 
     private fun viewModel(
