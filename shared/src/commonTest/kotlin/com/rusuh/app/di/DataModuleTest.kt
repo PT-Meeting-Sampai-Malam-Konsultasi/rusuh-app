@@ -361,7 +361,7 @@ class DataModuleTest {
         runTest {
             val koin = koin(AppEnvironment.Mock, BackendMode.Stub)
 
-            val events = koin.get<ApiClient>(ApiClientQualifier.Api).get<JsonObject>("/events")
+            val events = koin.get<ApiClient>(ApiClientQualifier.Api).get<JsonObject>("/core/events")
             val queue = koin.get<ApiClient>(ApiClientQualifier.Queue).get<JsonObject>("/queue/evt_2026_gbk/frontier")
 
             assertIs<ApiResult.Success<JsonObject>>(events)

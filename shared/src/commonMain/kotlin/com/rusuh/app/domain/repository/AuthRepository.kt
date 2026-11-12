@@ -48,4 +48,9 @@ interface AuthRepository {
 
     /** The signed-in account (prefill and the new-account name check). */
     suspend fun me(): DomainResult<AuthUser>
+
+    suspend fun updateProfile(
+        fullName: String,
+        locale: UserLocale? = null,
+    ): DomainResult<AuthUser>
 }

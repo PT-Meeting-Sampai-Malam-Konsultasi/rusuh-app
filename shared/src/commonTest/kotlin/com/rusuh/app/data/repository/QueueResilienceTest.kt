@@ -278,14 +278,18 @@ class QueueResilienceTest {
 
             device.places()
 
-            assertEquals(2, device.backend.callsTo("POST /devices"), "registered again after the rejected device token")
+            assertEquals(
+                2,
+                device.backend.callsTo("POST /queue/devices"),
+                "registered again after the rejected device token",
+            )
             assertEquals(2, device.backend.callsTo(claimLine))
 
             val stubborn = QueueHarness()
             stubborn.script(frontiers = listOf(open(400)), claim = listOf(Reply.problem(401, "FORBIDDEN")))
             val failure = assertFailsWith<DomainException> { stubborn.places() }
             assertEquals(401, assertIs<DomainResult.Error>(failure.result).code)
-            assertEquals(2, stubborn.backend.callsTo("POST /devices"), "only once")
+            assertEquals(2, stubborn.backend.callsTo("POST /queue/devices"), "only once")
             assertEquals(2, stubborn.backend.callsTo(claimLine))
         }
 
@@ -328,7 +332,7 @@ class QueueResilienceTest {
     fun concurrentForcedRefreshesRegisterOnce() =
         runTest {
             val h = QueueHarness()
-            h.backend.on("POST /devices", Reply.created(DEVICE_JSON))
+            h.backend.on("POST /queue/devices", Reply.created(DEVICE_JSON))
             h.backend.onRequest = { delay(50) }
 
             val both =
@@ -338,7 +342,7 @@ class QueueResilienceTest {
                 )
 
             assertEquals(listOf(DomainResult.Success(Unit), DomainResult.Success(Unit)), both.map { it.await() })
-            assertEquals(1, h.backend.callsTo("POST /devices"))
+            assertEquals(1, h.backend.callsTo("POST /queue/devices"))
         }
 
     @Test

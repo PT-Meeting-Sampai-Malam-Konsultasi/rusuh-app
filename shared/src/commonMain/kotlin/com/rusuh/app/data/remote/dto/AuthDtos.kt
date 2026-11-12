@@ -3,21 +3,11 @@ package com.rusuh.app.data.remote.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * Consent text version sent with every code request. shortcut: taken from the example of the Apidog contract
- * (`consentVersion`, required); to be confirmed with the backend and legal.
- */
-const val CONSENT_VERSION = "2026-10"
-
-/**
- * Body of `POST /auth/otp`. `consentVersion` is required by the contract. `toString` hides the email and the name
- * (personal data, never logged).
- */
+/** Body of `POST /auth/otp`. `toString` hides personal data. */
 @Serializable
 data class RequestOtpDto(
     @SerialName("email") val email: String = "",
     @SerialName("fullName") val fullName: String? = null,
-    @SerialName("consentVersion") val consentVersion: String = CONSENT_VERSION,
     @SerialName("locale") val locale: String? = null,
 ) {
     override fun toString(): String = "RequestOtpDto(<redacted>)"
@@ -50,6 +40,13 @@ data class UserDto(
 ) {
     override fun toString(): String = "UserDto(userId=$userId, <redacted>)"
 }
+
+/** Body of `PUT /auth/profile`. */
+@Serializable
+data class UpdateProfileDto(
+    @SerialName("fullName") val fullName: String,
+    @SerialName("locale") val locale: String? = null,
+)
 
 /** `Session` schema, the answer of `POST /auth/otp/verify`. `toString` hides the tokens and the user. */
 @Serializable

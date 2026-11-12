@@ -29,7 +29,7 @@ object StubJson {
          "imageUrl":"https://cdn.rusuh.id/events/evt_2026_jis/hero.jpg"}
         """
 
-    /** `GET /events`. */
+    /** `GET /core/events`. */
     const val EVENTS = """{"items":[$EVENT_GBK,$EVENT_JIS],"serverNow":"@{now}"}"""
 
     /** `GET /events/{eventId}`. */

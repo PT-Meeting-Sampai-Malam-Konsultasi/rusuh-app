@@ -5,9 +5,9 @@ import com.rusuh.app.data.network.session.RefreshOutcome
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.network.session.TokenRefresher
 import com.rusuh.app.data.remote.AuthApiService
-import com.rusuh.app.data.remote.dto.CONSENT_VERSION
 import com.rusuh.app.data.remote.dto.RequestOtpDto
 import com.rusuh.app.data.remote.dto.SessionDto
+import com.rusuh.app.data.remote.dto.UpdateProfileDto
 import com.rusuh.app.data.remote.dto.VerifyOtpDto
 import com.rusuh.app.data.remote.mapper.toDomain
 import com.rusuh.app.domain.model.AuthSession
@@ -30,8 +30,8 @@ import kotlin.time.Duration.Companion.seconds
  *
  * - The code request and check carry the device token when there is one: registration
  *   ([DeviceRepository.ensureRegistered]) is tried first but is best effort, so a registration error (the live
- *   backend has no `POST /devices` yet) never blocks the call. Only a NetworkError from the registration is returned
- *   as is. A 401 from the auth call itself forces one new registration and one retry; these calls are session-less,
+ *   live registration uses `POST /queue/devices`) never blocks the call. Only a NetworkError from registration is
+ *   returned as is. A 401 from the auth call forces one new registration and one retry; these calls are session-less,
  *   so that 401 never expires the session.
  * - A successful check hands the tokens to the [SessionManager], which stores them exactly like the refresh layer
  *   does and turns the signed-in state on.
@@ -54,12 +54,19 @@ class RealAuthRepository(
             RequestOtpDto(
                 email = email.trim(),
                 fullName = fullName?.trim()?.takeIf { it.isNotEmpty() },
-                consentVersion = CONSENT_VERSION,
                 locale = locale?.wire,
             )
         // A 202 without a challenge id cannot be used: a client-side problem, not an empty result.
         return deviceGated({ api.requestOtp(body) }) { it.toDomainResult { dto -> dto.toDomain() }.emptyIsTechnical() }
     }
+
+    override suspend fun updateProfile(
+        fullName: String,
+        locale: UserLocale?,
+    ): DomainResult<AuthUser> =
+        api.updateProfile(
+            UpdateProfileDto(fullName.trim(), locale?.wire),
+        ).toDomainResult { it.toDomain() }.emptyIsTechnical()
 
     // A verifyOtp that completes after a logout signs the user back in: VerifyOtpUseCase guards it with a generation
     // counter (bumped by SignOutUseCase) and ends the session again.
