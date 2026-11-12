@@ -3,6 +3,8 @@ package com.rusuh.app.data.repository
 import com.rusuh.app.data.cache.DeviceCache
 import com.rusuh.app.data.clock.parseRfc3339Millis
 import com.rusuh.app.data.network.newIdempotencyKey
+import com.rusuh.app.data.platform.AttestationProvider
+import com.rusuh.app.data.platform.DevAttestationProvider
 import com.rusuh.app.data.platform.wallClockMillis
 import com.rusuh.app.data.remote.DeviceApiService
 import com.rusuh.app.data.remote.dto.RegisterDeviceRequestDto
@@ -16,7 +18,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 
 /**
- * [DeviceRepository] over `POST /devices`. The install id is a random UUID made once and kept in the [SecureStore]
+ * [DeviceRepository] over `POST /queue/devices`. The install id is a random UUID made once and kept in the [SecureStore]
  * (Keystore / Keychain), so the same install always registers as the same device. Registration runs one at a time,
  * so concurrent callers share one call. Tokens and the install id are never logged.
  *
@@ -33,6 +35,7 @@ class RealDeviceRepository(
     private val cache: DeviceCache,
     private val serverClock: ServerClock,
     private val platform: String,
+    private val attestationProvider: AttestationProvider = DevAttestationProvider(),
     private val newInstallId: () -> String = ::newIdempotencyKey,
     private val wallClock: () -> Long = ::wallClockMillis,
 ) : DeviceRepository {
@@ -71,7 +74,12 @@ class RealDeviceRepository(
     }
 
     private suspend fun register(): DomainResult<Unit> {
-        val request = RegisterDeviceRequestDto(platform = platform, installId = installId())
+        val request =
+            RegisterDeviceRequestDto(
+                platform = platform,
+                installId = installId(),
+                attestation = attestationProvider.attestation(),
+            )
         val result = api.register(request).toDomainResult { dto -> dto.takeIf { it.deviceToken.isNotBlank() } }
         return when (result) {
             is DomainResult.Success -> {

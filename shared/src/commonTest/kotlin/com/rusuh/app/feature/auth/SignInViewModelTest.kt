@@ -54,7 +54,7 @@ class SignInViewModelTest {
             SignInViewModel(
                 requestOtp = RequestOtpUseCase(repository) { UserLocale.Indonesian },
                 verifyOtp = VerifyOtpUseCase(repository, generation),
-                saveDisplayName = SaveDisplayNameUseCase(names),
+                saveDisplayName = SaveDisplayNameUseCase(names, FakeAuthRepository()),
                 observeSession = ObserveSessionUseCase(observer),
                 clock = clock,
             )

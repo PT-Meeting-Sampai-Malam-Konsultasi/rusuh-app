@@ -68,7 +68,7 @@ internal fun HttpRequestBuilder.isOutsideSession(): Boolean {
 
 /** Their contract security is the device token only (or none): a 401 there is a bad code, not an expired session. */
 internal val SESSIONLESS_PATHS =
-    listOf("/auth/otp", "/auth/otp/verify", "/auth/refresh", "/devices")
+    listOf("/auth/otp", "/auth/otp/verify", "/auth/refresh", "/queue/devices")
 
 internal val SkipSessionAuthKey = AttributeKey<Boolean>("rusuh.skipSessionAuth")
 internal const val DEVICE_TOKEN_HEADER = "X-Device-Token"

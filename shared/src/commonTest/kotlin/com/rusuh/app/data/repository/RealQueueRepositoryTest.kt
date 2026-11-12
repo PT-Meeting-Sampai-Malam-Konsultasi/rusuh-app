@@ -111,7 +111,10 @@ class RealQueueRepositoryTest {
 
             assertEquals("mock-queue-token-$EVT", h.tokens.getQueueToken(EVT))
             assertEquals(listOf(EVT), h.queueCache.getJoinedEventIds())
-            assertEquals(listOf("POST /devices", joinLine, "GET /events", frontierLine), h.backend.seen.map { it.line })
+            assertEquals(
+                listOf("POST /queue/devices", joinLine, "GET /core/events", frontierLine),
+                h.backend.seen.map { it.line },
+            )
             assertNull(h.backend.seen.single { it.line == joinLine }.headers["X-Queue-Token"])
         }
 
@@ -123,7 +126,7 @@ class RealQueueRepositoryTest {
 
             h.queue.observePlace(EVT).first()
 
-            assertEquals("POST /devices", h.backend.seen.first().line)
+            assertEquals("POST /queue/devices", h.backend.seen.first().line)
             assertEquals("mock-device-token", h.tokens.getDeviceToken())
         }
 
@@ -352,7 +355,7 @@ class RealQueueRepositoryTest {
 
             val error = assertIs<DomainResult.Error>(assertIs<DomainException>(failure).result)
             assertEquals(404, error.code)
-            assertEquals(listOf("POST /devices"), h.backend.seen.map { it.line })
+            assertEquals(listOf("POST /queue/devices"), h.backend.seen.map { it.line })
         }
 
     @Test
@@ -360,7 +363,7 @@ class RealQueueRepositoryTest {
         runTest {
             val h = QueueHarness()
             h.scriptBasics()
-            h.backend.on("GET /events", Reply.notFound())
+            h.backend.on("GET /core/events", Reply.notFound())
 
             val joinFailure = assertIs<DomainException>(h.failure())
             assertEquals(404, assertIs<DomainResult.Error>(joinFailure.result).code)
@@ -396,7 +399,7 @@ class RealQueueRepositoryTest {
 
             h.queue.observePlace(EVT).first()
 
-            assertEquals(2, h.backend.callsTo("POST /devices"))
+            assertEquals(2, h.backend.callsTo("POST /queue/devices"))
             assertEquals(2, h.backend.callsTo(joinLine))
         }
 
@@ -410,7 +413,7 @@ class RealQueueRepositoryTest {
             val error = assertIs<DomainResult.Error>(assertIs<DomainException>(h.failure()).result)
 
             assertEquals(401, error.code)
-            assertEquals(2, h.backend.callsTo("POST /devices"))
+            assertEquals(2, h.backend.callsTo("POST /queue/devices"))
             assertEquals(2, h.backend.callsTo(joinLine))
         }
 
@@ -419,7 +422,7 @@ class RealQueueRepositoryTest {
         runTest {
             val h = QueueHarness()
             h.script(listOf(frontierJson(100)))
-            h.backend.on("POST /devices", Reply.problem(429, "RATE_LIMITED", retryAfter = 30))
+            h.backend.on("POST /queue/devices", Reply.problem(429, "RATE_LIMITED", retryAfter = 30))
 
             val error = assertIs<DomainResult.Error>(assertIs<DomainException>(h.failure()).result)
 
@@ -442,7 +445,7 @@ class RealQueueRepositoryTest {
         runTest {
             val h = QueueHarness()
             h.script(listOf(frontierJson(100)))
-            h.backend.on("GET /events", Reply.notFound())
+            h.backend.on("GET /core/events", Reply.notFound())
 
             val place = h.queue.observePlace(EVT).first()
 

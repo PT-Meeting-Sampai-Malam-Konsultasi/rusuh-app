@@ -5,7 +5,7 @@ import com.rusuh.app.di.BackendMode
 /**
  * The ONE place to flip between the local mock server and the real backend in a debug build.
  *
- * Edit [MOCK_API] and rebuild:
+ * Debug Android can override [MOCK_API] with `-PmockApi=false` (or true). Otherwise edit [MOCK_API] and rebuild:
  * - `true`: HTTP to the local Mockoon server (`workspace-local/mockoon`). Android emulator
  *   `http://10.0.2.2:3000`, iOS simulator `http://localhost:3000`; for a physical Android device run
  *   `adb reverse tcp:3000 tcp:3000` and point the app at `http://localhost:3000`.

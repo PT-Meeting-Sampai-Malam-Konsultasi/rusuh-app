@@ -95,6 +95,20 @@ class StubAuthRepository(
             }?.let { accounts[it] }?.let { DomainResult.Success(it) } ?: problem(401, ErrorCode.UNAUTHORIZED)
         }
 
+    override suspend fun updateProfile(
+        fullName: String,
+        locale: UserLocale?,
+    ): DomainResult<AuthUser> =
+        lock.withLock {
+            val user = currentEmail?.let(accounts::get)
+            if (user == null || !session.isSignedIn.value) {
+                problem(401, ErrorCode.UNAUTHORIZED)
+            } else {
+                user.copy(fullName = fullName.trim(), locale = locale ?: user.locale).also { accounts[user.email] = it }
+                    .let { DomainResult.Success(it) }
+            }
+        }
+
     private fun wrongCode(challenge: Challenge): DomainResult<Nothing> {
         challenge.attemptsLeft--
         return if (challenge.attemptsLeft <= 0) {

@@ -34,7 +34,7 @@ fun StubEngine.assertRequest(
     return request
 }
 
-/** Asserts the engine received exactly [expected] (`"GET /events"`), in order. */
+/** Asserts the engine received exactly [expected] (`"GET /core/events"`), in order. */
 fun StubEngine.assertRequestLine(vararg expected: String) {
     assertEquals(expected.toList(), requests.map { "${it.method.value} ${it.path}" })
 }

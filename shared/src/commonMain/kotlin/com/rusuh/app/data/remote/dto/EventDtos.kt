@@ -3,7 +3,7 @@ package com.rusuh.app.data.remote.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Answer of `GET /events`. */
+/** Answer of `GET /core/events`. */
 @Serializable
 data class EventsResponseDto(
     @SerialName("items") val items: List<EventDto> = emptyList(),
@@ -26,13 +26,18 @@ data class EventDto(
     @SerialName("subtitle") val subtitle: String = "",
     @SerialName("format") val format: String = "",
     @SerialName("venue") val venue: String = "",
+    @SerialName("venueShort") val venueShort: String? = null,
     @SerialName("city") val city: String = "",
     @SerialName("timezone") val timezone: String = "",
     @SerialName("startsAt") val startsAt: String = "",
+    @SerialName("doorsOpenAt") val doorsOpenAt: String? = null,
+    @SerialName("waitingRoomOpensAt") val waitingRoomOpensAt: String? = null,
     @SerialName("saleOpensAt") val saleOpensAt: String? = null,
     @SerialName("saleEndsAt") val saleEndsAt: String? = null,
     @SerialName("state") val state: String = "",
     @SerialName("priceFrom") val priceFrom: MoneyDto? = null,
+    @SerialName("minPrice") val minPrice: MoneyDto? = null,
     @SerialName("capacity") val capacity: Int? = null,
     @SerialName("soldOutAt") val soldOutAt: String? = null,
+    @SerialName("imageUrl") val imageUrl: String? = null,
 )
