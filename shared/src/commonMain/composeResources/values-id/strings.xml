@@ -122,9 +122,6 @@
     <string name="detail_section_holders">Pemegang tiket</string>
     <string name="detail_holders_hint">Nama dan NIK sesuai KTP. 1 NIK = 1 tiket per event — di pintu masuk, e-tiket dicocokkan dengan KTP asli.</string>
     <string name="detail_ticket_label">Tiket %1$d · %2$s</string>
-    <string name="detail_holder_toggle_description">Untuk siapa tiket ini</string>
-    <string name="detail_holder_self">Saya sendiri</string>
-    <string name="detail_holder_other">Orang lain</string>
     <string name="detail_name_label">Nama sesuai KTP</string>
     <string name="detail_name_placeholder">Nama lengkap</string>
     <string name="detail_name_hint">Dicetak di e-tiket.</string>
@@ -173,6 +170,8 @@
         <item quantity="other">%1$d antrian aktif</item>
     </plurals>
     <string name="my_queues_logo_description">Rusuh</string>
+    <string name="eticket_page_title">Tiket Saya</string>
+    <string name="eticket_qr_error">QR tidak bisa dibuat. Tampilkan kode tiket ke petugas.</string>
     <string name="my_queues_language_group">Bahasa</string>
     <string name="my_queues_language_id">ID</string>
     <string name="my_queues_language_en">EN</string>
@@ -234,6 +233,63 @@
     <string name="tickets_error_title">Tiket tidak bisa dimuat</string>
     <string name="tickets_error_body">Periksa koneksi Anda lalu coba lagi.</string>
     <string name="tickets_error_action">Coba lagi</string>
+    <string name="eticket_loading_description">Memuat e-tiket Anda</string>
+    <string name="eticket_error_title">E-tiket tidak bisa dimuat</string>
+    <string name="eticket_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="eticket_error_action">Coba lagi</string>
+    <string name="eticket_not_found_title">E-tiket tidak ditemukan</string>
+    <string name="eticket_not_found_body">Pesanan ini tidak punya tiket yang bisa ditampilkan. Kembali ke tiket Anda dan pilih pesanan lain.</string>
+    <string name="eticket_not_found_action">Kembali ke tiket saya</string>
+    <string name="eticket_stamp_paid">✓ LUNAS · %1$s %2$s</string>
+    <string name="eticket_stamp_paid_description">Lunas pukul %1$s %2$s</string>
+    <string name="eticket_headline">Sampai jumpa di %1$s!</string>
+    <plurals name="eticket_intro">
+        <item quantity="one">Tiket %2$s sudah atas nama pemegang NIK. Kami juga mengirim e-tiket ke %3$s.</item>
+        <item quantity="other">%1$d tiket %2$s sudah atas nama pemegang NIK masing-masing. Kami juga mengirim e-tiket ke %3$s.</item>
+    </plurals>
+    <string name="eticket_add_to_calendar">Tambah ke kalender</string>
+    <string name="eticket_order_line">Pesanan %1$s · %2$s · %3$s</string>
+    <string name="eticket_ticket_label">TIKET %1$d/%2$d</string>
+    <string name="eticket_holder_label">PEMEGANG</string>
+    <string name="eticket_holder_nik">NIK %1$s</string>
+    <string name="eticket_entry_label">MASUK</string>
+    <string name="eticket_doors_label">PINTU DIBUKA</string>
+    <string name="eticket_doors_value">%1$s, %2$d %3$s · %4$s %5$s</string>
+    <string name="eticket_time_format">%1$s.%2$s</string>
+    <string name="eticket_seating_standing">berdiri</string>
+    <string name="eticket_seating_seated">duduk bebas</string>
+    <string name="eticket_qr_description">Kode QR untuk tiket %1$s</string>
+    <string name="eticket_ticket_summary">Tiket %1$d dari %2$d, %3$s, NIK %4$s, masuk %5$s, pintu dibuka %6$s</string>
+    <string name="eticket_ticket_summary_no_entry">Tiket %1$d dari %2$d, %3$s, NIK %4$s, pintu dibuka %5$s</string>
+    <string name="eticket_at_door_title">Di pintu masuk</string>
+    <string name="eticket_step_1">Tunjukkan QR tiket — dari aplikasi atau cetakan.</string>
+    <string name="eticket_step_2">Bawa %1$s dengan NIK yang sama seperti di tiket. Tanpa KTP yang cocok, petugas tidak bisa memindai.</string>
+    <string name="eticket_step_2_bold">KTP asli</string>
+    <string name="eticket_step_3">Satu QR hanya bisa dipindai sekali. Jangan unggah tiket ke media sosial.</string>
+    <string name="eticket_step_number">%1$d.</string>
+    <string-array name="eticket_weekdays_short">
+        <item>Sen</item>
+        <item>Sel</item>
+        <item>Rab</item>
+        <item>Kam</item>
+        <item>Jum</item>
+        <item>Sab</item>
+        <item>Min</item>
+    </string-array>
+    <string-array name="eticket_months_short">
+        <item>Jan</item>
+        <item>Feb</item>
+        <item>Mar</item>
+        <item>Apr</item>
+        <item>Mei</item>
+        <item>Jun</item>
+        <item>Jul</item>
+        <item>Agu</item>
+        <item>Sep</item>
+        <item>Okt</item>
+        <item>Nov</item>
+        <item>Des</item>
+    </string-array>
     <string name="otp_input_label">Kode verifikasi</string>
     <string name="otp_input_progress">%1$d dari %2$d digit terisi</string>
     <string name="sign_in_back">Kembali</string>

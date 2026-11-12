@@ -1,5 +1,6 @@
 package com.rusuh.app.feature.tickets
 
+import com.rusuh.app.feature.eticket.ETicketOrder
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -120,5 +121,7 @@ class GetMyTicketsUseCaseTest {
 
     private object FailingRepository : TicketsRepository {
         override suspend fun getMyOrders(): List<TicketOrder> = error("must not be called")
+
+        override suspend fun getOrderTickets(orderId: String): ETicketOrder? = error("must not be called")
     }
 }
