@@ -15,6 +15,9 @@ enum class SessionPhase {
  * `SessionManager`). Kept as an interface so the domain layer and the tests do not depend on the data layer.
  */
 interface SessionObserver {
+    /** Current phase without waiting for a flow collector to start. */
+    val currentPhase: SessionPhase
+
     /** The current phase, replaying the latest value to a new collector. */
     val phase: Flow<SessionPhase>
 

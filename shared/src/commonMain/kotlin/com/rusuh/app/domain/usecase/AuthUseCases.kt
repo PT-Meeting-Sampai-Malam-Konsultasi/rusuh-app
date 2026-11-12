@@ -144,6 +144,8 @@ class SaveDisplayNameUseCase(
 class ObserveSessionUseCase(
     private val observer: SessionObserver,
 ) {
+    val currentPhase get() = observer.currentPhase
+
     fun phase(): Flow<SessionPhase> = observer.phase
 
     /** One item each time the session expired (refresh token rejected). */

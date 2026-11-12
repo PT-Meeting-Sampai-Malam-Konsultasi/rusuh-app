@@ -128,6 +128,44 @@ class AccountViewModelTest {
         }
 
     @Test
+    fun releasingTheNameStepResetsAnEarlyProfileLoad() =
+        runTest(dispatcher) {
+            val f = fixture(SessionPhase.SignedIn)
+            send(f, AccountIntent.LoadProfile)
+            assertIs<AccountBody.Profile>(f.state.toBody())
+            send(f, AccountIntent.NameStepVisibilityChanged(true))
+            send(f, AccountIntent.NameStepVisibilityChanged(false))
+            assertEquals(ProfileLoad.Idle, f.state.profile)
+            f.viewModel.clear()
+        }
+
+    @Test
+    fun aProfileAnswerStartedBeforeTheNameStepIsDroppedAfterItCloses() =
+        runTest(dispatcher) {
+            val f = fixture(SessionPhase.SignedIn)
+            val gate = CompletableDeferred<Unit>()
+            f.repository.onMe = {
+                gate.await()
+                DomainResult.Success(TEST_USER)
+            }
+            send(f, AccountIntent.LoadProfile)
+            send(f, AccountIntent.NameStepVisibilityChanged(true))
+            send(f, AccountIntent.NameStepVisibilityChanged(false))
+            gate.complete(Unit)
+            runCurrent()
+            assertEquals(ProfileLoad.Idle, f.state.profile)
+            f.viewModel.clear()
+        }
+
+    @Test
+    fun anAlreadyRestoredSessionSeedsTheInitialPhase() =
+        runTest(dispatcher) {
+            val f = fixture(SessionPhase.SignedIn)
+            assertEquals(SessionPhase.SignedIn, f.state.phase)
+            f.viewModel.clear()
+        }
+
+    @Test
     fun loadingTwiceCallsMeOnce() =
         runTest(dispatcher) {
             val f = fixture(SessionPhase.SignedIn)

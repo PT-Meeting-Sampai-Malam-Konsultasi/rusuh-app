@@ -107,6 +107,7 @@ class FakeAuthRepository : AuthRepository {
 
 class FakeSessionObserver(initial: SessionPhase = SessionPhase.SignedOut) : SessionObserver {
     val current = MutableStateFlow(initial)
+    override val currentPhase: SessionPhase get() = current.value
     val expiredEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
 
     /** The bounded wait for the cold-start restore: pending until a test completes it (false = it timed out). */

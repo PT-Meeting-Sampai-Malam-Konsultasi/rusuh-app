@@ -282,9 +282,8 @@ AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> use cases -->
   OTP calls, best effort. A registration error (404 on the live backend, which has no `POST /devices`) never blocks the
   call: it goes out without the header. A NetworkError from the registration is returned as is. A 401 from the auth
   call forces one new registration and one retry, and never expires the session (these paths are session-less).
-- `isNewAccount` and `user.fullName == null`: the sign-in created an account without a name. The contract has no
-  profile update, so the name travels in `requestOtp(fullName = ...)` ("required only if the email has no account
-  yet"); the UI asks for it before requesting the code when it needs to.
+- `isNewAccount = true`: only after the code is verified does the UI show the new-account name step. The name has no
+  API to be saved (the Apidog contract has no profile update), so it is kept on the device only.
 - Profile: `GET /me` (`AuthRepository.me()`), with the Bearer. `/me/email-change` is out of scope.
 - Refresh is not in `AuthRepository`: `ApiTokenRefresher` + `SessionRefreshCoordinator` refresh on 401 with the stored
   refresh token (single flight, rotation, `SessionExpired` on a rejected token); see "401 and refresh".
@@ -365,7 +364,11 @@ so a step survives rotation and tab switches; the work is cancelled when the ent
   `AuthCache` (`auth_display_name` + `auth_display_name_user`, non-sensitive preferences, bound to the user id) and used
   when `/me` has no name (else the part of the email before the `@`). Sign-out removes it. To confirm with the backend.
 - `shortcut:` the consent checkbox of the name step is not sent anywhere; the consent version travels with the code
-  request. Not saved across process death (the user requests a new code).
+  request.
+- The in-progress name step is not saved across process death. If the app is killed or the user leaves that step, the
+  session stays signed in and the profile shows the email prefix; this is acceptable for the POC.
+- Open question for the backend: may `fullName` be omitted on `POST /auth/otp` for a new email? Apidog says it is
+  "required only if the email has no account yet".
 
 ### Known live divergences (2026-11-12, `https://api.rusuh-tiket.web.id/v1`)
 

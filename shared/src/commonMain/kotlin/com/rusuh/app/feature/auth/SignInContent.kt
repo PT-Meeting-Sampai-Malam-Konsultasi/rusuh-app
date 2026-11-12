@@ -134,6 +134,7 @@ private fun EmailStep(
         label = stringResource(Res.string.sign_in_email_label),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { if (canSend) actions.onSendCode() }),
+        readOnly = status.isBusy,
         modifier = Modifier.focusRequester(focusRequester),
     )
     Spacer(Modifier.height(RusuhSpacing.lg))
@@ -323,6 +324,7 @@ private fun NewAccountStep(
         keyboardOptions =
             KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { if (canContinue) actions.onCreateAccount() }),
+        readOnly = status.isBusy,
         modifier = Modifier.focusRequester(focusRequester),
     )
     Spacer(Modifier.height(RusuhSpacing.md))
@@ -359,6 +361,12 @@ private fun StatusLine(status: SignInStatus) {
             SignInError.InvalidInput -> stringResource(Res.string.sign_in_error_invalid)
             SignInError.Unknown -> stringResource(Res.string.sign_in_error_unknown)
         }
-    ErrorLine(message)
+    val announcement =
+        if (error is SignInError.RateLimited) {
+            stringResource(Res.string.sign_in_error_rate_limited_now)
+        } else {
+            message
+        }
+    ErrorLine(message, announceText = announcement)
     Spacer(Modifier.height(RusuhSpacing.lg))
 }

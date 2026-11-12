@@ -221,9 +221,21 @@ class SignInViewModel(
             onVerified(result.data)
             return
         }
-        val email = emailOfCodeStep() ?: return
+        val email = emailOfCodeStep() ?: (currentState.step as? SignInUiState.CodeExpired)?.email ?: return
         when (val failure = result.authFailure()) {
-            is AuthFailure.WrongCode -> wrongCode(email, code, failure.attemptsLeft)
+            is AuthFailure.WrongCode ->
+                if (currentState.challenge == null || currentState.step is SignInUiState.CodeExpired) {
+                    setState {
+                        copy(
+                            isBusy = false,
+                            error = null,
+                            challenge = null,
+                            step = SignInUiState.CodeExpired(email, code),
+                        )
+                    }
+                } else {
+                    wrongCode(email, code, failure.attemptsLeft)
+                }
             AuthFailure.ChallengeExpired, AuthFailure.ChallengeLocked ->
                 setState {
                     copy(

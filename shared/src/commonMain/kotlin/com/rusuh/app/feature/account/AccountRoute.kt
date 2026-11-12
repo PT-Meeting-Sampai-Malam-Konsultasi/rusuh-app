@@ -29,6 +29,9 @@ fun AccountRoute(
     LaunchedEffect(canShowProfile, account.profile) {
         if (canShowProfile && account.profile == ProfileLoad.Idle) accountViewModel.dispatch(AccountIntent.LoadProfile)
     }
+    LaunchedEffect(signIn.holdsAccountPage) {
+        accountViewModel.dispatch(AccountIntent.NameStepVisibilityChanged(signIn.holdsAccountPage))
+    }
     // Signing in on this tab needs no navigation (the session shows the page); drain so nothing piles up.
     LaunchedEffect(signInViewModel) { signInViewModel.effect.collect { } }
 
