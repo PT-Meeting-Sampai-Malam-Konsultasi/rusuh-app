@@ -3,6 +3,7 @@ package com.rusuh.app.data.remote
 import com.rusuh.app.data.network.ApiClient
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.jsonBody
+import com.rusuh.app.data.network.plugin.skipSessionAuth
 import com.rusuh.app.data.remote.dto.OtpChallengeDto
 import com.rusuh.app.data.remote.dto.RequestOtpDto
 import com.rusuh.app.data.remote.dto.SessionDto
@@ -13,7 +14,7 @@ import io.ktor.http.HttpHeaders
 
 /**
  * Auth endpoints of the core service. `POST /auth/otp` and `/auth/otp/verify` are session-less (device token only,
- * no Bearer, no 401 refresh: see `SESSIONLESS_PATHS`); `/auth/logout` and `/me` carry the Bearer and get
+ * no Bearer, no 401 refresh: see `SESSIONLESS_PATHS`); `/me` carries the Bearer and gets
  * the single-flight 401 refresh. `POST /auth/refresh` is NOT here: `ApiTokenRefresher` owns it.
  *
  * Contract: the Apidog project "Rusuh Booking Tiket API" (no `/auth/otp/request` alias, no `/auth/profile`).
@@ -35,7 +36,12 @@ class AuthApiService(
      * repository passes a snapshot taken before it clears the local session, so the call can run after the sign-out.
      */
     suspend fun logout(bearer: String): ApiResult<Unit> =
-        api.post(EP_LOGOUT) { header(HttpHeaders.Authorization, "Bearer $bearer") }
+        api.post(EP_LOGOUT) {
+            // Outside the session handling: the explicit Bearer is the only credential, and a 401 must never be
+            // replayed with the access token of a newer login.
+            skipSessionAuth()
+            header(HttpHeaders.Authorization, "Bearer $bearer")
+        }
 
     suspend fun getMe(): ApiResult<UserDto> = api.get(EP_ME)
 

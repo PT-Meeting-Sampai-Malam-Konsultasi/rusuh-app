@@ -1,6 +1,9 @@
 package com.rusuh.app.data.repository
 
+import com.rusuh.app.data.network.session.RefreshOutcome
 import com.rusuh.app.data.network.session.SessionEvent
+import com.rusuh.app.data.network.session.TokenRefresher
+import com.rusuh.app.data.remote.AuthApiService
 import com.rusuh.app.domain.model.AuthFailure
 import com.rusuh.app.domain.model.AuthSession
 import com.rusuh.app.domain.model.AuthUser
@@ -31,6 +34,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // one class per repository, like the other repository tests
 class RealAuthRepositoryTest {
     private val otp = "POST /auth/otp"
     private val verify = "POST /auth/otp/verify"
@@ -564,6 +568,71 @@ class RealAuthRepositoryTest {
             assertEquals(DomainResult.NetworkError, h.repository.logout())
             assertFalse(h.session.isSignedIn.value)
             assertNull(h.tokens.getRefreshToken())
+        }
+
+    @Test
+    fun anUnreachableRefreshIsANetworkErrorEvenAfterA401OnTheFirstLogout() =
+        runTest {
+            val h = harness()
+            h.seedSession()
+            h.session.startSession("access-1", "refresh-1")
+            h.backend.on(logout, problemReply(401, LIVE_UNAUTHORIZED))
+            h.backend.on(refresh, Reply(503, ""))
+
+            assertEquals(DomainResult.NetworkError, h.repository.logout())
+            assertFalse(h.session.isSignedIn.value)
+        }
+
+    @Test
+    fun aLoginThatStartsWhileTheLogoutIsPendingIsNeverUsedToReplayTheLogout() =
+        runTest {
+            val h = harness()
+            h.seedSession()
+            h.session.startSession("access-1", "refresh-1")
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            h.backend.onRequest = { gate.await() }
+            h.backend.on(logout, problemReply(401, LIVE_UNAUTHORIZED))
+            h.backend.on(refresh, problemReply(401, LIVE_UNAUTHORIZED))
+
+            val pending = async { h.repository.logout() }
+            runCurrent()
+            h.session.startSession("access-9", "refresh-9")
+            gate.complete(Unit)
+
+            assertEquals(DomainResult.Success(Unit), pending.await())
+            assertTrue(h.backend.seen.filter { it.line == logout }.all { it.bearer() == "Bearer access-1" })
+            assertTrue(h.session.isSignedIn.value, "the newer login stays signed in")
+            assertEquals("access-9", h.tokens.accessToken)
+            assertEquals("refresh-9", h.tokens.getRefreshToken())
+        }
+
+    @Test
+    fun theBoundCoversTheRefreshAndTheLogoutAndTheRotatedTokensAreNotStored() =
+        runTest {
+            val h = harness(logoutTimeout = null)
+            h.seedSession(access = null, refresh = "refresh-1")
+            var refreshCalls = 0
+            val repository =
+                RealAuthRepository(
+                    AuthApiService(h.backend.api),
+                    h.devices,
+                    h.session,
+                    TokenRefresher {
+                        refreshCalls++
+                        RefreshOutcome.Refreshed("access-2", "refresh-2")
+                    },
+                )
+            val never = kotlinx.coroutines.CompletableDeferred<Unit>()
+            h.backend.onRequest = { never.await() }
+
+            val result = repository.logout()
+
+            assertEquals(DomainResult.NetworkError, result)
+            assertEquals(1, refreshCalls)
+            assertEquals(5_000L, testScheduler.currentTime)
+            assertNull(h.tokens.accessToken)
+            assertNull(h.tokens.getRefreshToken())
+            assertFalse(h.session.isSignedIn.value)
         }
 
     @Test

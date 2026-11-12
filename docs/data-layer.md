@@ -304,7 +304,13 @@ AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> (auth state, 
   (cold start) it makes ONE `POST /auth/refresh` with the snapshot refresh token (session-less: no `SessionExpired`,
   the result is not stored, the cleared local state is untouched) and sends the logout with that access token. A
   refresh the server rejects, no refresh token, or a 401 on the logout itself all count as success (nothing left to
-  revoke). A timeout or an unreachable server is `NetworkError`. No server call when not signed in. If clearing
+  revoke). A timeout or an unreachable server (also an unreachable refresh) is `NetworkError`: not revoked and not worth
+  retrying, a rotated refresh token may stay valid on the server until it expires; one 5 s bound covers the refresh and
+  the logout, and nothing from the refresh is stored. The logout call is marked `skipSessionAuth()` and carries only
+  the snapshot Bearer, so a 401 is never replayed with a newer login's access token. Before the clear, `logout()`
+  may wait up to 5 s for a hanging cold-start storage read (`awaitSignedIn()`). Known gap, `TODO(AUTH-00 #77)`: a
+  `verifyOtp` that completes after a logout signs the user back in; the state layer needs a generation counter. No
+  server call when not signed in. If clearing
   storage threw, the result is `TechnicalError`: the access token and the flag are gone but a refresh token may remain
   on disk, so offer a retry. The device token and the install id survive (`TokenStore.clearSession`).
 - Session-less paths (no Bearer, no refresh, no `SessionExpired`): `/auth/otp`, `/auth/otp/verify`, `/auth/refresh`,
