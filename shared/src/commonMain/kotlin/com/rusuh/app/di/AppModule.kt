@@ -17,6 +17,8 @@ import com.rusuh.app.domain.usecase.VerifyOtpUseCase
 import com.rusuh.app.feature.account.AccountViewModel
 import com.rusuh.app.feature.auth.SignInViewModel
 import com.rusuh.app.feature.detail.DetailViewModel
+import com.rusuh.app.feature.eticket.ETicketViewModel
+import com.rusuh.app.feature.eticket.GetETicketUseCase
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
@@ -57,6 +59,8 @@ val appModule =
         factory { ObserveSessionUseCase(get()) }
         factory { SignInViewModel(get(), get(), get(), get(), get()) }
         factory { AccountViewModel(get(), get(), get()) }
+        factory { GetETicketUseCase(get()) }
+        factory { (orderId: String) -> ETicketViewModel(orderId, get()) }
 
         // Detail ticket page (the ServerClock is bound per backend mode in dataModule).
         factory { GetDetailUseCase(get()) }
