@@ -40,10 +40,6 @@ class DetailViewModel(
             DetailIntent.Proceed -> proceed()
             is DetailIntent.IncrementCategory -> changeQuantity(intent.categoryId, +1)
             is DetailIntent.DecrementCategory -> changeQuantity(intent.categoryId, -1)
-            is DetailIntent.AttendeeKindChanged ->
-                editForm { content, form ->
-                    form.withKind(intent.index, intent.kind, content.accountName)
-                }
             is DetailIntent.AttendeeNameChanged -> editForm { _, form -> form.withName(intent.index, intent.name) }
             is DetailIntent.AttendeeNikChanged -> editForm { _, form -> form.withNik(intent.index, intent.nik) }
         }

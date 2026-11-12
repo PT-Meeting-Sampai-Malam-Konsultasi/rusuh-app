@@ -126,7 +126,6 @@ internal fun DetailOffering.toDetailContent(): DetailContent =
                     entryGate = it.entryGate,
                 )
             },
-        accountName = profile.name,
         accountEmail = profile.email,
         adminFeeRupiah = adminFeeRupiah,
         reservedUnits = reservedUnits,
