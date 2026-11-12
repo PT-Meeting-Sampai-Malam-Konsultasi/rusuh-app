@@ -268,4 +268,13 @@
     <string name="sign_in_consent">I agree to the Rusuh Terms of Service and Privacy Policy.</string>
     <string name="sign_in_account_notice">Your account only stores your email and name. No NIK is needed to sign in.</string>
     <string name="sign_in_create_account">Create account</string>
+    <string name="account_sign_in_section">Sign in</string>
+    <string name="account_change_email">Change email</string>
+    <string name="account_email_label">Email</string>
+    <string name="account_verified">Verified</string>
+    <string name="account_email_row_description">Email %1$s, %2$s</string>
+    <string name="account_login_method_label">How you sign in</string>
+    <string name="account_login_method_value">A 6-digit code to this email. No password.</string>
+    <string name="account_sign_out">Sign out</string>
+    <string name="account_delete">Delete account</string>
 </resources>
