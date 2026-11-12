@@ -56,7 +56,7 @@ class CoreModuleTest {
         assertEquals(config.baseUrl, koin.get<ApiClient>(ApiClientQualifier.Api).baseUrl)
         assertEquals(config.queueBaseUrl, koin.get<ApiClient>(ApiClientQualifier.Queue).baseUrl)
         assertEquals(config.payBaseUrl, koin.get<ApiClient>(ApiClientQualifier.Pay).baseUrl)
-        assertEquals("https://api.rusuh-tiket.web.id", koin.get<ApiClient>(ApiClientQualifier.Queue).baseUrl)
+        assertEquals("https://api.rusuh-tiket.web.id/v1", koin.get<ApiClient>(ApiClientQualifier.Queue).baseUrl)
     }
 
     @Test
