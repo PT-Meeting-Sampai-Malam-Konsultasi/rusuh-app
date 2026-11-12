@@ -34,7 +34,7 @@ data class AuthUser(
 /**
  * Result of a successful code check. The tokens never leave the data layer (they are stored by the session layer).
  * [isNewAccount] is true when this sign-in created the account; with a null `user.fullName` the UI asks for the
- * name (and the consent) and calls `AuthRepository.updateProfile`.
+ * name (and the consent) and requests a new code with `fullName` (the contract has no profile update).
  */
 data class AuthSession(
     val user: AuthUser,
@@ -47,7 +47,7 @@ data class AuthSession(
  * never on message text.
  */
 sealed interface AuthFailure {
-    /** 409 WRONG_CODE. [attemptsLeft] is null when the server did not say. */
+    /** 400 WRONG_CODE (an unmapped 409 counts too). [attemptsLeft] is null when the server did not say. */
     data class WrongCode(val attemptsLeft: Int?) : AuthFailure
 
     /** 410 CHALLENGE_EXPIRED: request a new code. */
@@ -88,7 +88,8 @@ fun DomainResult<*>.authFailure(): AuthFailure? =
 
 private fun DomainResult.Error.classify(): AuthFailure =
     when {
-        errorCode == ErrorCode.WRONG_CODE -> AuthFailure.WrongCode(attemptsLeft())
+        // 409: the older contract's status for a wrong code; an unmapped 409 on verify can only mean that.
+        errorCode == ErrorCode.WRONG_CODE || code == HTTP_CONFLICT -> AuthFailure.WrongCode(attemptsLeft())
         errorCode == ErrorCode.CHALLENGE_LOCKED -> AuthFailure.ChallengeLocked
         errorCode == ErrorCode.CHALLENGE_EXPIRED || code == HTTP_GONE -> AuthFailure.ChallengeExpired
         errorCode == ErrorCode.RATE_LIMITED || code == HTTP_TOO_MANY -> AuthFailure.RateLimited(retryAfterSeconds)
@@ -101,5 +102,6 @@ private fun DomainResult.Error.attemptsLeft(): Int? = (extras["attemptsLeft"] as
 
 private const val HTTP_BAD_REQUEST = 400
 private const val HTTP_UNAUTHORIZED = 401
+private const val HTTP_CONFLICT = 409
 private const val HTTP_GONE = 410
 private const val HTTP_TOO_MANY = 429

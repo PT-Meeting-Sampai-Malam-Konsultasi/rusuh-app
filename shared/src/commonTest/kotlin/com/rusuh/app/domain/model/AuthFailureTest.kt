@@ -23,9 +23,9 @@ class AuthFailureTest {
     fun theContractCodesMapToTheirFailures() {
         assertEquals(
             AuthFailure.WrongCode(3),
-            error(409, ErrorCode.WRONG_CODE, mapOf("attemptsLeft" to JsonPrimitive(3))).authFailure(),
+            error(400, ErrorCode.WRONG_CODE, mapOf("attemptsLeft" to JsonPrimitive(3))).authFailure(),
         )
-        assertEquals(AuthFailure.WrongCode(null), error(409, ErrorCode.WRONG_CODE).authFailure())
+        assertEquals(AuthFailure.WrongCode(null), error(400, ErrorCode.WRONG_CODE).authFailure())
         assertEquals(AuthFailure.ChallengeExpired, error(410, ErrorCode.CHALLENGE_EXPIRED).authFailure())
         assertEquals(AuthFailure.ChallengeLocked, error(410, ErrorCode.CHALLENGE_LOCKED).authFailure())
         assertEquals(AuthFailure.RateLimited(30), error(429, ErrorCode.RATE_LIMITED, retryAfter = 30).authFailure())
@@ -40,12 +40,12 @@ class AuthFailureTest {
         assertEquals(AuthFailure.RateLimited(null), error(429, ErrorCode.UNKNOWN).authFailure())
         assertEquals(AuthFailure.ChallengeExpired, error(410, ErrorCode.UNKNOWN).authFailure())
         assertEquals(AuthFailure.Unknown(500), error(500, ErrorCode.UNKNOWN).authFailure())
-        assertEquals(AuthFailure.Unknown(409), error(409, ErrorCode.UNKNOWN).authFailure())
+        assertEquals(AuthFailure.WrongCode(null), error(409, ErrorCode.UNKNOWN).authFailure())
     }
 
     @Test
     fun aNonNumericAttemptsLeftIsNull() {
-        val failure = error(409, ErrorCode.WRONG_CODE, mapOf("attemptsLeft" to JsonPrimitive("many"))).authFailure()
+        val failure = error(400, ErrorCode.WRONG_CODE, mapOf("attemptsLeft" to JsonPrimitive("many"))).authFailure()
 
         assertEquals(AuthFailure.WrongCode(null), failure)
     }
@@ -90,7 +90,7 @@ class AuthFailureTest {
     @Test
     fun theContractTypeUriStyleParsesToo() {
         val body =
-            """{"type":"https://api.rusuh.id/problems/wrong-code","title":"Kode salah","status":409,""" +
+            """{"type":"https://api.rusuh.id/problems/wrong-code","title":"Kode salah","status":400,""" +
                 """"code":"WRONG_CODE","detail":"The code does not match.","attemptsLeft":3}"""
 
         val problem = ApiClient.defaultJson.decodeFromString(ProblemDetails.serializer(), body)

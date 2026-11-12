@@ -26,6 +26,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -33,10 +34,13 @@ class RealAuthRepositoryTest {
     private val otp = "POST /auth/otp"
     private val verify = "POST /auth/otp/verify"
     private val logout = "POST /auth/logout"
-    private val profile = "GET /auth/profile"
+    private val profile = "GET /me"
     private val refresh = "POST /auth/refresh"
 
-    private fun TestScope.harness(devices: FakeDevices = FakeDevices()) = AuthHarness(backgroundScope, devices)
+    private fun TestScope.harness(
+        devices: FakeDevices = FakeDevices(),
+        logoutTimeout: Duration = Duration.INFINITE,
+    ) = AuthHarness(backgroundScope, devices, logoutTimeout)
 
     private fun Seen.bearer() = headers["Authorization"]
 
@@ -62,8 +66,8 @@ class RealAuthRepositoryTest {
             assertEquals(otp, seen.line)
             assertEquals("test.user@example.test", seen.json().getValue("email").jsonPrimitive.content)
             assertEquals("Test User", seen.json().getValue("fullName").jsonPrimitive.content)
-            assertFalse("consentVersion" in seen.body, "the live server rejects it")
-            assertEquals(setOf("email", "fullName", "locale"), seen.json().keys)
+            assertEquals("2026-10", seen.json().getValue("consentVersion").jsonPrimitive.content)
+            assertEquals(setOf("email", "fullName", "consentVersion", "locale"), seen.json().keys)
             assertEquals("en", seen.json().getValue("locale").jsonPrimitive.content)
             assertNull(seen.bearer(), "the code request is session-less")
             assertEquals(1, h.devices.calls, "the device token is made sure first")
@@ -77,7 +81,7 @@ class RealAuthRepositoryTest {
 
             h.repository.requestOtp("test.user@example.test", fullName = "  ")
 
-            assertEquals(setOf("email"), h.backend.seen.single().json().keys)
+            assertEquals(setOf("email", "consentVersion"), h.backend.seen.single().json().keys)
         }
 
     @Test
@@ -137,14 +141,117 @@ class RealAuthRepositoryTest {
         }
 
     @Test
-    fun aFailedDeviceRegistrationStopsTheCodeRequestAndTheCodeCheck() =
+    fun aFailedDeviceRegistrationNeverBlocksTheAuthCalls() =
         runTest {
-            val failure = DomainResult.Error(code = 503, errorCode = ErrorCode.SERVICE_UNAVAILABLE)
+            val failure = DomainResult.Error(code = 404, errorCode = ErrorCode.UNKNOWN)
             val h = harness(FakeDevices(failure))
+            h.backend.on(otp, Reply(202, CHALLENGE_JSON))
+            h.backend.on(verify, Reply.ok(SESSION_JSON))
 
-            assertEquals(failure, h.repository.requestOtp("test.user@example.test"))
-            assertEquals(failure, h.repository.verifyOtp("ch_test_1", "123456"))
+            assertIs<DomainResult.Success<*>>(h.repository.requestOtp("test.user@example.test"))
+            assertIs<DomainResult.Success<*>>(h.repository.verifyOtp("ch_test_1", "123456"))
+
+            assertEquals(2, h.devices.calls, "registration is still tried each time")
+            assertEquals(listOf(otp, verify), h.backend.seen.map { it.line })
+            assertNull(h.backend.seen.first().headers["X-Device-Token"], "no device token: the call goes out without")
+        }
+
+    @Test
+    fun theLiveCaseOf404OnDevicesStillReachesTheOtpEndpoint() =
+        runTest {
+            val h = harness(FakeDevices(DomainResult.Error(code = 404)))
+            h.backend.on(otp, problemReply(400, LIVE_BAD_REQUEST))
+
+            val result = h.repository.requestOtp("x")
+
+            assertEquals(AuthFailure.InvalidInput, result.authFailure())
+            assertEquals(1, h.backend.callsTo(otp))
+        }
+
+    @Test
+    fun aNetworkErrorOnRegistrationIsReturnedWithoutCallingTheAuthEndpoint() =
+        runTest {
+            val h = harness(FakeDevices(DomainResult.NetworkError))
+
+            assertEquals(DomainResult.NetworkError, h.repository.requestOtp("test.user@example.test"))
+            assertEquals(DomainResult.NetworkError, h.repository.verifyOtp("c", "123456"))
             assertTrue(h.backend.seen.isEmpty())
+        }
+
+    @Test
+    fun a401FromTheAuthCallForcesOneRegistrationAndOneRetryAndNeverExpiresTheSession() =
+        runTest {
+            val h = harness()
+            h.seedSession()
+            h.backend.on(otp, problemReply(401, LIVE_UNAUTHORIZED), Reply(202, CHALLENGE_JSON))
+
+            val result = h.repository.requestOtp("test.user@example.test")
+
+            assertIs<DomainResult.Success<*>>(result)
+            assertEquals(listOf(false, true), h.devices.forced)
+            assertEquals(2, h.backend.callsTo(otp))
+            assertEquals(0, h.backend.callsTo(refresh))
+            assertFalse(h.events.expired.value)
+        }
+
+    @Test
+    fun aSecond401IsReturnedAfterExactlyOneRetry() =
+        runTest {
+            val h = harness()
+            h.backend.on(verify, problemReply(401, LIVE_UNAUTHORIZED))
+
+            val result = h.repository.verifyOtp("c", "123456")
+
+            assertEquals(AuthFailure.Unauthorized, result.authFailure())
+            assertEquals(2, h.backend.callsTo(verify))
+            assertEquals(listOf(false, true), h.devices.forced)
+            assertFalse(h.events.expired.value)
+        }
+
+    @Test
+    fun theEmailAndCodeAreTrimmed() =
+        runTest {
+            val h = harness()
+            h.backend.on(otp, Reply(202, CHALLENGE_JSON))
+            h.backend.on(verify, wrongCodeReply(4))
+
+            h.repository.requestOtp("  test.user@example.test \n", fullName = "  Test User ")
+            h.repository.verifyOtp("c", " 123456 ")
+
+            assertEquals("test.user@example.test", h.backend.seen[0].json().getValue("email").jsonPrimitive.content)
+            assertEquals("Test User", h.backend.seen[0].json().getValue("fullName").jsonPrimitive.content)
+            assertEquals("123456", h.backend.seen[1].json().getValue("code").jsonPrimitive.content)
+        }
+
+    @Test
+    fun a400BadRequestOnVerifyIsInvalidInputAndAnUnmapped409IsAWrongCode() =
+        runTest {
+            val h = harness()
+            h.backend.on(verify, problemReply(400, LIVE_BAD_REQUEST), codeReply(409, "SOMETHING_NEW"))
+
+            assertEquals(AuthFailure.InvalidInput, h.repository.verifyOtp("c", "123456").authFailure())
+            assertEquals(AuthFailure.WrongCode(null), h.repository.verifyOtp("c", "123456").authFailure())
+        }
+
+    @Test
+    fun aThrowingDeviceRegistrationIsAlsoTolerated() =
+        runTest {
+            val h = harness(FakeDevices(throwing = true))
+            h.backend.on(otp, Reply(202, CHALLENGE_JSON))
+
+            assertIs<DomainResult.Success<*>>(h.repository.requestOtp("test.user@example.test"))
+        }
+
+    @Test
+    fun theDeviceTokenIsSentWhenRegistrationSucceeded() =
+        runTest {
+            val h = harness()
+            h.tokens.setDeviceToken("device-1")
+            h.backend.on(otp, Reply(202, CHALLENGE_JSON))
+
+            h.repository.requestOtp("test.user@example.test")
+
+            assertEquals("device-1", h.backend.seen.single().headers["X-Device-Token"])
         }
 
     // verifyOtp
@@ -206,7 +313,7 @@ class RealAuthRepositoryTest {
             val result = h.repository.verifyOtp("ch_test_1", "111111")
 
             assertEquals(AuthFailure.WrongCode(3), result.authFailure())
-            assertEquals(409, assertIs<DomainResult.Error>(result).code)
+            assertEquals(400, assertIs<DomainResult.Error>(result).code)
             assertNull(h.tokens.accessToken)
             assertNull(h.tokens.getRefreshToken())
             assertFalse(h.session.isSignedIn.value)
@@ -263,7 +370,7 @@ class RealAuthRepositoryTest {
             assertEquals(AuthFailure.Unauthorized, result.authFailure())
             assertEquals(ErrorCode.UNAUTHORIZED, assertIs<DomainResult.Error>(result).errorCode)
             assertEquals(0, h.backend.callsTo(refresh), "session-less: a 401 here is not an expired session")
-            assertNull(h.backend.seen.single().bearer())
+            assertTrue(h.backend.seen.all { it.bearer() == null })
             assertFalse(h.events.expired.value)
         }
 
@@ -284,7 +391,7 @@ class RealAuthRepositoryTest {
         }
 
     @Test
-    fun verifyOtpWithoutARefreshTokenKeepsTheStoredOneAndSignsIn() =
+    fun verifyOtpWithoutARefreshTokenRemovesAStaleOneAndSignsIn() =
         runTest {
             val h = harness()
             h.seedSession(access = null, refresh = "refresh-old")
@@ -292,7 +399,7 @@ class RealAuthRepositoryTest {
 
             assertIs<DomainResult.Success<*>>(h.repository.verifyOtp("c", "123456"))
 
-            assertEquals("refresh-old", h.tokens.getRefreshToken())
+            assertNull(h.tokens.getRefreshToken(), "the old one belongs to an older login")
             assertTrue(h.session.isSignedIn.value)
         }
 
@@ -338,7 +445,7 @@ class RealAuthRepositoryTest {
         }
 
     @Test
-    fun logoutClearsTheFlagEvenWhenTheStorageRemovalThrows() =
+    fun logoutSurfacesAFailedLocalClearButStillSignsOutInMemoryAndTriesTheServer() =
         runTest {
             val h = harness()
             h.seedSession()
@@ -348,13 +455,71 @@ class RealAuthRepositoryTest {
 
             val result = h.repository.logout()
 
-            assertEquals(DomainResult.Success(Unit), result)
+            assertEquals(DomainResult.TechnicalError, result, "the refresh token may still be on disk: not a success")
             assertFalse(h.session.isSignedIn.value)
             assertNull(h.tokens.accessToken, "the access token goes first")
+            assertEquals(1, h.backend.callsTo(logout))
         }
 
     @Test
-    fun logoutWithARejectedRefreshStillSignsOutAndExpiresTheSessionOnce() =
+    fun aRetriedLogoutAfterAFailedClearRemovesTheRefreshTokenAndSkipsTheServer() =
+        runTest {
+            val h = harness()
+            h.seedSession()
+            h.session.startSession("access-1", "refresh-1")
+            h.backend.on(logout, Reply.noContent())
+            h.secure.failingRemovals += "auth_refresh_token"
+            h.repository.logout()
+            h.secure.failingRemovals.clear()
+
+            val retry = h.repository.logout()
+
+            assertEquals(DomainResult.Success(Unit), retry)
+            assertNull(h.tokens.getRefreshToken())
+            assertEquals(1, h.backend.callsTo(logout), "not signed in any more: no second server call")
+        }
+
+    @Test
+    fun logoutWhenNotSignedInSendsNothing() =
+        runTest {
+            val h = harness()
+
+            assertEquals(DomainResult.Success(Unit), h.repository.logout())
+            assertTrue(h.backend.seen.isEmpty())
+        }
+
+    @Test
+    fun logoutOnAColdStartWithoutAnAccessTokenSkipsTheServerButClearsTheRefreshToken() =
+        runTest {
+            val h = harness()
+            h.seedSession(access = null, refresh = "refresh-1")
+
+            assertEquals(DomainResult.Success(Unit), h.repository.logout())
+
+            assertNull(h.tokens.getRefreshToken())
+            assertTrue(h.backend.seen.isEmpty())
+            assertFalse(h.session.isSignedIn.value)
+        }
+
+    @Test
+    fun anOfflineOrHangingLogoutIsSignedOutAtOnceAndBoundedByTheTimeout() =
+        runTest {
+            val h = harness(logoutTimeout = 2.seconds)
+            h.seedSession()
+            h.session.startSession("access-1", "refresh-1")
+            val never = kotlinx.coroutines.CompletableDeferred<Unit>()
+            h.backend.onRequest = { never.await() }
+            h.backend.on(logout, Reply.noContent())
+
+            val result = h.repository.logout()
+
+            assertEquals(DomainResult.NetworkError, result)
+            assertFalse(h.session.isSignedIn.value)
+            assertNull(h.tokens.getRefreshToken())
+        }
+
+    @Test
+    fun logoutRejectedWith401StillEndsSignedOutWithoutRefreshing() =
         runTest {
             val h = harness()
             h.seedSession()
@@ -367,12 +532,13 @@ class RealAuthRepositoryTest {
             assertEquals(AuthFailure.Unauthorized, result.authFailure())
             assertFalse(h.session.isSignedIn.value)
             assertNull(h.tokens.getRefreshToken())
+            assertEquals(0, h.backend.callsTo(refresh), "the session is already cleared: nothing to refresh")
         }
 
-    // me and updateProfile
+    // me
 
     @Test
-    fun meReadsTheAliasProfilePathWithTheBearerNeverMe() =
+    fun meReadsGetMeWithTheBearer() =
         runTest {
             val h = harness()
             h.seedSession()
@@ -383,7 +549,7 @@ class RealAuthRepositoryTest {
             assertEquals("usr_test_1", user.userId)
             assertEquals("test.user@example.test", user.email)
             assertEquals("Bearer access-1", h.backend.seen.single().bearer())
-            assertEquals(0, h.backend.callsTo("GET /me"))
+            assertEquals(0, h.backend.callsTo("GET /auth/profile"))
         }
 
     @Test
@@ -423,32 +589,6 @@ class RealAuthRepositoryTest {
             assertEquals("refresh-2", h.tokens.getRefreshToken())
             assertTrue(h.session.isSignedIn.value)
             assertEquals("Bearer access-2", h.backend.seen.last().bearer())
-        }
-
-    @Test
-    fun updateProfilePutsTheNameAndMapsTheUser() =
-        runTest {
-            val h = harness()
-            h.seedSession()
-            h.backend.on("PUT /auth/profile", Reply.ok(USER_JSON))
-
-            val result = h.repository.updateProfile("Test User", UserLocale.English)
-
-            assertIs<DomainResult.Success<*>>(result)
-            val seen = h.backend.seen.single()
-            assertEquals("Test User", seen.json().getValue("fullName").jsonPrimitive.content)
-            assertEquals("en", seen.json().getValue("locale").jsonPrimitive.content)
-            assertEquals("Bearer access-1", seen.bearer())
-        }
-
-    @Test
-    fun updateProfileValidationFailureIsInvalidInput() =
-        runTest {
-            val h = harness()
-            h.seedSession()
-            h.backend.on("PUT /auth/profile", problemReply(400, LIVE_BAD_REQUEST))
-
-            assertEquals(AuthFailure.InvalidInput, h.repository.updateProfile("").authFailure())
         }
 
     @Test

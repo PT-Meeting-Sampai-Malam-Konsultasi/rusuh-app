@@ -24,6 +24,8 @@ import com.rusuh.app.data.storage.TokenStore
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
 import com.rusuh.app.domain.clock.ServerClock
+import com.rusuh.app.domain.model.DomainResult
+import com.rusuh.app.domain.model.OtpChallenge
 import com.rusuh.app.domain.repository.AuthRepository
 import com.rusuh.app.domain.repository.DetailRepository
 import com.rusuh.app.domain.repository.DeviceRepository
@@ -180,13 +182,14 @@ class DataModuleTest {
             val stub = koin(AppEnvironment.Mock, BackendMode.Stub)
             val challenge = stub.get<AuthApiService>().requestOtp(RequestOtpDto(email = "test.user@example.test"))
             assertIs<ApiResult.Success<*>>(challenge)
-            assertIs<ApiResult.Success<*>>(stub.get<AuthApiService>().getProfile())
+            assertIs<ApiResult.Success<*>>(stub.get<AuthApiService>().getMe())
         }
 
     @Test
-    fun theTicketsTabFollowsTheSessionManager() =
+    fun theTicketsTabIsNotGatedByTheSessionYet() =
         runTest {
-            val app =
+            // TODO(AUTH-00 #77): once the sign-in UI is wired, GetMyTicketsUseCase follows SessionManager.
+            val koin =
                 koinApplication {
                     allowOverride(true)
                     modules(
@@ -200,17 +203,37 @@ class DataModuleTest {
                         dataModule(BackendMode.Stub, true) { },
                         appModule,
                     )
-                }
-            val koin = app.koin
-            val tickets = koin.get<GetMyTicketsUseCase>()
-            assertEquals(MyTickets.SignedOut, tickets())
+                }.koin
 
-            koin.get<SessionManager>().startSession("access-1", "refresh-1")
+            assertFalse(koin.get<SessionManager>().isSignedIn.value)
+            assertIs<MyTickets.Content>(koin.get<GetMyTicketsUseCase>()())
+        }
 
-            assertIs<MyTickets.Content>(tickets())
-            koin.get<AuthRepository>().logout()
-            assertEquals(MyTickets.SignedOut, tickets())
-            app.close()
+    @Test
+    fun stubModeKeepsItsPlaceholderTokensOutOfTheRealSecureStore() =
+        runTest {
+            val secure = FakeSecureStore()
+            val koin =
+                koinApplication {
+                    allowOverride(true)
+                    modules(
+                        module {
+                            single { AppEnvironment.Mock }
+                            single<SecureStore> { secure }
+                            single<AppPreferences> { FakeAppPreferences() }
+                        },
+                        storageModule,
+                        coreModule(),
+                        dataModule(BackendMode.Stub, true) { },
+                    )
+                }.koin
+            val auth = koin.get<AuthRepository>()
+            val challenge = assertIs<DomainResult.Success<OtpChallenge>>(auth.requestOtp("stub.user@example.test")).data
+
+            auth.verifyOtp(challenge.challengeId, "123456")
+
+            assertTrue(koin.get<SessionManager>().isSignedIn.value)
+            assertTrue(secure.entries.isEmpty(), "${secure.entries.keys}")
         }
 
     @Test

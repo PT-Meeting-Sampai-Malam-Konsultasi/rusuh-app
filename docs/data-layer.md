@@ -263,6 +263,9 @@ stub.assertRequest(0, HttpMethod.Get, "/queue/evt_1/frontier", mapOf("Accept" to
 
 ## Auth (email OTP, session)
 
+Contract: the Apidog project "Rusuh Booking Tiket API" is the single reference (not the older OpenAPI file, not
+the live behaviour).
+
 ```
 AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> (auth state, #77)
                                    |  tokens
@@ -270,54 +273,62 @@ AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> (auth state, 
 ```
 
 - Flow: `requestOtp(email, fullName?, locale?)` (`POST /auth/otp`, 202 `challengeId`, `expiresAt`,
-  `resendAfterSeconds`) then `verifyOtp(challengeId, code)` (`POST /auth/otp/verify`, 200 session). On success the
-  access token is kept in memory, the refresh token goes to the `TokenStore`, the sticky `SessionEvents.expired` is
-  reset and `SessionManager.isSignedIn` turns true, all before `verifyOtp` returns. The tokens are not part of the
-  domain model. Both OTP calls need the device token, so the repository calls `DeviceRepository.ensureRegistered()`
-  first and returns its failure unchanged.
-- `isNewAccount` and `user.fullName == null`: the sign-in created the account without a name (the email had none at
-  request time), so the UI asks for the name and consent and calls `updateProfile` (`PUT /auth/profile`).
+  `resendAfterSeconds`) then `verifyOtp(challengeId, code)` (`POST /auth/otp/verify`, 200 session). The request always
+  carries `consentVersion` (required by the contract): `CONSENT_VERSION = "2026-10"` (`shortcut:` taken from the
+  contract example, to be confirmed with the backend and legal). On success the access token is kept in memory, the
+  refresh token goes to the `TokenStore`, the sticky `SessionEvents.expired` is reset and `SessionManager.isSignedIn`
+  turns true, all before `verifyOtp` returns. The tokens are not part of the domain model.
+- Device token (security scheme `deviceToken`): the repository tries `DeviceRepository.ensureRegistered()` before both
+  OTP calls, best effort. A registration error (404 on the live backend, which has no `POST /devices`) never blocks the
+  call: it goes out without the header. A NetworkError from the registration is returned as is. A 401 from the auth
+  call forces one new registration and one retry, and never expires the session (these paths are session-less).
+- `isNewAccount` and `user.fullName == null`: the sign-in created an account without a name. The contract has no
+  profile update, so the name travels in `requestOtp(fullName = ...)` ("required only if the email has no account
+  yet"); the UI asks for it before requesting the code when it needs to.
+- Profile: `GET /me` (`AuthRepository.me()`), with the Bearer. `/me/email-change` is out of scope.
 - Refresh is not in `AuthRepository`: `ApiTokenRefresher` + `SessionRefreshCoordinator` refresh on 401 with the stored
   refresh token (single flight, rotation, `SessionExpired` on a rejected token); see "401 and refresh".
 - `SessionManager.isSignedIn: StateFlow<Boolean>`: true after login, false after `logout()`, and false on
   `SessionEvent.SessionExpired`. Cold start: the access token is memory-only, so the initial value is restored
   asynchronously from "a refresh token is stored" (and no expiry pending); `isRestored` turns true when that read is
-  done, and `awaitSignedIn()` waits for it, so a screen never flashes "signed out" for a user with a session. A login
-  or logout that happens before the restore wins. The first call after a cold start has no Bearer, gets a 401 and
-  refreshes. `GetMyTicketsUseCase` takes `SessionManager::awaitSignedIn` (`AppModule`).
-- `logout()`: calls `POST /auth/logout` (204, Bearer, so NOT session-less) and ALWAYS clears locally afterwards, also
-  when the call fails, times out or is cancelled, and even when removing a stored token throws (the flag flips
-  anyway). The result returned is the server call's; navigate to signed-out regardless. The device token and the
-  install id survive (`TokenStore.clearSession`).
-- Session-less paths (no Bearer, no refresh, no `SessionExpired`): `/auth/otp`, `/auth/otp/verify`, `/auth/otp/request`,
-  `/auth/refresh`, `/devices`. `/auth/logout` and `/auth/profile` are not (a 401 there refreshes), covered by
-  `SessionRefreshTest`.
-- Failures: read `DomainResult.authFailure()` (`AuthFailure`): `WrongCode(attemptsLeft)` (409), `ChallengeExpired` and
-  `ChallengeLocked` (410), `RateLimited(retryAfterSeconds)` (429), `InvalidInput` (400), `Unauthorized` (401),
-  `Network`, `Unknown(status)`. The contract code decides; an unknown code falls back to the status for 400, 401, 429,
-  and a 410 with an unknown code counts as expired.
+  done. `awaitSignedIn()` waits for it for at most 5 s; if the storage read hangs it returns the current value (false,
+  signed out) instead of blocking, and a read that throws anything is treated as signed out. A login or logout that
+  happens before the restore wins. The first call after a cold start has no Bearer, gets a 401 and refreshes.
+  `startSession` runs to the end even if its caller is cancelled, and a login without a refresh token removes the
+  stored one. `TODO(AUTH-00 #77)`: `GetMyTicketsUseCase` is NOT wired to the `SessionManager` yet (it keeps its
+  signed-in default, as before auth) until the sign-in UI exists.
+- `logout()`: snapshots the Bearer, clears the local session first (the UI is signed out at once; an offline logout
+  never waits), then calls `POST /auth/logout` (204, NOT session-less) with the snapshot, bounded to 5 s (a timeout
+  returns `NetworkError`). No server call when not signed in or when there is no access token (cold start). The
+  returned result is the server call's, for diagnostics. If clearing storage threw, the access token and the flag are
+  gone but a refresh token may remain on disk, so the result is `TechnicalError` (the server call is still tried):
+  offer a retry, which removes it. The device token and the install id survive (`TokenStore.clearSession`).
+- Session-less paths (no Bearer, no refresh, no `SessionExpired`): `/auth/otp`, `/auth/otp/verify`, `/auth/refresh`,
+  `/devices`. `/auth/logout` and `/me` are not (a 401 there refreshes), covered by `SessionRefreshTest`.
+- Failures: read `DomainResult.authFailure()` (`AuthFailure`): `WrongCode(attemptsLeft)` (400 `WRONG_CODE` with
+  `attemptsLeft`; an unmapped 409 on verify counts as a wrong code too), `ChallengeExpired` and `ChallengeLocked` (410), `RateLimited(retryAfterSeconds)` (429),
+  `InvalidInput` (400), `Unauthorized` (401), `Network`, `Unknown(status)`. The contract code decides; an unknown
+  code falls back to the status for 400, 401, 429, and a 410 with an unknown code counts as expired.
 - Stub mode: `StubAuthRepository` (hand-written, in memory, real `SessionManager`): code `123456` signs in, `000000`
   is "expired", any other code is a wrong code with `attemptsLeft` 4, 3, 2, 1 and then locked (as after five wrong
   codes). A first sign-in without `fullName` is `isNewAccount = true` with no name; a repeat sign-in of the same email
-  is not new. Nothing is persisted. Real mode has no fallback to it.
+  is not new. Nothing is persisted: the stub's `SessionManager` uses an in-memory `TokenStore`, so its placeholder
+  tokens never reach the secure store and a stub run starts signed out. Real mode has no fallback to it.
+- TODO(EPIC-01-M5 #66): the OTP gate headers (`X-Turnstile-Token`, `X-Queue-Token`, `X-Admission-Token`) are not sent yet.
 
-### Live backend notes (verified 2026-11-12, `https://api.rusuh-tiket.web.id/v1`)
+### Known live divergences (2026-11-12, `https://api.rusuh-tiket.web.id/v1`)
 
-- `shortcut:` the profile is read from `GET /auth/profile` (the contract's alias of `GET /me`) because the live
-  backend answers 404 for `/me` and 401 (without a token) for `/auth/profile`. Change `EP_PROFILE` in
-  `AuthApiService` back to `/me` when the backend routes it.
+The app follows the contract, so a real call from this build can fail until the backend matches it. This is intended.
+
+- The live backend REJECTS `consentVersion` (400 `"consentVersion" is not allowed`), so `POST /auth/otp` fails there.
+- It answers `GET /auth/profile` (401 without a token) but 404 for `GET /me`; the app calls `/me`.
+- It has no `POST /devices` (hence the best-effort registration above).
 - Auth errors come as problem+json with `type: "about:blank"` (not an `api.rusuh.id/problems/...` URI), an Indonesian
   `detail` and sometimes a code outside the contract: `400` `Validasi gagal: "email" is required` with code
-  `BAD_REQUEST`, `401` `Token akun tidak ditemukan` with code `UNAUTHORIZED`. `ProblemDetails` does not read `type`
-  for any decision; `BAD_REQUEST` parses to `ErrorCode.UNKNOWN` (kept in `rawCode`) and still lands on
-  `AuthFailure.InvalidInput` through the 400 status. `detail` is for diagnostics, never shown.
-- `shortcut:` `consentVersion` is NOT sent: the live server answers 400 `"consentVersion" is not allowed` (the Apidog
-  project, the contract file and the server disagree; the contract file is the reference otherwise). `RequestOtpDto`
-  has no such member and a test asserts the serialised body. `locale` (`id`/`en`) and `fullName` stay optional and are
-  omitted when null (`explicitNulls = false`).
-- A third live fixture: `410` with title `OTP challenge expired` and code `CHALLENGE_EXPIRED`: map by `code`, never
-  by title or detail.
-- The canonical `/auth/otp` is called, not the alias `/auth/otp/request`.
+  `BAD_REQUEST`, `401` `Token akun tidak ditemukan` with `UNAUTHORIZED`, `410` titled `OTP challenge expired` with
+  `CHALLENGE_EXPIRED`. `ProblemDetails` never reads `type` or `title` for a decision; `BAD_REQUEST` parses to
+  `ErrorCode.UNKNOWN` (kept in `rawCode`) and still lands on `AuthFailure.InvalidInput` through the 400 status.
+  `detail` is for diagnostics, never shown. Fixtures of these bodies are in `AuthHarness.kt`.
 
 ## Storage
 
@@ -391,7 +402,7 @@ Order (request direction): `ContentNegotiation`, `HttpTimeout`, `AcceptLanguageP
   `api.get(EP) { queueToken(token) }`, `api.post(EP) { admissionToken(token) }` (`X-Queue-Token`, `X-Admission-Token`;
   read the value from `TokenStore` in the repository).
 - Outside the session by default (no Bearer, no refresh, no `SessionExpired`; the device token is still sent): the
-  paths ending in `/auth/otp`, `/auth/otp/verify`, `/auth/otp/request`, `/auth/refresh` and `/devices`. A 401 from
+  paths ending in `/auth/otp`, `/auth/otp/verify`, `/auth/refresh` and `/devices`. A 401 from
   verify-OTP is a wrong code, not an expired session. Any other such call adds `skipSessionAuth()`.
 - Creating or charging POSTs add `idempotencyKey(key)`.
 

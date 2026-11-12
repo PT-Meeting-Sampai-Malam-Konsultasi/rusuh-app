@@ -11,6 +11,7 @@ import com.rusuh.app.data.storage.SecureTokenStore
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.repository.DeviceRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlin.time.Duration
 
 /** Synthetic fixtures only: no real emails, names or tokens. */
 const val CHALLENGE_JSON = """{"challengeId":"ch_test_1","expiresAt":"2026-11-14T10:50:00Z","resendAfterSeconds":60}"""
@@ -45,8 +46,8 @@ fun problemReply(
 
 fun wrongCodeReply(attemptsLeft: Int) =
     problemReply(
-        409,
-        """{"type":"https://api.rusuh.id/problems/wrong-code","title":"Kode salah","status":409,""" +
+        400,
+        """{"type":"https://api.rusuh.id/problems/wrong-code","title":"Kode salah","status":400,""" +
             """"code":"WRONG_CODE","detail":"The code does not match.","attemptsLeft":$attemptsLeft}""",
     )
 
@@ -61,11 +62,15 @@ fun codeReply(
 /** Device registration stand-in that records calls; [result] can be made to fail. */
 class FakeDevices(
     var result: DomainResult<Unit> = DomainResult.Success(Unit),
+    private val throwing: Boolean = false,
 ) : DeviceRepository {
     var calls = 0
+    val forced = mutableListOf<Boolean>()
 
     override suspend fun ensureRegistered(forceRefresh: Boolean): DomainResult<Unit> {
         calls++
+        forced += forceRefresh
+        check(!throwing) { "keystore unavailable" }
         return result
     }
 }
@@ -74,6 +79,8 @@ class FakeDevices(
 class AuthHarness(
     managerScope: CoroutineScope,
     val devices: FakeDevices = FakeDevices(),
+    // Infinite by default: runTest skips virtual time while the mock engine works on a real thread.
+    logoutTimeout: Duration = Duration.INFINITE,
 ) {
     val secure = FakeSecureStore()
     val tokens = SecureTokenStore(secure)
@@ -89,7 +96,7 @@ class AuthHarness(
         fake = FakeBackend(HostAuth(tokens, coordinator))
         backend = fake
         session = SessionManager(tokens, events, managerScope)
-        repository = RealAuthRepository(AuthApiService(backend.api), devices, session)
+        repository = RealAuthRepository(AuthApiService(backend.api), devices, session, logoutTimeout)
     }
 
     /** A signed-in state as left by a previous login: access token in memory, refresh token in storage. */

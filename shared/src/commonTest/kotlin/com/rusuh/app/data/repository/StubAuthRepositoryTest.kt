@@ -10,7 +10,6 @@ import com.rusuh.app.domain.model.AuthSession
 import com.rusuh.app.domain.model.AuthUser
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.OtpChallenge
-import com.rusuh.app.domain.model.UserLocale
 import com.rusuh.app.domain.model.authFailure
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -61,7 +60,7 @@ class StubAuthRepositoryTest {
         }
 
     @Test
-    fun aNameLessFirstSignInIsANewAccountWithoutANameUntilTheProfileIsUpdated() =
+    fun aNameLessFirstSignInIsANewAccountWithoutAName() =
         runTest {
             val f = Fixture(this)
 
@@ -69,9 +68,7 @@ class StubAuthRepositoryTest {
 
             assertTrue(session.isNewAccount)
             assertNull(session.user.fullName)
-            val updated = f.repository.updateProfile("Stub User", UserLocale.English)
-            assertEquals("Stub User", assertIs<DomainResult.Success<AuthUser>>(updated).data.fullName)
-            assertEquals("Stub User", assertIs<DomainResult.Success<AuthUser>>(f.repository.me()).data.fullName)
+            assertNull(assertIs<DomainResult.Success<AuthUser>>(f.repository.me()).data.fullName)
         }
 
     @Test
@@ -161,6 +158,5 @@ class StubAuthRepositoryTest {
             assertFalse(f.session.isSignedIn.value)
             assertNull(f.tokens.accessToken)
             assertEquals(AuthFailure.Unauthorized, f.repository.me().authFailure())
-            assertEquals(AuthFailure.Unauthorized, f.repository.updateProfile("X").authFailure())
         }
 }
