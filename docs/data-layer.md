@@ -130,7 +130,7 @@ the override unless `isDebug`, `NetworkConfigTest` covers every combination, and
   `adb reverse tcp:3000 tcp:3000` (the debug config allows `localhost`) or the machine's LAN IP (add it to the debug
   `network_security_config.xml`). A physical iOS device cannot reach `localhost`: point it at another environment or
   a LAN URL.
-- Staging and Production use the real host `https://api.rusuh-tiket.web.id` (`ApiConfig.REAL_HOST_URL`). The queue
+- Staging and Production use the real base URL `https://api.rusuh-tiket.web.id/v1` (`ApiConfig.REAL_BASE_URL`; the `/v1` prefix comes from the staging web app configuration, the OpenAPI file lists no server). The queue
   (`q.`) and payment (`pay.`) hosts are not confirmed, so all three hosts use the same URL for now (`shortcut:` in
   `ApiConfig`); give them their own constants when the backend publishes them. The host is a skeleton: until the backend
   routes exist every call answers 404, which the app shows as its error states. `ApiConfig.usesPlaceholderHosts` (a
@@ -174,7 +174,7 @@ whether repositories talk to them. Four ways to run the app:
 | Mode | Environment + mode | Network | Repositories | Needs |
 |---|---|---|---|---|
 | Mockoon over HTTP (the debug default) | `Mock` + `Real` (`MOCK_API = true`) | HTTP to the Mockoon mock at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth; stub Detail and Tickets (WARNING once each) | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
-| Real host (debug) | `Staging` + `Real` (`MOCK_API = false`) | HTTP to `https://api.rusuh-tiket.web.id` | Same as above | The backend (404 on every route today) |
+| Real host (debug) | `Staging` + `Real` (`MOCK_API = false`) | HTTP to `https://api.rusuh-tiket.web.id/v1` | Same as above | The backend (queue and auth routes answer; core/booking routes 404 as of 2026-11-12) |
 | Release | `Production` + `Real` | HTTP to the real host | Same as above | The backend |
 | Stub (in process, offline demo) | `Mock`/`Staging` + `Stub` (debug only, `-PbackendMode=Stub` or `BACKEND_MODE=Stub` in the Xcode scheme) | None: the HTTP client runs on `StubEngine` | Stub repositories | Nothing |
 
