@@ -1,5 +1,6 @@
 package com.rusuh.app.data.repository
 
+import com.rusuh.app.data.network.session.SessionEvent
 import com.rusuh.app.data.network.session.SessionEvents
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.storage.FakeSecureStore
@@ -11,7 +12,9 @@ import com.rusuh.app.domain.model.AuthUser
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.OtpChallenge
 import com.rusuh.app.domain.model.authFailure
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,11 +25,13 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class StubAuthRepositoryTest {
     private class Fixture(scope: TestScope) {
         val clock = StubClock()
         val tokens = SecureTokenStore(FakeSecureStore())
-        val session = SessionManager(tokens, SessionEvents(), scope.backgroundScope)
+        val events = SessionEvents()
+        val session = SessionManager(tokens, events, scope.backgroundScope)
         val repository = StubAuthRepository(session, clock)
     }
 
@@ -157,6 +162,19 @@ class StubAuthRepositoryTest {
 
             assertFalse(f.session.isSignedIn.value)
             assertNull(f.tokens.accessToken)
+            assertEquals(AuthFailure.Unauthorized, f.repository.me().authFailure())
+        }
+
+    @Test
+    fun meAfterASessionExpiryIsUnauthorized() =
+        runTest {
+            val f = Fixture(this)
+            f.repository.signIn("Stub User")
+            assertIs<DomainResult.Success<AuthUser>>(f.repository.me())
+
+            f.events.emit(SessionEvent.SessionExpired)
+            runCurrent()
+
             assertEquals(AuthFailure.Unauthorized, f.repository.me().authFailure())
         }
 }

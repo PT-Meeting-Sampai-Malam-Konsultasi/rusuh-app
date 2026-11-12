@@ -66,12 +66,13 @@ class FakeDevices(
 ) : DeviceRepository {
     var calls = 0
     val forced = mutableListOf<Boolean>()
+    var resultFor: ((Boolean) -> DomainResult<Unit>)? = null
 
     override suspend fun ensureRegistered(forceRefresh: Boolean): DomainResult<Unit> {
         calls++
         forced += forceRefresh
         check(!throwing) { "keystore unavailable" }
-        return result
+        return resultFor?.invoke(forceRefresh) ?: result
     }
 }
 
@@ -80,7 +81,7 @@ class AuthHarness(
     managerScope: CoroutineScope,
     val devices: FakeDevices = FakeDevices(),
     // Infinite by default: runTest skips virtual time while the mock engine works on a real thread.
-    logoutTimeout: Duration = Duration.INFINITE,
+    logoutTimeout: Duration? = Duration.INFINITE,
 ) {
     val secure = FakeSecureStore()
     val tokens = SecureTokenStore(secure)
@@ -96,7 +97,14 @@ class AuthHarness(
         fake = FakeBackend(HostAuth(tokens, coordinator))
         backend = fake
         session = SessionManager(tokens, events, managerScope)
-        repository = RealAuthRepository(AuthApiService(backend.api), devices, session, logoutTimeout)
+        val refresher = ApiTokenRefresher(fake.api)
+        val api = AuthApiService(backend.api)
+        repository =
+            if (logoutTimeout == null) {
+                RealAuthRepository(api, devices, session, refresher)
+            } else {
+                RealAuthRepository(api, devices, session, refresher, logoutTimeout)
+            }
     }
 
     /** A signed-in state as left by a previous login: access token in memory, refresh token in storage. */

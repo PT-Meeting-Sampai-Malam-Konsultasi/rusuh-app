@@ -67,6 +67,17 @@ class SessionManager(
         return signedIn.value
     }
 
+    /** The stored refresh token (null when none or unreadable), for a revoke that runs after the local sign-out. */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    suspend fun currentRefreshToken(): String? =
+        try {
+            tokenStore.getRefreshToken()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            null
+        }
+
     /** The in-memory access token (null on a cold start before the first refresh), for a call after the sign-out. */
     fun currentAccessToken(): String? = tokenStore.accessToken
 
