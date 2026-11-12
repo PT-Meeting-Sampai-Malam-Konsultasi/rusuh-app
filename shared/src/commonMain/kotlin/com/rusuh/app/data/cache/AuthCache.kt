@@ -4,8 +4,8 @@ import com.rusuh.app.data.storage.AppPreferences
 import com.rusuh.app.domain.repository.DisplayNameStore
 
 /**
- * Auth module cache (non-sensitive preferences, never tokens): the display name a new account typed, with the user id
- * it belongs to.
+ * Auth module cache (preferences excluded from Android backup, never tokens): the display name a new account typed,
+ * with the user id it belongs to.
  *
  * shortcut: the name is only on this device because the contract has no profile update; remove with the first
  * endpoint that stores it.

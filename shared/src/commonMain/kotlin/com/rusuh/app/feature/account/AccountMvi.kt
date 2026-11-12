@@ -39,6 +39,8 @@ sealed interface AccountIntent : MviIntent {
     data object RetryProfile : AccountIntent
 
     data object SignOut : AccountIntent
+
+    data class NameStepVisibilityChanged(val held: Boolean) : AccountIntent
 }
 
 /** No one-time effects yet: sign-out is shown by the session phase changing. */

@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -116,6 +117,7 @@ private fun styledParts(
 internal fun ErrorLine(
     text: String,
     modifier: Modifier = Modifier,
+    announceText: String = text,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
@@ -144,7 +146,7 @@ internal fun ErrorLine(
             text = text,
             style = RusuhBrandTextStyles.label.body(),
             color = RusuhColors.BrandDanger,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).clearAndSetSemantics { contentDescription = announceText },
         )
     }
 }

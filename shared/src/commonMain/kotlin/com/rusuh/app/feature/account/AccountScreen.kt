@@ -172,7 +172,11 @@ private fun ProfileError(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
-            modifier = Modifier.semantics { heading() },
+            modifier =
+                Modifier.semantics {
+                    heading()
+                    liveRegion = LiveRegionMode.Polite
+                },
         )
         Spacer(Modifier.height(RusuhSpacing.md))
         Text(

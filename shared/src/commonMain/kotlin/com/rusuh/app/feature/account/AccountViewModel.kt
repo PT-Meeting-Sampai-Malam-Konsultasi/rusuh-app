@@ -22,7 +22,10 @@ class AccountViewModel(
     private val getProfile: GetProfileUseCase,
     private val signOut: SignOutUseCase,
     private val observeSession: ObserveSessionUseCase,
-) : MviViewModel<AccountState, AccountIntent, AccountEffect>(AccountState()) {
+) : MviViewModel<AccountState, AccountIntent, AccountEffect>(AccountState(phase = observeSession.currentPhase)) {
+    private var heldByNameStep = false
+    private var profileLoadGeneration = 0
+
     init {
         viewModelScope.launch { observeSession.phase().collect { onPhase(it) } }
         viewModelScope.launch { observeSession.expired().collect { setState { copy(sessionExpiredNotice = true) } } }
@@ -41,6 +44,13 @@ class AccountViewModel(
                 if (currentState.profile == ProfileLoad.Idle || currentState.profile == ProfileLoad.Failed) load()
             AccountIntent.RetryProfile -> if (currentState.profile != ProfileLoad.Loading) load()
             AccountIntent.SignOut -> signOutNow()
+            is AccountIntent.NameStepVisibilityChanged -> {
+                if (heldByNameStep && !intent.held) {
+                    profileLoadGeneration++
+                    setState { copy(profile = ProfileLoad.Idle) }
+                }
+                heldByNameStep = intent.held
+            }
         }
     }
 
@@ -57,10 +67,11 @@ class AccountViewModel(
 
     private suspend fun load() {
         if (currentState.phase != SessionPhase.SignedIn) return
+        val generation = ++profileLoadGeneration
         setState { copy(profile = ProfileLoad.Loading) }
         val result = getProfile()
         // Signed out (or a different login) while waiting: the answer is not for this screen any more.
-        if (currentState.phase != SessionPhase.SignedIn) return
+        if (currentState.phase != SessionPhase.SignedIn || generation != profileLoadGeneration) return
         setState {
             copy(profile = if (result is DomainResult.Success) ProfileLoad.Loaded(result.data) else ProfileLoad.Failed)
         }

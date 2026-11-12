@@ -322,6 +322,28 @@ class SignInViewModelTest {
         }
 
     @Test
+    fun aWrongAnswerAfterExpiryKeepsTheExpiredStep() =
+        runTest(dispatcher) {
+            val f = fixture()
+            val gate = CompletableDeferred<Unit>()
+            f.repository.onRequest = {
+                DomainResult.Success(challenge(expiresAtMillis = TestClock.START_MILLIS + 2_000))
+            }
+            f.repository.onVerify = { _, _ ->
+                gate.await()
+                problem(400, ErrorCode.WRONG_CODE)
+            }
+            onCodeStep(f)
+            send(f, SignInIntent.SubmitCode("123456"))
+            elapse(2_000)
+            assertIs<SignInUiState.CodeExpired>(f.step)
+            gate.complete(Unit)
+            runCurrent()
+            assertEquals(SignInUiState.CodeExpired(TEST_EMAIL, "123456"), f.step)
+            finish(f)
+        }
+
+    @Test
     fun resendBeforeTheCooldownEndsIsIgnored() =
         runTest(dispatcher) {
             val f = fixture()

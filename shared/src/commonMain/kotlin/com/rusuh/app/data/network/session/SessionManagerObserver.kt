@@ -12,6 +12,14 @@ class SessionManagerObserver(
     private val session: SessionManager,
     events: SessionEvents,
 ) : SessionObserver {
+    override val currentPhase: SessionPhase
+        get() =
+            when {
+                !session.isRestored.value -> SessionPhase.Restoring
+                session.isSignedIn.value -> SessionPhase.SignedIn
+                else -> SessionPhase.SignedOut
+            }
+
     override val phase: Flow<SessionPhase> =
         combine(session.isRestored, session.isSignedIn) { restored, signedIn ->
             when {

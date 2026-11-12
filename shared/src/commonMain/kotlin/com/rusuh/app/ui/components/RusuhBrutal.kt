@@ -162,6 +162,7 @@ fun BrutalTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    readOnly: Boolean = false,
     onFocusChange: (Boolean) -> Unit = {},
     onFocusLost: () -> Unit = {},
 ) {
@@ -172,6 +173,7 @@ fun BrutalTextField(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
+        readOnly = readOnly,
         singleLine = true,
         textStyle = textStyle,
         cursorBrush = SolidColor(RusuhColors.BrandInk),
