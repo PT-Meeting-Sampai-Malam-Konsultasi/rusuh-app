@@ -106,7 +106,7 @@ private fun Modifier.logoDescription(): Modifier {
  * control that does nothing.
  */
 @Composable
-private fun LanguageToggle(selected: AppLanguageOption) {
+internal fun LanguageToggle(selected: AppLanguageOption) {
     val groupDescription = stringResource(Res.string.my_queues_language_group)
     Row(
         modifier =

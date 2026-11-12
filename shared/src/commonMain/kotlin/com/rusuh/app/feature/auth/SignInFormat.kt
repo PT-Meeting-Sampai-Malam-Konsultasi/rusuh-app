@@ -1,9 +1,11 @@
 package com.rusuh.app.feature.auth
 
+import com.rusuh.app.ui.components.OTP_CODE_LENGTH
+
 private const val SECONDS_PER_MINUTE = 60
 private const val SECOND_PAD_WIDTH = 2
 
-/** Formats a resend cooldown as m:ss ("1:00", "0:07"); negative values clamp to "0:00". */
+/** Formats a countdown (resend cooldown, code validity) as m:ss ("1:00", "0:07"); negatives clamp to "0:00". */
 fun formatResendCountdown(seconds: Int): String {
     val total = seconds.coerceAtLeast(0)
     val minutes = total / SECONDS_PER_MINUTE
@@ -22,4 +24,38 @@ fun isPlausibleEmail(raw: String): Boolean {
     val domain = email.substring(at + 1)
     val dot = domain.lastIndexOf('.')
     return dot > 0 && dot < domain.length - 1 && !domain.contains("..")
+}
+
+/**
+ * Whether the main button of a step can be pressed: a plausible email, a complete code, a
+ * non-blank name. The expired step always allows asking for a new code. The new-account
+ * checkbox is optional marketing consent, so it never blocks.
+ */
+fun SignInUiState.isPrimaryEnabled(): Boolean =
+    when (this) {
+        is SignInUiState.Email -> isPlausibleEmail(email)
+        is SignInUiState.Code -> code.length == OTP_CODE_LENGTH
+        is SignInUiState.WrongCode -> code.length == OTP_CODE_LENGTH
+        is SignInUiState.CodeExpired -> true
+        is SignInUiState.NewAccount -> fullName.isNotBlank()
+    }
+
+/**
+ * Character ranges of each of [parts] inside [text] (first occurrence, a repeated part takes the
+ * next one; parts that do not occur are skipped). Lets a localized sentence with placeholders
+ * emphasise the substituted values without splitting the string resource.
+ */
+fun findPartRanges(
+    text: String,
+    parts: List<String>,
+): List<IntRange> {
+    val found = mutableListOf<IntRange>()
+    parts.forEach { part ->
+        if (part.isEmpty()) return@forEach
+        // A part repeated in the list takes the next occurrence, not the same one again.
+        var start = text.indexOf(part)
+        while (start >= 0 && found.any { it.first == start }) start = text.indexOf(part, start + 1)
+        if (start >= 0) found += start until start + part.length
+    }
+    return found
 }

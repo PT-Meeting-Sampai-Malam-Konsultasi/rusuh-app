@@ -276,7 +276,6 @@ private fun DetailContentBody(
                         attendee = attendee,
                         duplicateOf = form.duplicateOf(index),
                         isLast = index == form.attendees.lastIndex,
-                        onKindChange = { dispatch(DetailIntent.AttendeeKindChanged(index, it)) },
                         onNameChange = { dispatch(DetailIntent.AttendeeNameChanged(index, it)) },
                         onNikChange = { dispatch(DetailIntent.AttendeeNikChanged(index, it)) },
                     )

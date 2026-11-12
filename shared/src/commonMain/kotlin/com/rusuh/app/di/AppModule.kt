@@ -31,6 +31,8 @@ val appModule =
         factory { LeaveQueueUseCase(get()) }
 
         // Tickets (Tiket tab).
+        // TODO(AUTH-00 #77): pass `isSignedIn = get<SessionManager>()::awaitSignedIn` once the sign-in UI exists. Until
+        // then the tab keeps its default (signed in), exactly as before auth, or it would show signed out for everyone.
         factory { GetMyTicketsUseCase(get()) }
         factory { GetETicketUseCase(get()) }
         factory { (orderId: String) -> ETicketViewModel(orderId, get()) }

@@ -15,6 +15,19 @@ class GetMyTicketsUseCaseTest {
         }
 
     @Test
+    fun theSessionIsAskedOnEveryCallSoALoginOrLogoutShowsUpAtOnce() =
+        runTest {
+            var signedIn = false
+            val useCase = GetMyTicketsUseCase(StubTicketsRepository(), isSignedIn = { signedIn })
+
+            assertEquals(MyTickets.SignedOut, useCase())
+            signedIn = true
+            assertIs<MyTickets.Content>(useCase())
+            signedIn = false
+            assertEquals(MyTickets.SignedOut, useCase())
+        }
+
+    @Test
     fun noOrdersIsEmpty() =
         runTest {
             val useCase = GetMyTicketsUseCase(StubTicketsRepository(StubTicketsJson.EMPTY))
