@@ -86,7 +86,7 @@ class QueueHarness(
 
     /** The happy-path device and event routes every queue test needs. */
     fun scriptBasics() {
-        backend.on("POST /devices", Reply.created(DEVICE_JSON))
-        backend.on("GET /events", Reply.ok(EVENTS_JSON))
+        backend.on("POST /queue/devices", Reply.created(DEVICE_JSON))
+        backend.on("GET /core/events", Reply.ok(EVENTS_JSON))
     }
 }

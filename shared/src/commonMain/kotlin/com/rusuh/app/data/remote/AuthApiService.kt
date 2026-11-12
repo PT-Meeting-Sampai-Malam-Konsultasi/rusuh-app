@@ -7,6 +7,7 @@ import com.rusuh.app.data.network.plugin.skipSessionAuth
 import com.rusuh.app.data.remote.dto.OtpChallengeDto
 import com.rusuh.app.data.remote.dto.RequestOtpDto
 import com.rusuh.app.data.remote.dto.SessionDto
+import com.rusuh.app.data.remote.dto.UpdateProfileDto
 import com.rusuh.app.data.remote.dto.UserDto
 import com.rusuh.app.data.remote.dto.VerifyOtpDto
 import io.ktor.client.request.header
@@ -43,12 +44,14 @@ class AuthApiService(
             header(HttpHeaders.Authorization, "Bearer $bearer")
         }
 
-    suspend fun getMe(): ApiResult<UserDto> = api.get(EP_ME)
+    suspend fun getMe(): ApiResult<UserDto> = api.get(EP_PROFILE)
+
+    suspend fun updateProfile(body: UpdateProfileDto): ApiResult<UserDto> = api.put(EP_PROFILE) { jsonBody(body) }
 
     private companion object {
         const val EP_OTP = "/auth/otp"
         const val EP_VERIFY = "/auth/otp/verify"
         const val EP_LOGOUT = "/auth/logout"
-        const val EP_ME = "/me"
+        const val EP_PROFILE = "/auth/profile"
     }
 }

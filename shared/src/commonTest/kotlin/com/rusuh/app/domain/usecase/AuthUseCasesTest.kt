@@ -147,7 +147,7 @@ class AuthUseCasesTest {
         runTest {
             val prefs = FakeAppPreferences()
             val cache = AuthCache(prefs)
-            SaveDisplayNameUseCase(cache)("usr_1", "  Sari Wulandari ")
+            SaveDisplayNameUseCase(cache, FakeAuthRepository())("usr_1", "  Sari Wulandari ")
 
             assertEquals("Sari Wulandari", cache.get("usr_1"))
             assertNull(cache.get("usr_2"))
