@@ -19,8 +19,8 @@ sealed interface SessionEvent {
  *
  * [events] is not replayed, so an event with no collector is lost; [expired] is the sticky counterpart: it turns
  * true with the event and stays true until [reset], so a shell that starts collecting late (or a screen that
- * resumes) still learns the session is over. [reset] is called when a login stores tokens (the auth data layer, #67)
- * and automatically on the first request that carries an access token again.
+ * resumes) still learns the session is over. [reset] is called when a login stores tokens
+ * (`SessionManager.startSession`) and automatically on the first request that carries an access token again.
  */
 class SessionEvents {
     private val flow =
