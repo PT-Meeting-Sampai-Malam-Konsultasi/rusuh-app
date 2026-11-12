@@ -89,7 +89,10 @@ class StubAuthRepository(
 
     override suspend fun me(): DomainResult<AuthUser> =
         lock.withLock {
-            currentEmail?.let { accounts[it] }?.let { DomainResult.Success(it) } ?: problem(401, ErrorCode.UNAUTHORIZED)
+            // Not signed in any more (logout or a session expiry) means unauthorized, like the server.
+            currentEmail?.takeIf {
+                session.isSignedIn.value
+            }?.let { accounts[it] }?.let { DomainResult.Success(it) } ?: problem(401, ErrorCode.UNAUTHORIZED)
         }
 
     private fun wrongCode(challenge: Challenge): DomainResult<Nothing> {

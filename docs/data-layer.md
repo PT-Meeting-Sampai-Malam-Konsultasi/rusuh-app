@@ -297,16 +297,21 @@ AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> (auth state, 
   `startSession` runs to the end even if its caller is cancelled, and a login without a refresh token removes the
   stored one. `TODO(AUTH-00 #77)`: `GetMyTicketsUseCase` is NOT wired to the `SessionManager` yet (it keeps its
   signed-in default, as before auth) until the sign-in UI exists.
-- `logout()`: snapshots the Bearer, clears the local session first (the UI is signed out at once; an offline logout
-  never waits), then calls `POST /auth/logout` (204, NOT session-less) with the snapshot, bounded to 5 s (a timeout
-  returns `NetworkError`). No server call when not signed in or when there is no access token (cold start). The
-  returned result is the server call's, for diagnostics. If clearing storage threw, the access token and the flag are
-  gone but a refresh token may remain on disk, so the result is `TechnicalError` (the server call is still tried):
-  offer a retry, which removes it. The device token and the install id survive (`TokenStore.clearSession`).
+- `logout()`: snapshots the access and refresh tokens, clears the local session FIRST and non-cancellably (the UI is
+  signed out at once and never waits for the network), then revokes on the server inside a 5 s bound. The returned
+  result only describes the revoke attempt: read `SessionManager.isSignedIn` (already false while the revoke runs) to
+  navigate. With an access token it calls `POST /auth/logout`; on a 401 (expired access token) or with no access token
+  (cold start) it makes ONE `POST /auth/refresh` with the snapshot refresh token (session-less: no `SessionExpired`,
+  the result is not stored, the cleared local state is untouched) and sends the logout with that access token. A
+  refresh the server rejects, no refresh token, or a 401 on the logout itself all count as success (nothing left to
+  revoke). A timeout or an unreachable server is `NetworkError`. No server call when not signed in. If clearing
+  storage threw, the result is `TechnicalError`: the access token and the flag are gone but a refresh token may remain
+  on disk, so offer a retry. The device token and the install id survive (`TokenStore.clearSession`).
 - Session-less paths (no Bearer, no refresh, no `SessionExpired`): `/auth/otp`, `/auth/otp/verify`, `/auth/refresh`,
-  `/devices`. `/auth/logout` and `/me` are not (a 401 there refreshes), covered by `SessionRefreshTest`.
+  `/devices`. `/me` is not (a 401 there refreshes), covered by `SessionRefreshTest`. `/auth/logout` takes the Bearer but is
+  called by the repository after the local sign-out, with its own token snapshot (see `logout()`).
 - Failures: read `DomainResult.authFailure()` (`AuthFailure`): `WrongCode(attemptsLeft)` (400 `WRONG_CODE` with
-  `attemptsLeft`; an unmapped 409 on verify counts as a wrong code too), `ChallengeExpired` and `ChallengeLocked` (410), `RateLimited(retryAfterSeconds)` (429),
+  `attemptsLeft`; the repository also maps an unmapped 409 on verify to it), `ChallengeExpired` and `ChallengeLocked` (410), `RateLimited(retryAfterSeconds)` (429),
   `InvalidInput` (400), `Unauthorized` (401), `Network`, `Unknown(status)`. The contract code decides; an unknown
   code falls back to the status for 400, 401, 429, and a 410 with an unknown code counts as expired.
 - Stub mode: `StubAuthRepository` (hand-written, in memory, real `SessionManager`): code `123456` signs in, `000000`

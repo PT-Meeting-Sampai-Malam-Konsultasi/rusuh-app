@@ -33,10 +33,12 @@ interface AuthRepository {
     ): DomainResult<AuthSession>
 
     /**
-     * Signs out: the app is signed out in memory at once (the local session is cleared first, then the server
-     * revocation is tried with a bounded wait, so offline logout is instant). Skipped server call when not signed in.
-     * The result is the server call's, for diagnostics, except [DomainResult.TechnicalError] when clearing storage
-     * failed: a refresh token may then remain on disk, so offer a retry.
+     * Signs out. The local session is always cleared first (the UI never waits for the network): after this call,
+     * and already while it is still running, `SessionManager.isSignedIn` is false, so navigate on that, not on the
+     * result. The result only describes the server revoke (bounded to 5 s; with an expired or missing access token one
+     * refresh is made to get a token to revoke with): [DomainResult.NetworkError] when it could not be reached, and
+     * [DomainResult.TechnicalError] when clearing storage failed (a refresh token may remain on disk: offer a retry).
+     * A 401 from the revoke is not an error. No server call when not signed in.
      */
     suspend fun logout(): DomainResult<Unit>
 

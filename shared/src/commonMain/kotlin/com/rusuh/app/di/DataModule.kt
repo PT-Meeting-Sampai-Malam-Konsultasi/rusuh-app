@@ -125,7 +125,14 @@ fun dataModule(
                 single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }
                 single<WaitingRoomRepository> { get<QueueRepository>() }
                 single<MyQueuesRepository> { RealMyQueuesRepository(get(), get(), get(), get(), get()) }
-                single<AuthRepository> { RealAuthRepository(api = get(), devices = get(), session = get()) }
+                single<AuthRepository> {
+                    RealAuthRepository(
+                        api = get(),
+                        devices = get(),
+                        session = get(),
+                        refresher = get(),
+                    )
+                }
                 single<TicketsRepository> { notYetReal("TicketsRepository") { StubTicketsRepository() } }
                 single<DetailRepository> { notYetReal("DetailRepository") { StubDetailRepository(get()) } }
             }

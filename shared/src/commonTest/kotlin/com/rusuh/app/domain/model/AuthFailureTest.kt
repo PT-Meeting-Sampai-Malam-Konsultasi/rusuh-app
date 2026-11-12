@@ -40,7 +40,7 @@ class AuthFailureTest {
         assertEquals(AuthFailure.RateLimited(null), error(429, ErrorCode.UNKNOWN).authFailure())
         assertEquals(AuthFailure.ChallengeExpired, error(410, ErrorCode.UNKNOWN).authFailure())
         assertEquals(AuthFailure.Unknown(500), error(500, ErrorCode.UNKNOWN).authFailure())
-        assertEquals(AuthFailure.WrongCode(null), error(409, ErrorCode.UNKNOWN).authFailure())
+        assertEquals(AuthFailure.Unknown(409), error(409, ErrorCode.UNKNOWN).authFailure())
     }
 
     @Test

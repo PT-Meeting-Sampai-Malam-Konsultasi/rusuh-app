@@ -11,6 +11,7 @@ import com.rusuh.app.domain.model.UserLocale
 import com.rusuh.app.domain.model.authFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -39,7 +40,7 @@ class RealAuthRepositoryTest {
 
     private fun TestScope.harness(
         devices: FakeDevices = FakeDevices(),
-        logoutTimeout: Duration = Duration.INFINITE,
+        logoutTimeout: Duration? = Duration.INFINITE,
     ) = AuthHarness(backgroundScope, devices, logoutTimeout)
 
     private fun Seen.bearer() = headers["Authorization"]
@@ -489,16 +490,154 @@ class RealAuthRepositoryTest {
         }
 
     @Test
-    fun logoutOnAColdStartWithoutAnAccessTokenSkipsTheServerButClearsTheRefreshToken() =
+    fun logoutOnAColdStartRefreshesOnceToGetATokenToRevokeWithAndNeverExpiresTheSession() =
         runTest {
             val h = harness()
             h.seedSession(access = null, refresh = "refresh-1")
+            h.backend.on(refresh, Reply.ok(REFRESHED_JSON))
+            h.backend.on(logout, Reply.noContent())
 
             assertEquals(DomainResult.Success(Unit), h.repository.logout())
 
-            assertNull(h.tokens.getRefreshToken())
-            assertTrue(h.backend.seen.isEmpty())
+            val refreshCall = h.backend.seen.single { it.line == refresh }
+            assertEquals("refresh-1", refreshCall.json().getValue("refreshToken").jsonPrimitive.content)
+            assertNull(refreshCall.bearer())
+            assertEquals("Bearer access-2", h.backend.seen.single { it.line == logout }.bearer())
+            assertNull(h.tokens.getRefreshToken(), "the refreshed tokens are not stored")
+            assertNull(h.tokens.accessToken)
             assertFalse(h.session.isSignedIn.value)
+            assertFalse(h.events.expired.value)
+        }
+
+    @Test
+    fun logoutWithAnExpiredAccessTokenRefreshesOnceAndRetriesTheRevoke() =
+        runTest {
+            val h = harness()
+            h.seedSession()
+            h.session.startSession("access-1", "refresh-1")
+            h.backend.on(logout, problemReply(401, LIVE_UNAUTHORIZED), Reply.noContent())
+            h.backend.on(refresh, Reply.ok(REFRESHED_JSON))
+
+            assertEquals(DomainResult.Success(Unit), h.repository.logout())
+
+            val logouts = h.backend.seen.filter { it.line == logout }
+            assertEquals(listOf("Bearer access-1", "Bearer access-2"), logouts.map { it.bearer() })
+            assertEquals(1, h.backend.callsTo(refresh))
+            assertFalse(h.session.isSignedIn.value)
+            assertFalse(h.events.expired.value)
+        }
+
+    @Test
+    fun aRejectedRefreshOrAStill401MeansNothingLeftToRevokeAndIsNotAnError() =
+        runTest {
+            val rejected = harness()
+            rejected.seedSession()
+            rejected.session.startSession("access-1", "refresh-1")
+            rejected.backend.on(logout, problemReply(401, LIVE_UNAUTHORIZED))
+            rejected.backend.on(refresh, problemReply(401, LIVE_UNAUTHORIZED))
+            assertEquals(DomainResult.Success(Unit), rejected.repository.logout())
+            assertFalse(rejected.events.expired.value, "no SessionExpired from the revoke")
+
+            val still = harness()
+            still.seedSession()
+            still.session.startSession("access-1", "refresh-1")
+            still.backend.on(logout, problemReply(401, LIVE_UNAUTHORIZED))
+            still.backend.on(refresh, Reply.ok(REFRESHED_JSON))
+            assertEquals(DomainResult.Success(Unit), still.repository.logout())
+            assertEquals(2, still.backend.callsTo(logout))
+            assertEquals(1, still.backend.callsTo(refresh))
+
+            val coldRejected = harness()
+            coldRejected.seedSession(access = null, refresh = "refresh-1")
+            coldRejected.backend.on(refresh, problemReply(401, LIVE_UNAUTHORIZED))
+            assertEquals(DomainResult.Success(Unit), coldRejected.repository.logout())
+            assertEquals(0, coldRejected.backend.callsTo(logout))
+        }
+
+    @Test
+    fun anUnavailableRefreshDuringTheRevokeIsANetworkErrorButTheUserIsSignedOut() =
+        runTest {
+            val h = harness()
+            h.seedSession(access = null, refresh = "refresh-1")
+            h.backend.on(refresh, Reply(503, ""))
+
+            assertEquals(DomainResult.NetworkError, h.repository.logout())
+            assertFalse(h.session.isSignedIn.value)
+            assertNull(h.tokens.getRefreshToken())
+        }
+
+    @Test
+    fun withNeitherTokenThereIsNothingToRevoke() =
+        runTest {
+            val h = harness()
+            h.session.startSession("access-1", "refresh-1")
+            h.tokens.accessToken = null
+            h.tokens.clearRefreshToken()
+
+            assertEquals(DomainResult.Success(Unit), h.repository.logout())
+            assertTrue(h.backend.seen.isEmpty())
+        }
+
+    @Test
+    fun theUserIsSignedOutLocallyWhileTheRevokeIsStillPending() =
+        runTest {
+            val h = harness()
+            h.seedSession()
+            h.session.startSession("access-1", "refresh-1")
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            h.backend.onRequest = { gate.await() }
+            h.backend.on(logout, Reply.noContent())
+
+            val pending = async { h.repository.logout() }
+            runCurrent()
+
+            assertFalse(pending.isCompleted)
+            assertFalse(h.session.isSignedIn.value, "signed out before the network answers")
+            assertNull(h.tokens.accessToken)
+            assertNull(h.tokens.getRefreshToken())
+
+            gate.complete(Unit)
+            assertEquals(DomainResult.Success(Unit), pending.await())
+        }
+
+    @Test
+    fun theDefaultFiveSecondBoundEndsAHangingRevokeInVirtualTime() =
+        runTest {
+            val h = harness(logoutTimeout = null)
+            h.seedSession()
+            h.session.startSession("access-1", "refresh-1")
+            val never = kotlinx.coroutines.CompletableDeferred<Unit>()
+            h.backend.onRequest = { never.await() }
+            h.backend.on(logout, Reply.noContent())
+
+            val result = h.repository.logout()
+
+            assertEquals(DomainResult.NetworkError, result)
+            assertEquals(5_000L, testScheduler.currentTime)
+            assertFalse(h.session.isSignedIn.value)
+        }
+
+    @Test
+    fun a409OnRequestOtpIsNotAWrongCode() =
+        runTest {
+            val h = harness()
+            h.backend.on(otp, codeReply(409, "SOMETHING_NEW"))
+
+            assertEquals(AuthFailure.Unknown(409), h.repository.requestOtp("test.user@example.test").authFailure())
+        }
+
+    @Test
+    fun aFailedForcedRegistrationSkipsTheRetry() =
+        runTest {
+            val devices = FakeDevices()
+            val h = harness(devices)
+            h.backend.on(otp, problemReply(401, LIVE_UNAUTHORIZED))
+            devices.resultFor = { forced -> if (forced) DomainResult.Error(code = 404) else DomainResult.Success(Unit) }
+
+            val result = h.repository.requestOtp("test.user@example.test")
+
+            assertEquals(AuthFailure.Unauthorized, result.authFailure())
+            assertEquals(1, h.backend.callsTo(otp), "no duplicate auth call after a failed registration")
         }
 
     @Test
@@ -516,23 +655,6 @@ class RealAuthRepositoryTest {
             assertEquals(DomainResult.NetworkError, result)
             assertFalse(h.session.isSignedIn.value)
             assertNull(h.tokens.getRefreshToken())
-        }
-
-    @Test
-    fun logoutRejectedWith401StillEndsSignedOutWithoutRefreshing() =
-        runTest {
-            val h = harness()
-            h.seedSession()
-            h.session.startSession("access-1", "refresh-1")
-            h.backend.on(logout, problemReply(401, LIVE_UNAUTHORIZED))
-            h.backend.on(refresh, problemReply(401, LIVE_UNAUTHORIZED))
-
-            val result = h.repository.logout()
-
-            assertEquals(AuthFailure.Unauthorized, result.authFailure())
-            assertFalse(h.session.isSignedIn.value)
-            assertNull(h.tokens.getRefreshToken())
-            assertEquals(0, h.backend.callsTo(refresh), "the session is already cleared: nothing to refresh")
         }
 
     // me
