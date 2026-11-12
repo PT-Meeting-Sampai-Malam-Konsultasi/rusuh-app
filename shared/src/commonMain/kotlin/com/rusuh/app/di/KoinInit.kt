@@ -36,8 +36,9 @@ fun initKoin(
 fun initKoinForBuild(
     isDebug: Boolean,
     backendModeName: String? = null,
+    mockApiOverride: Boolean? = null,
     appDeclaration: KoinAppDeclaration = {},
 ): KoinApplication {
-    val startup = NetworkConfig.startup(isDebug, backendModeName)
+    val startup = NetworkConfig.startup(isDebug, backendModeName, mockApiOverride ?: NetworkConfig.MOCK_API)
     return initKoin(startup.environment, startup.backendMode, appDeclaration)
 }

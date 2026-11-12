@@ -105,20 +105,24 @@ See `ApiClientTest` for success, 204, problem+json, 5xx, timeout, malformed body
 ## Environments and hosts
 
 `AppEnvironment { Mock, Staging, Production }` picks the backend. The ONE switch between the local mock and the real
-host is `NetworkConfig.MOCK_API` (`data/network/NetworkConfig.kt`): edit the constant and rebuild.
+host is `NetworkConfig.MOCK_API` (`data/network/NetworkConfig.kt`). Android debug builds can override it with
+`-PmockApi=true` or `-PmockApi=false`; an empty property uses the constant.
 
 | Build | `MOCK_API = true` | `MOCK_API = false` |
 |---|---|---|
 | Debug | `Mock` + `BackendMode.Real`: HTTP to the local Mockoon | `Staging` + `BackendMode.Real`: HTTP to the real host |
 | Release | `Production` + `Real` (the flag is ignored) | `Production` + `Real` |
 
+Run modes: Stub `./gradlew :androidApp:assembleDebug -PbackendMode=Stub`; Mock `./gradlew :androidApp:assembleDebug -PmockApi=true`;
+Live staging `./gradlew :androidApp:assembleDebug -PmockApi=false`.
+
 The platform entry points only say whether the build is debug and pass the optional debug-only backend mode override
 to `initKoinForBuild(isDebug, backendModeName)`, which asks `NetworkConfig.startup`: Android `RusuhApplication` passes
-`BuildConfig.DEBUG` and `BuildConfig.BACKEND_MODE`, iOS `iOSApp.swift` calls `KoinIosKt.doInitKoin(isDebug:backendModeName:)`
+`BuildConfig.DEBUG`, `BuildConfig.BACKEND_MODE` and the optional debug `MOCK_API_OVERRIDE`, iOS `iOSApp.swift` calls `KoinIosKt.doInitKoin(isDebug:backendModeName:)`
 inside `#if DEBUG` / `#else`. A release build can never select the mock or stub data: `startup` ignores the flag and
 the override unless `isDebug`, `NetworkConfigTest` covers every combination, and `./gradlew
 :androidApp:verifyReleaseNeverUsesMockApi` (part of `:androidApp:check`) checks the generated release `BuildConfig`
-(`DEBUG = false`, empty `BACKEND_MODE`).
+(`DEBUG = false`, empty `BACKEND_MODE` and `MOCK_API_OVERRIDE`).
 
 `ApiConfig.forEnvironment(env)` returns three independently configured hosts: `baseUrl` (api), `queueBaseUrl`
 (`q.`) and `payBaseUrl` (`pay.`). Every URL is validated at construction (blank, malformed or non-http(s) throws
@@ -168,15 +172,28 @@ In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `
 
 ## Backend modes: Stub, Mockoon, Real
 
+### Live API (staging) notes
+
+All services share `https://api.rusuh-tiket.web.id/v1`: core routes use `/core/...` (public event list and detail;
+categories, tickets and bookings require auth), auth uses `/auth/...`, and queue uses `/queue/...`. Verified live
+queue routes include `/queue/devices` and `/queue/{eventId}/join|me|frontier|claim|stream`; queue currently returns
+404 `Unknown event` until the event queues are configured. `/core/me` and payments currently return 404.
+
+Live differs from Apidog: `POST /auth/otp` rejects `consentVersion`; profile is `GET` and `PUT /auth/profile`;
+mobile registration is `POST /queue/devices` and requires an `attestation` string. Staging accepts the temporary
+`dev` value; release builds must replace it with native attestation. Event list responses wrap `items` and `serverNow`
+and include extra nullable fields such as `venueShort`, `doorsOpenAt`, and `imageUrl`; decoders ignore unknown fields.
+
 `AppEnvironment` says which hosts exist; `BackendMode { Stub, Real }` (`di/BackendMode.kt`, the `useStubs` switch) says
-whether repositories talk to them. Four ways to run the app:
+whether repositories talk to them. Three debug ways to run the app:
 
 | Mode | Environment + mode | Network | Repositories | Needs |
 |---|---|---|---|---|
-| Mockoon over HTTP (the debug default) | `Mock` + `Real` (`MOCK_API = true`) | HTTP to the Mockoon mock at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth; stub Detail and Tickets (WARNING once each) | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
-| Real host (debug) | `Staging` + `Real` (`MOCK_API = false`) | HTTP to `https://api.rusuh-tiket.web.id/v1` | Same as above | The backend (queue and auth routes answer; core/booking routes 404 as of 2026-11-12) |
-| Release | `Production` + `Real` | HTTP to the real host | Same as above | The backend |
-| Stub (in process, offline demo) | `Mock`/`Staging` + `Stub` (debug only, `-PbackendMode=Stub` or `BACKEND_MODE=Stub` in the Xcode scheme) | None: the HTTP client runs on `StubEngine` | Stub repositories | Nothing |
+| Stub (offline demo) | `Stub` (`-PbackendMode=Stub`; iOS scheme `BACKEND_MODE=Stub`) | None; in-process `StubEngine` | Stub repositories | Nothing |
+| Mock (debug) | `Mock` + `Real` (`-PmockApi=true`; empty uses `MOCK_API`) | HTTP to Mockoon at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth; stub Detail and Tickets | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
+| Live staging (debug) | `Staging` + `Real` (`-PmockApi=false`) | HTTP to `https://api.rusuh-tiket.web.id/v1` | Same repositories as Mock | The staging backend |
+
+Release builds always use `Production` + `Real` over HTTPS.
 
 - Defaults: `BackendMode.defaultFor(env)` is `Real` for every environment. `Stub` is an explicit debug opt-in; asking
   for it for `Production` is rejected (`IllegalArgumentException`).
@@ -185,9 +202,9 @@ whether repositories talk to them. Four ways to run the app:
   replaces the shared `HttpClient` with one on the in-process `StubEngine` (closed with Koin), so the three named
   `ApiClient`s and any ApiService built on them run with zero network, and the `ServerClock` is the demo's ticking
   `StubClock`, so countdowns run.
-- Real repositories (`data/repository`): `RealHomeRepository` (`GET /events`), `RealQueueRepository` (behind both
+- Real repositories (`data/repository`): `RealHomeRepository` (`GET /core/events`), `RealQueueRepository` (behind both
   `WaitingRoomRepository` and `QueueRepository`: join, frontier polling at the ADR-0003 cadence, claim, leave),
-  `RealMyQueuesRepository`, `RealDeviceRepository` (`POST /devices`, the install id lives in the `SecureStore`). They
+  `RealMyQueuesRepository`, `RealDeviceRepository` (`POST /queue/devices`, the install id lives in the `SecureStore`). They
   are built on `EventApiService`, `QueueApiService` and `DeviceApiService` (`data/remote`), which use the `Api` and
   `Queue` clients (`/devices` and `/queue/*` belong to the queue service). Failed calls surface as `DomainException`
   (carrying the `DomainResult`), `SignInRequiredException` for a guest claim. `QueuePacing` makes the waits and the
@@ -274,17 +291,15 @@ AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> use cases -->
 
 - Flow: `requestOtp(email, fullName?, locale?)` (`POST /auth/otp`, 202 `challengeId`, `expiresAt`,
   `resendAfterSeconds`) then `verifyOtp(challengeId, code)` (`POST /auth/otp/verify`, 200 session). The request always
-  carries `consentVersion` (required by the contract): `CONSENT_VERSION = "2026-10"` (`shortcut:` taken from the
-  contract example, to be confirmed with the backend and legal). On success the access token is kept in memory, the
+  omits `consentVersion` because staging rejects it. On success the access token is kept in memory, the
   refresh token goes to the `TokenStore`, the sticky `SessionEvents.expired` is reset and `SessionManager.isSignedIn`
   turns true, all before `verifyOtp` returns. The tokens are not part of the domain model.
 - Device token (security scheme `deviceToken`): the repository tries `DeviceRepository.ensureRegistered()` before both
-  OTP calls, best effort. A registration error (404 on the live backend, which has no `POST /devices`) never blocks the
-  call: it goes out without the header. A NetworkError from the registration is returned as is. A 401 from the auth
-  call forces one new registration and one retry, and never expires the session (these paths are session-less).
-- `isNewAccount = true`: only after the code is verified does the UI show the new-account name step. The name has no
-  API to be saved (the Apidog contract has no profile update), so it is kept on the device only.
-- Profile: `GET /me` (`AuthRepository.me()`), with the Bearer. `/me/email-change` is out of scope.
+  OTP calls, best effort. Registration is `POST /queue/devices` with the required staging `attestation: "dev"`. A
+  NetworkError from registration is returned as is. A 401 from the auth call forces one new registration and one retry.
+- `isNewAccount = true`: after code verification, the name step stores the entered name locally and attempts
+  `PUT /auth/profile`; the local value remains a fallback if the update fails.
+- Profile: `GET /auth/profile` (`AuthRepository.me()`), with the Bearer.
 - Refresh is not in `AuthRepository`: `ApiTokenRefresher` + `SessionRefreshCoordinator` refresh on 401 with the stored
   refresh token (single flight, rotation, `SessionExpired` on a rejected token); see "401 and refresh".
 - `SessionManager.isSignedIn: StateFlow<Boolean>`: true after login, false after `logout()`, and false on
@@ -356,7 +371,7 @@ so a step survives rotation and tab switches; the work is cancelled when the ent
   started with and, if it moved, drops the answer and calls `logout()` again when the answer had signed in
   (`VerifyOtpOutcome.Superseded`). The sign-in ViewModel resets to a fresh Email step when the session goes from
   signed in to not signed in.
-- Account: `AccountViewModel` follows the phase, loads `GET /me` when the route asks (not during the name step), and
+- Account: `AccountViewModel` follows the phase, loads `GET /auth/profile` when the route asks (not during the name step), and
   signs out (local session first, per `logout()`). Cold start shows a neutral state until the stored session is read
   (bounded by `awaitSignedIn`, then signed out); `SessionExpired` returns to the login with a short message. `/me`
   failure is a small retry state. "Hapus akun" stays inert, "Ganti email" is hidden.
@@ -372,20 +387,19 @@ so a step survives rotation and tab switches; the work is cancelled when the ent
 
 ### Known live divergences (2026-11-12, `https://api.rusuh-tiket.web.id/v1`)
 
-The app follows the contract, so a real call from this build can fail until the backend matches it. This is intended.
+The app follows the verified live staging behavior for the paths below.
 
-- The live backend REJECTS `consentVersion` (400 `"consentVersion" is not allowed`), so `POST /auth/otp` fails there.
-- It answers `GET /auth/profile` (401 without a token) but 404 for `GET /me`; the app calls `/me`.
-- It has no `POST /devices` (hence the best-effort registration above).
+- The live backend rejects `consentVersion`, so the app omits it from `POST /auth/otp`.
+- Profile reads and name updates use `GET` and `PUT /auth/profile`; the app stores a local name fallback before attempting the update.
+- Device registration uses `POST /queue/devices` with `attestation: "dev"` until native attestation is available.
 - Auth errors come as problem+json with `type: "about:blank"` (not an `api.rusuh.id/problems/...` URI), an Indonesian
   `detail` and sometimes a code outside the contract: `400` `Validasi gagal: "email" is required` with code
   `BAD_REQUEST`, `401` `Token akun tidak ditemukan` with `UNAUTHORIZED`, `410` titled `OTP challenge expired` with
   `CHALLENGE_EXPIRED`. `ProblemDetails` never reads `type` or `title` for a decision; `BAD_REQUEST` parses to
   `ErrorCode.UNKNOWN` (kept in `rawCode`) and still lands on `AuthFailure.InvalidInput` through the 400 status.
   `detail` is for diagnostics, never shown. Fixtures of these bodies are in `AuthHarness.kt`.
-- Result in the app: with `MOCK_API = false` the code request fails with a 400 until the backend matches the contract;
-  the sign-in screen shows the inline "request rejected" line and stays usable (no crash). The signed-in page needs
-  `GET /me`, which is a 404 on the live backend, so it shows the retry state.
+- Result in the app: with live staging selected, the code request follows the accepted live payload;
+  the sign-in screen shows the inline "request rejected" line and stays usable (no crash). The profile screen reads the live `/auth/profile` response.
 
 ## Storage
 

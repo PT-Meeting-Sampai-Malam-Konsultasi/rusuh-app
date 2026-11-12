@@ -103,6 +103,12 @@ class FakeAuthRepository : AuthRepository {
         meCalls++
         return onMe()
     }
+
+    override suspend fun updateProfile(
+        fullName: String,
+        locale: UserLocale?,
+    ): DomainResult<AuthUser> =
+        DomainResult.Success(TEST_USER.copy(fullName = fullName, locale = locale ?: TEST_USER.locale))
 }
 
 class FakeSessionObserver(initial: SessionPhase = SessionPhase.SignedOut) : SessionObserver {

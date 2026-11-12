@@ -493,7 +493,7 @@ class SessionRefreshTest {
             val f = Fixture(refresher = { RefreshOutcome.Refreshed("new", "refresh-2") }) { unauthorized() }
             f.signIn()
 
-            listOf("/auth/otp", "/auth/otp/verify", "/auth/refresh", "/devices").forEach {
+            listOf("/auth/otp", "/auth/otp/verify", "/auth/refresh", "/queue/devices").forEach {
                 val result = f.http.api.post<Unit>(it)
                 assertEquals(401, assertIs<ApiResult.Error>(result).code)
             }

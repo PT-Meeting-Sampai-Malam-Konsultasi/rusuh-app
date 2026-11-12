@@ -1,5 +1,7 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.data.platform.AttestationProvider
+import com.rusuh.app.data.platform.DevAttestationProvider
 import com.rusuh.app.data.storage.AppPreferences
 import com.rusuh.app.data.storage.KeychainSecureStore
 import com.rusuh.app.data.storage.SecureStore
@@ -11,4 +13,5 @@ actual val platformModule: Module =
     module {
         single<SecureStore> { KeychainSecureStore() }
         single<AppPreferences> { UserDefaultsAppPreferences() }
+        single<AttestationProvider> { DevAttestationProvider() }
     }
