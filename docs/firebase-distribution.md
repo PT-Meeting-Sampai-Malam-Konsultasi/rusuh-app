@@ -10,10 +10,11 @@ emulator). iOS is not distributed: a device install needs a signed build and the
 2. A tester group. The workflow uses the alias `rusuh-devs`; to use another alias set the repository variable
    `FIREBASE_TESTER_GROUPS` (comma separated aliases). The alias is shown under App Distribution > Testers & Groups.
 3. A Google Cloud service account for project `rusuh-app` with the role **Firebase App Distribution Admin** and a JSON key.
-4. Repository secrets (Settings > Secrets and variables > Actions):
-   - `FIREBASE_SERVICE_ACCOUNT_JSON`: the whole JSON key;
-   - `FIREBASE_APP_ID`: the Android app id (`1:...:android:...`, Firebase Project settings > Your apps).
-Until both secrets exist the job only prints a notice and passes.
+4. In Settings > Secrets and variables > Actions:
+   - secret `FIREBASE_SERVICE_ACCOUNT_JSON`: the whole JSON key;
+   - `FIREBASE_APP_ID`: the Android app id (`1:...:android:...`, Firebase Project settings > Your apps). It is not a
+     secret: a repository **variable** is enough (a secret with the same name also works; the variable wins).
+Until both exist the job only prints a notice and passes.
 
 ## Notes
 - `google-services.json` is **not** needed (no Firebase SDK in the app) and must not be committed (public repo).
