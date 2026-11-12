@@ -6,6 +6,8 @@ import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
 import com.rusuh.app.domain.usecase.LeaveQueueUseCase
 import com.rusuh.app.domain.usecase.ValidateAttendeeUseCase
 import com.rusuh.app.feature.detail.DetailViewModel
+import com.rusuh.app.feature.eticket.ETicketViewModel
+import com.rusuh.app.feature.eticket.GetETicketUseCase
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
@@ -30,6 +32,8 @@ val appModule =
 
         // Tickets (Tiket tab).
         factory { GetMyTicketsUseCase(get()) }
+        factory { GetETicketUseCase(get()) }
+        factory { (orderId: String) -> ETicketViewModel(orderId, get()) }
 
         // Detail ticket page (the ServerClock is bound per backend mode in dataModule).
         factory { GetDetailUseCase(get()) }

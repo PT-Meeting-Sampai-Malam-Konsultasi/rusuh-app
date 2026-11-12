@@ -45,6 +45,19 @@ sealed class Screen(val route: String) {
         /** Build the concrete route for [eventId]. */
         fun routeFor(eventId: String): String = "detail/$eventId"
     }
+
+    /**
+     * E-ticket page of one order, opened from the Tiket tab. It lives inside the Tiket tab (the bottom bar
+     * stays, Tiket selected) and Back returns to the tab.
+     *
+     * @property route the route pattern with a URL-encoded `orderId` path argument.
+     */
+    data object ETicket : Screen("eticket/{orderId}") {
+        const val ARG_ORDER_ID = "orderId"
+
+        /** Build the concrete route for [orderId], URL-encoded so it stays one path segment. */
+        fun routeFor(orderId: String): String = "eticket/${encodePathSegment(orderId)}"
+    }
 }
 
 /**
@@ -58,3 +71,15 @@ fun RusuhTab.destinationRoute(): String =
         RusuhTab.Tiket -> Screen.Tickets.route
         RusuhTab.Akun -> Screen.Account.route
     }
+
+/** Percent-encodes everything but unreserved characters so an id cannot add path segments or a query. */
+internal fun encodePathSegment(value: String): String =
+    buildString {
+        for (byte in value.encodeToByteArray()) {
+            val c = byte.toInt() and 0xFF
+            val unreserved = c < 0x80 && (c.toChar().isLetterOrDigit() || c.toChar() in "-._~")
+            if (unreserved) append(c.toChar()) else append('%').append(HEX[c shr 4]).append(HEX[c and 0xF])
+        }
+    }
+
+private const val HEX = "0123456789ABCDEF"
