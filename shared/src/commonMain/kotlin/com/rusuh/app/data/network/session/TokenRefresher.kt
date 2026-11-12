@@ -1,6 +1,6 @@
 package com.rusuh.app.data.network.session
 
-/** Calls `POST /auth/refresh`. The real `AuthRepository.refresh` (EPIC-01-M6 #67) can replace [ApiTokenRefresher]. */
+/** Calls `POST /auth/refresh`. [ApiTokenRefresher] is the implementation; `AuthRepository` has no refresh. */
 fun interface TokenRefresher {
     suspend fun refresh(refreshToken: String): RefreshOutcome
 }

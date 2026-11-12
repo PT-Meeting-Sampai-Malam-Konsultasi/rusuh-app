@@ -1,6 +1,7 @@
 package com.rusuh.app.navigation
 
 import com.rusuh.app.ui.components.RusuhTab
+import io.ktor.http.encodeURLParameter
 
 /** Defines app screens with their navigation routes. */
 sealed class Screen(val route: String) {
@@ -17,7 +18,7 @@ sealed class Screen(val route: String) {
     /** Tiket tab — stub destination until the Tickets screen is built. */
     data object Tickets : Screen("tickets")
 
-    /** Akun tab — stub destination until the Account screen is built. */
+    /** Akun tab: the compact login while signed out (AUTH-00-M5), the account page once signed in. */
     data object Account : Screen("account")
 
     // --- Pushed destinations (NO bottom bar). ---
@@ -57,6 +58,18 @@ sealed class Screen(val route: String) {
 
         /** Build the concrete route for [orderId], URL-encoded so it stays one path segment. */
         fun routeFor(orderId: String): String = "eticket/${encodePathSegment(orderId)}"
+    }
+
+    /**
+     * Full-screen login (AUTH-00-M4), pushed from the waiting room (entry point: #103).
+     * The optional `eventId` query argument names the event the user continues to afterwards.
+     */
+    data object SignIn : Screen("sign-in?eventId={eventId}") {
+        const val ARG_EVENT_ID = "eventId"
+
+        /** Build the concrete route, with or without the event the user continues to. */
+        fun routeFor(eventId: String? = null): String =
+            if (eventId == null) "sign-in" else "sign-in?eventId=${eventId.encodeURLParameter()}"
     }
 }
 
