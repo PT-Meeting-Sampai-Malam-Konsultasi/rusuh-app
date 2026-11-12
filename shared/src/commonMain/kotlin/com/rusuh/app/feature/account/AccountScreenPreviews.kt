@@ -52,7 +52,13 @@ internal fun AccountSignInNewAccountPreview() =
 
 @Composable
 internal fun AccountSignedInPreview() {
-    RusuhTheme { AccountScreen(isSignedIn = true, signInState = SignInUiState.Email()) }
+    RusuhTheme {
+        AccountScreen(
+            isSignedIn = true,
+            signInState = SignInUiState.Email(),
+            profile = AccountProfileUi(name = "Sari Wulandari", email = SAMPLE_EMAIL, emailVerified = true),
+        )
+    }
 }
 
 // 2x font scale (accessibility): the longest steps, to check nothing clips or overlaps.

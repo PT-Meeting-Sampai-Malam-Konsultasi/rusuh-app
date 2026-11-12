@@ -1,3 +1,5 @@
+@file:Suppress("LongParameterList")
+
 package com.rusuh.app.feature.account
 
 import androidx.compose.foundation.layout.Box
@@ -8,11 +10,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.rusuh.app.feature.auth.SignInActions
 import com.rusuh.app.feature.auth.SignInContent
@@ -24,9 +23,6 @@ import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhBrandColors
 import com.rusuh.app.ui.theme.RusuhSpacing
-import org.jetbrains.compose.resources.stringResource
-import rusuh_app.shared.generated.resources.Res
-import rusuh_app.shared.generated.resources.tab_coming_soon
 
 /**
  * Akun tab (AUTH-00-M5 #102): the normal tab chrome (RUSUH! header with ID|EN, bottom bar with
@@ -42,6 +38,8 @@ fun AccountScreen(
     signInState: SignInUiState,
     modifier: Modifier = Modifier,
     signInActions: SignInActions = SignInActions(),
+    profile: AccountProfileUi = AccountProfileUi(name = "", email = "", emailVerified = true),
+    profileActions: AccountProfileActions = AccountProfileActions(onSignOut = {}),
     onTabSelected: (RusuhTab) -> Unit = {},
 ) {
     Scaffold(
@@ -54,6 +52,8 @@ fun AccountScreen(
             isSignedIn = isSignedIn,
             signInState = signInState,
             signInActions = signInActions,
+            profile = profile,
+            profileActions = profileActions,
             modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
         )
     }
@@ -61,8 +61,7 @@ fun AccountScreen(
 
 /**
  * The single seam of the Account tab body: the compact login while signed out, the account page
- * once signed in. ACCOUNT-00 (#104, PR #106) swaps [SignedInAccountSlot] for `AccountProfileContent`
- * without touching the signed-out branch.
+ * once signed in (`AccountProfileContent`, ACCOUNT-00 #104).
  */
 @Composable
 fun AccountContent(
@@ -70,9 +69,12 @@ fun AccountContent(
     signInState: SignInUiState,
     modifier: Modifier = Modifier,
     signInActions: SignInActions = SignInActions(),
+    profile: AccountProfileUi = AccountProfileUi(name = "", email = "", emailVerified = true),
+    profileActions: AccountProfileActions = AccountProfileActions(onSignOut = {}),
 ) {
     if (isSignedIn) {
-        SignedInAccountSlot(modifier)
+        // TODO(AUTH-00 #77): feed [profile] from the real session (GET /me) instead of the placeholder flow.
+        AccountProfileContent(profile = profile, actions = profileActions, modifier = modifier)
     } else {
         CompactSignIn(signInState, signInActions, modifier)
     }
@@ -97,22 +99,6 @@ private fun CompactSignIn(
             actions = actions,
             variant = SignInVariant.Compact,
             modifier = Modifier.padding(PaddingValues(horizontal = RusuhSpacing.xl, vertical = RusuhSpacing.xl)),
-        )
-    }
-}
-
-/**
- * Slot for the signed-in account page.
- * TODO(ACCOUNT-00 #104): replace with `AccountProfileContent` from feature/account (PR #106);
- *  until it merges this keeps the "coming soon" stub the tab always had.
- */
-@Composable
-private fun SignedInAccountSlot(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            text = stringResource(Res.string.tab_coming_soon, stringResource(RusuhTab.Akun.label)),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

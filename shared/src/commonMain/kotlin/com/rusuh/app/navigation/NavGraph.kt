@@ -25,6 +25,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.rusuh.app.feature.account.AccountProfileActions
+import com.rusuh.app.feature.account.AccountProfileUi
 import com.rusuh.app.feature.account.AccountScreen
 import com.rusuh.app.feature.auth.SignInEventContext
 import com.rusuh.app.feature.auth.SignInScreen
@@ -234,17 +236,7 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
         )
     }
 
-    composable(Screen.Account.route) {
-        // Placeholder login flow (local UI state) until AUTH-00-M3 (#77) provides the real state.
-        // Finishing it flips isSignedIn so the login -> Account page transition can be seen.
-        val signIn = rememberPlaceholderSignIn(startOpen = true)
-        AccountScreen(
-            isSignedIn = signIn.isSignedIn,
-            signInState = signIn.state ?: SignInUiState.Email(),
-            signInActions = signIn.actions,
-            onTabSelected = onTabSelected,
-        )
-    }
+    composable(Screen.Account.route) { AccountTabRoute(onTabSelected) }
 }
 
 /** Holder for the last non-null login step; written during composition on purpose (not snapshot state). */
@@ -258,6 +250,28 @@ private class LastState(
  */
 private fun NavHostController.popIfCurrent(route: String) {
     if (currentDestination?.route == route) popBackStack()
+}
+
+/**
+ * Akun tab host: the placeholder login flow (local UI state) until AUTH-00-M3 (#77) provides the
+ * real state. Finishing it flips isSignedIn so login -> Account page can be seen before #77.
+ */
+@Composable
+private fun AccountTabRoute(onTabSelected: (RusuhTab) -> Unit) {
+    val signIn = rememberPlaceholderSignIn(startOpen = true)
+    AccountScreen(
+        isSignedIn = signIn.isSignedIn,
+        signInState = signIn.state ?: SignInUiState.Email(),
+        signInActions = signIn.actions,
+        profile =
+            AccountProfileUi(
+                name = signIn.signedInName,
+                email = signIn.signedInEmail,
+                emailVerified = true,
+            ),
+        profileActions = AccountProfileActions(onSignOut = signIn::signOut),
+        onTabSelected = onTabSelected,
+    )
 }
 
 /**
