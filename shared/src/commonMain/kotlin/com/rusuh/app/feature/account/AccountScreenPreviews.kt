@@ -66,7 +66,10 @@ internal fun AccountSignedInPreview() {
 @Composable
 internal fun AccountSessionExpiredPreview() {
     RusuhTheme {
-        AccountScreen(body = AccountBody.SignedOut(sessionExpired = true), signInState = SignInUiState.Email())
+        AccountScreen(
+            body = AccountBody.SignedOut(sessionExpired = true),
+            signInState = SignInUiState.Email(),
+        )
     }
 }
 

@@ -214,17 +214,6 @@ class DetailViewModelTest {
         }
 
     @Test
-    fun selfModePrefillsNameOnlyAndNeverNik() =
-        runTest(dispatcher) {
-            val vm = viewModel()
-            send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.AttendeeKindChanged(0, AttendeeKind.Self))
-            val attendee = vm.state.value.form.attendees.single()
-            assertEquals("Nadia Saputri", attendee.name)
-            assertEquals("", attendee.nik)
-            assertFalse(vm.state.value.canProceed)
-        }
-
-    @Test
     fun nikEditKeepsDigitsOnlyUpToSixteen() =
         runTest(dispatcher) {
             val vm = viewModel()
@@ -431,12 +420,12 @@ class DetailViewModelTest {
         runTest(dispatcher) {
             val vm = viewModel()
             send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.IncrementCategory("b"))
-            send(vm, DetailIntent.AttendeeKindChanged(0, AttendeeKind.Self), DetailIntent.AttendeeNikChanged(0, nikA))
+            send(vm, DetailIntent.AttendeeNameChanged(0, "Nadia"), DetailIntent.AttendeeNikChanged(0, nikA))
             send(vm, DetailIntent.AttendeeNameChanged(1, "Raka"), DetailIntent.AttendeeNikChanged(1, nikB))
             send(vm, DetailIntent.IncrementCategory("a"))
             val attendees = vm.state.value.form.attendees
             assertEquals(listOf("a", "b", "a"), attendees.map { it.categoryId })
-            assertEquals(AttendeeKind.Self, attendees[0].kind)
+            assertEquals("Nadia", attendees[0].name)
             assertEquals(nikA, attendees[0].nik)
             assertEquals("Raka", attendees[1].name)
             assertEquals(nikB, attendees[1].nik)
@@ -485,19 +474,6 @@ class DetailViewModelTest {
             send(vm, DetailIntent.AttendeeNikChanged(0, nikB))
             assertEquals(1, vm.state.value.form.duplicateOf(1))
             assertFalse(vm.state.value.canProceed)
-        }
-
-    @Test
-    fun switchingSelfToOtherClearsOnlyThePrefilledName() =
-        runTest(dispatcher) {
-            val vm = viewModel()
-            send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.AttendeeKindChanged(0, AttendeeKind.Self))
-            send(vm, DetailIntent.AttendeeNikChanged(0, nikA))
-            send(vm, DetailIntent.AttendeeKindChanged(0, AttendeeKind.Other))
-            val attendee = vm.state.value.form.attendees.single()
-            assertEquals(AttendeeKind.Other, attendee.kind)
-            assertEquals("", attendee.name)
-            assertEquals(nikA, attendee.nik)
         }
 
     @Test
