@@ -32,11 +32,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      HAS_FIREBASE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' && secrets.FIREBASE_APP_ID != '' }}
+      HAS_FIREBASE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' && (vars.FIREBASE_APP_ID != '' || secrets.FIREBASE_APP_ID != '') }}
     steps:
       - name: Skip when Firebase secrets are missing
         if: env.HAS_FIREBASE != 'true'
-        run: echo "FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_APP_ID is not set, skipping distribution."
+        run: echo "FIREBASE_SERVICE_ACCOUNT_JSON (secret) or FIREBASE_APP_ID (variable or secret) is not set, skipping distribution."
       - uses: actions/checkout@v4
         if: env.HAS_FIREBASE == 'true'
       - uses: actions/setup-java@v4
@@ -51,12 +51,13 @@ jobs:
         if: env.HAS_FIREBASE == 'true'
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID || secrets.FIREBASE_APP_ID }}
           FIREBASE_GROUPS: ${{ vars.FIREBASE_TESTER_GROUPS || 'rusuh-devs' }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          FIREBASE_APP_ID="$(printf '%s' "$FIREBASE_APP_ID" | tr -d '[:space:]')"
           CREDS="$RUNNER_TEMP/firebase-service-account.json"
           trap 'rm -f "$CREDS"' EXIT
           umask 077
