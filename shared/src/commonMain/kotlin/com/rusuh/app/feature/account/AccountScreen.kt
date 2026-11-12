@@ -86,10 +86,7 @@ fun AccountScreen(
     }
 }
 
-/**
- * The single seam of the Account tab body: the compact login while signed out, a neutral state while the stored
- * session is read or the account loads, the account page once signed in, a small retry state when it failed.
- */
+/** Compact login, account page, and loading/error states derived by [AccountRoute]. */
 @Composable
 fun AccountContent(
     body: AccountBody,

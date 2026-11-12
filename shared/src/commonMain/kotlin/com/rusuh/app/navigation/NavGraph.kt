@@ -32,6 +32,7 @@ import com.rusuh.app.feature.account.AccountViewModelHolder
 import com.rusuh.app.feature.auth.SignInEffect
 import com.rusuh.app.feature.auth.SignInEventContext
 import com.rusuh.app.feature.auth.SignInScreen
+import com.rusuh.app.feature.auth.SignInUiState
 import com.rusuh.app.feature.auth.SignInViewModel
 import com.rusuh.app.feature.auth.SignInViewModelHolder
 import com.rusuh.app.feature.auth.signInActions
@@ -132,6 +133,8 @@ fun RusuhNavGraph(navController: NavHostController) {
                     factory = viewModelFactory { initializer { SignInViewModelHolder(koin.get<SignInViewModel>()) } },
                 ).viewModel
             val state by viewModel.state.collectAsState()
+            val lastState = remember { LastState() }
+            lastState.value = state.step
             // TODO(AUTH-00 #103): continue to the queue / Detail once signed in (today: close the screen).
             LaunchedEffect(viewModel) {
                 viewModel.effect.collect { effect ->
@@ -141,7 +144,7 @@ fun RusuhNavGraph(navController: NavHostController) {
                 }
             }
             SignInScreen(
-                state = state.step,
+                state = lastState.value,
                 event = PLACEHOLDER_SIGN_IN_EVENT,
                 status = state.status,
                 actions =
@@ -272,6 +275,11 @@ private fun AccountDestination(
         onTabSelected = onTabSelected,
     )
 }
+
+/** Holder for the last sign-in step while the route exits. */
+private class LastState(
+    var value: SignInUiState = SignInUiState.Email(),
+)
 
 /**
  * Pops only while [route] is still the current destination, so a double tap (or a tap during the
