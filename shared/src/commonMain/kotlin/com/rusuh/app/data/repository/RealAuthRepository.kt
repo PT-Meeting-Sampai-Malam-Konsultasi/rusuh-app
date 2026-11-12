@@ -61,6 +61,8 @@ class RealAuthRepository(
         return deviceGated({ api.requestOtp(body) }) { it.toDomainResult { dto -> dto.toDomain() }.emptyIsTechnical() }
     }
 
+    // TODO(AUTH-00 #77): a verifyOtp that completes after a logout signs the user back in. The state layer should keep
+    //  a generation counter (bumped by logout) and drop a result that belongs to an older one.
     override suspend fun verifyOtp(
         challengeId: String,
         code: String,
@@ -93,7 +95,11 @@ class RealAuthRepository(
      *   stored) and the logout is sent with that fresh access token;
      * - a refresh the server rejects, or no refresh token at all, means there is nothing to revoke: success;
      * - a 401 on the logout itself is not an error (the token family is gone either way).
-     * No server call when not signed in. Timeout or an unreachable server is [DomainResult.NetworkError]. If clearing
+     * No server call when not signed in. Timeout or an unreachable server is [DomainResult.NetworkError]: not
+     * revoked and not worth retrying (the local session is gone; a rotated refresh token may stay valid on the server
+     * until it expires). [DomainResult.NetworkError] covers both calls (refresh and logout) under the one bound. The
+     * wait for a cold-start restore ([SessionManager.awaitSignedIn], at most 5 s if the storage read hangs) happens
+     * before the clear. If clearing
      * storage threw, the result is [DomainResult.TechnicalError] (the refresh token may remain on disk: retry).
      */
     override suspend fun logout(): DomainResult<Unit> {
@@ -129,7 +135,8 @@ class RealAuthRepository(
             when (val fresh = freshAccessToken(refreshToken)) {
                 is Fresh.Token -> api.logout(fresh.value).toDomainResult { Unit }.unauthorizedIsDone()
                 Fresh.Nothing -> DomainResult.Success(Unit)
-                Fresh.Unreachable -> first?.unauthorizedIsDone() ?: DomainResult.NetworkError
+                // Nothing was revoked: never report success, whatever the first logout answered.
+                Fresh.Unreachable -> DomainResult.NetworkError
             }
         }
     }
