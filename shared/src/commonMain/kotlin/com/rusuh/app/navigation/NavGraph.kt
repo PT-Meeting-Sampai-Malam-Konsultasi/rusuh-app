@@ -19,19 +19,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.rusuh.app.feature.account.AccountProfileActions
-import com.rusuh.app.feature.account.AccountProfileUi
-import com.rusuh.app.feature.account.AccountScreen
+import com.rusuh.app.feature.account.AccountRoute
+import com.rusuh.app.feature.account.AccountViewModel
+import com.rusuh.app.feature.account.AccountViewModelHolder
+import com.rusuh.app.feature.auth.SignInEffect
 import com.rusuh.app.feature.auth.SignInEventContext
 import com.rusuh.app.feature.auth.SignInScreen
 import com.rusuh.app.feature.auth.SignInUiState
-import com.rusuh.app.feature.auth.rememberPlaceholderSignIn
+import com.rusuh.app.feature.auth.SignInViewModel
+import com.rusuh.app.feature.auth.SignInViewModelHolder
+import com.rusuh.app.feature.auth.signInActions
 import com.rusuh.app.feature.detail.DetailRoute
 import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.detail.DetailViewModelHolder
@@ -134,29 +138,36 @@ fun RusuhNavGraph(navController: NavHostController) {
                         defaultValue = null
                     },
                 ),
-        ) {
+        ) { backStackEntry ->
             // TODO(AUTH-00 #103): resolve the event from the ARG_EVENT_ID argument and add the
             //  waiting-room entry point (navigate(Screen.SignIn.routeFor(eventId))); until then
             //  nothing pushes this route and the banner shows a placeholder event.
-            val signIn = rememberPlaceholderSignIn(startOpen = true)
-            // The flow clears its state when it finishes; keep showing the last step while the
-            // screen animates out, so it does not flash the Email step or reopen the keyboard.
+            val koin = getKoin()
+            val viewModel =
+                viewModel<SignInViewModelHolder>(
+                    viewModelStoreOwner = backStackEntry,
+                    key = "sign-in",
+                    factory = viewModelFactory { initializer { SignInViewModelHolder(koin.get<SignInViewModel>()) } },
+                ).viewModel
+            val state by viewModel.state.collectAsState()
             val lastState = remember { LastState() }
-            signIn.state?.let { lastState.value = it }
+            lastState.value = state.step
+            // TODO(AUTH-00 #103): continue to the queue / Detail once signed in (today: close the screen).
+            LaunchedEffect(viewModel) {
+                viewModel.effect.collect { effect ->
+                    when (effect) {
+                        is SignInEffect.SignedIn -> navController.popIfCurrent(Screen.SignIn.route)
+                    }
+                }
+            }
             SignInScreen(
                 state = lastState.value,
                 event = PLACEHOLDER_SIGN_IN_EVENT,
+                status = state.status,
                 actions =
-                    signIn.actions.copy(
+                    signInActions(
+                        viewModel = viewModel,
                         onDismiss = { navController.popIfCurrent(Screen.SignIn.route) },
-                        // TODO(AUTH-00 #103): continue to the queue / Detail once signed in.
-                        onCreateAccount = {
-                            // Only the first tap counts: the flow leaves NewAccount right away.
-                            if (signIn.state is SignInUiState.NewAccount) {
-                                signIn.actions.onCreateAccount()
-                                navController.popIfCurrent(Screen.SignIn.route)
-                            }
-                        },
                     ),
             )
         }
@@ -234,7 +245,7 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
                     TicketsEffect.GoToEvents -> navController.switchTab(RusuhTab.Event)
                     is TicketsEffect.OpenETicket -> navController.navigate(Screen.ETicket.routeFor(effect.orderId))
                     // The Account tab hosts the compact login (decision 2026-11-12).
-                    // TODO(AUTH-00 #77): return to the Tiket tab once signed in.
+                    // shortcut: after signing in the user stays on the Account page and taps Tiket again.
                     TicketsEffect.OpenSignIn -> navController.switchTab(RusuhTab.Akun)
                 }
             }
@@ -252,10 +263,36 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
         )
     }
 
-    composable(Screen.Account.route) { AccountTabRoute(onTabSelected) }
+    composable(Screen.Account.route) { backStackEntry -> AccountDestination(backStackEntry, onTabSelected) }
 }
 
-/** Holder for the last non-null login step; written during composition on purpose (not snapshot state). */
+/** The Akun tab: both ViewModels live in the back-stack entry (kept while the tab is saved), see the holders. */
+@Composable
+private fun AccountDestination(
+    backStackEntry: NavBackStackEntry,
+    onTabSelected: (RusuhTab) -> Unit,
+) {
+    val koin = getKoin()
+    val accountViewModel =
+        viewModel<AccountViewModelHolder>(
+            viewModelStoreOwner = backStackEntry,
+            key = "account",
+            factory = viewModelFactory { initializer { AccountViewModelHolder(koin.get<AccountViewModel>()) } },
+        ).viewModel
+    val signInViewModel =
+        viewModel<SignInViewModelHolder>(
+            viewModelStoreOwner = backStackEntry,
+            key = "account-sign-in",
+            factory = viewModelFactory { initializer { SignInViewModelHolder(koin.get<SignInViewModel>()) } },
+        ).viewModel
+    AccountRoute(
+        accountViewModel = accountViewModel,
+        signInViewModel = signInViewModel,
+        onTabSelected = onTabSelected,
+    )
+}
+
+/** Holder for the last sign-in step while the route exits. */
 private class LastState(
     var value: SignInUiState = SignInUiState.Email(),
 )
@@ -266,28 +303,6 @@ private class LastState(
  */
 private fun NavHostController.popIfCurrent(route: String) {
     if (currentDestination?.route == route) popBackStack()
-}
-
-/**
- * Akun tab host: the placeholder login flow (local UI state) until AUTH-00-M3 (#77) provides the
- * real state. Finishing it flips isSignedIn so login -> Account page can be seen before #77.
- */
-@Composable
-private fun AccountTabRoute(onTabSelected: (RusuhTab) -> Unit) {
-    val signIn = rememberPlaceholderSignIn(startOpen = true)
-    AccountScreen(
-        isSignedIn = signIn.isSignedIn,
-        signInState = signIn.state ?: SignInUiState.Email(),
-        signInActions = signIn.actions,
-        profile =
-            AccountProfileUi(
-                name = signIn.signedInName,
-                email = signIn.signedInEmail,
-                emailVerified = true,
-            ),
-        profileActions = AccountProfileActions(onSignOut = signIn::signOut),
-        onTabSelected = onTabSelected,
-    )
 }
 
 /**

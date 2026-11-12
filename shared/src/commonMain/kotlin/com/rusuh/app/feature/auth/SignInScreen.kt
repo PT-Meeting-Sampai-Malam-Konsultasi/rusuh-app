@@ -72,6 +72,7 @@ fun SignInScreen(
     event: SignInEventContext,
     modifier: Modifier = Modifier,
     actions: SignInActions = SignInActions(),
+    status: SignInStatus = SignInStatus(),
 ) {
     Column(modifier = modifier.fillMaxSize().background(RusuhColors.BrandPaper)) {
         SignInTopBar(onBack = actions.onDismiss)
@@ -93,7 +94,13 @@ fun SignInScreen(
             Spacer(Modifier.height(RusuhSpacing.md))
             SignInEventBanner(event)
             Spacer(Modifier.height(RusuhSpacing.xxl))
-            SignInContent(state = state, actions = actions, variant = SignInVariant.Full, autoFocusEmail = true)
+            SignInContent(
+                state = state,
+                actions = actions,
+                variant = SignInVariant.Full,
+                autoFocusEmail = true,
+                status = status,
+            )
             Spacer(Modifier.height(RusuhSpacing.xxl))
             SignInInfoBlocks()
         }

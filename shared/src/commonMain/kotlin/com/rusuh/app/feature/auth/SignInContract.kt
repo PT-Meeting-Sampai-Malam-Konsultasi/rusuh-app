@@ -11,9 +11,10 @@ private const val SECONDS_PER_MINUTE = 60
  * Numbers that appear in the sign-in copy and countdowns, in one place so they can change
  * together. The string resources take them as placeholders, never as literals.
  *
- * TODO(AUTH-00 #77): the Figma copy says "5 menit" (code validity) and "15 menit" (lock-out
+ * shortcut: the Figma copy says "5 menit" (code validity) and "15 menit" (lock-out
  *  after wrong codes), ADR-0006 says 10 minutes valid, a new code after 60 s and 5 attempts.
- *  Keep the design numbers until the team confirms, then change them here only.
+ *  The copy keeps the design numbers until the team confirms, then change them here only. The countdown itself
+ *  runs from the server's `expiresAt` (the design number is only the fallback).
  */
 object SignInPolicy {
     /** Minutes a code stays valid, as shown to the user (design: 5, ADR-0006: 10). */
@@ -35,8 +36,8 @@ object SignInPolicy {
 /**
  * UI-level render state for the sign-in screens (Figma Login: Email, Code, Wrong code,
  * Code expired, New account). Presentation-only discriminator, NOT an MVI state;
- * AUTH-00-M3 maps the real auth state onto it. Each case carries the values the fields
- * show, so the screens stay stateless.
+ * `SignInViewModel` (AUTH-00-M3) maps its state onto it, with [SignInStatus] next to it for the in-flight and
+ * error lines. Each case carries the values the fields show, so the screens stay stateless.
  */
 @Immutable
 sealed interface SignInUiState {
@@ -77,6 +78,38 @@ sealed interface SignInUiState {
     ) : SignInUiState
 }
 
+/**
+ * A failure shown as one line inside the current step (the five design states do not cover it). Never carries
+ * server text: the screen picks localised copy from the case.
+ */
+@Immutable
+sealed interface SignInError {
+    /** Offline, timeout or connection failure. */
+    data object Network : SignInError
+
+    /** 429. [secondsLeft] counts down to 0 when the server said how long to wait, else null. */
+    data class RateLimited(val secondsLeft: Int?) : SignInError
+
+    /** 400 that is not a wrong code: the server rejected the input. */
+    data object InvalidInput : SignInError
+
+    /** Anything else (including a failure to store the session). */
+    data object Unknown : SignInError
+}
+
+/**
+ * What is going on around the current step: a request in flight and/or an inline [error]. While [isBusy], or while
+ * a [SignInError.RateLimited] countdown runs, the main button is disabled.
+ */
+@Immutable
+data class SignInStatus(
+    val isBusy: Boolean = false,
+    val error: SignInError? = null,
+) {
+    val blocksPrimary: Boolean
+        get() = isBusy || ((error as? SignInError.RateLimited)?.secondsLeft ?: 0) > 0
+}
+
 /** Where the sign-in content is shown; decides what happens after the new-account step. */
 enum class SignInVariant {
     /** Full screen from the waiting room: after signing up the user continues to the queue. */
@@ -101,8 +134,7 @@ data class SignInEventContext(
 
 /**
  * Callbacks the sign-in screens raise, bundled like MyQueuesActions. All default to no-ops
- * so previews can render them. This and [SignInUiState] are the seam AUTH-00-M3 (#77) fills
- * with a real ViewModel.
+ * so previews can render them. This, [SignInUiState] and [SignInStatus] are the seam `SignInViewModel` fills.
  */
 data class SignInActions(
     val onEmailChange: (String) -> Unit = {},
