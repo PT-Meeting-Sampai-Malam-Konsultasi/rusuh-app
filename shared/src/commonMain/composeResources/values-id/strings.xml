@@ -122,9 +122,6 @@
     <string name="detail_section_holders">Pemegang tiket</string>
     <string name="detail_holders_hint">Nama dan NIK sesuai KTP. 1 NIK = 1 tiket per event — di pintu masuk, e-tiket dicocokkan dengan KTP asli.</string>
     <string name="detail_ticket_label">Tiket %1$d · %2$s</string>
-    <string name="detail_holder_toggle_description">Untuk siapa tiket ini</string>
-    <string name="detail_holder_self">Saya sendiri</string>
-    <string name="detail_holder_other">Orang lain</string>
     <string name="detail_name_label">Nama sesuai KTP</string>
     <string name="detail_name_placeholder">Nama lengkap</string>
     <string name="detail_name_hint">Dicetak di e-tiket.</string>
