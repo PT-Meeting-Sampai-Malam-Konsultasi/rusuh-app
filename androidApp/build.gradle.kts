@@ -26,7 +26,8 @@ android {
         applicationId = "com.rusuh.app.android"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
+        // CI passes -PversionCode=<run number> so every distributed build is distinguishable.
+        versionCode = providers.gradleProperty("versionCode").orNull?.toIntOrNull() ?: 1
         versionName = "1.0"
     }
 
