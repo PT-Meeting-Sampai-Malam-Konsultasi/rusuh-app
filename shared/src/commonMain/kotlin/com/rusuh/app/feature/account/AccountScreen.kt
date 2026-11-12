@@ -17,7 +17,6 @@ import com.rusuh.app.feature.auth.SignInActions
 import com.rusuh.app.feature.auth.SignInContent
 import com.rusuh.app.feature.auth.SignInUiState
 import com.rusuh.app.feature.auth.SignInVariant
-import com.rusuh.app.feature.queues.AppLanguageOption
 import com.rusuh.app.feature.queues.MyQueuesHeader
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
@@ -45,7 +44,7 @@ fun AccountScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = RusuhBrandColors.Paper,
-        topBar = { MyQueuesHeader(language = AppLanguageOption.Indonesian) },
+        topBar = { MyQueuesHeader() },
         bottomBar = { RusuhBottomBar(selectedTab = RusuhTab.Akun, onTabSelected = onTabSelected) },
     ) { innerPadding ->
         AccountContent(

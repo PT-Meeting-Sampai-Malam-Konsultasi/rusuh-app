@@ -2,6 +2,7 @@ package com.rusuh.app.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,9 +28,13 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import com.rusuh.app.AppLanguageState
+import com.rusuh.app.LocalAppLanguage
+import com.rusuh.app.data.network.AppLanguage
 import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.home_language_toggle_description
 import rusuh_app.shared.generated.resources.home_logo_accent
@@ -38,7 +44,8 @@ import rusuh_app.shared.generated.resources.home_logo_wordmark
 /** Paper app bar: RUSUH! wordmark on the left, ID | EN language toggle on the right, heavy ink rule below. */
 @Composable
 internal fun HomeAppBar(
-    selectedLanguage: HomeLanguage,
+    selectedLanguage: HomeLanguage =
+        if (LocalAppLanguage.current == AppLanguage.English) HomeLanguage.EN else HomeLanguage.ID,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -91,6 +98,7 @@ private fun LanguageToggle(
     selected: HomeLanguage,
     modifier: Modifier = Modifier,
 ) {
+    val state: AppLanguageState = koinInject()
     val description = stringResource(Res.string.home_language_toggle_description)
     Row(
         modifier =
@@ -110,6 +118,11 @@ private fun LanguageToggle(
                 modifier =
                     Modifier
                         .background(if (isSelected) RusuhColors.Ink else Color.Transparent, CircleShape)
+                        .clickable {
+                            state.select(
+                                if (language == HomeLanguage.EN) AppLanguage.English else AppLanguage.Indonesian,
+                            )
+                        }
                         .padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.xs),
             )
         }

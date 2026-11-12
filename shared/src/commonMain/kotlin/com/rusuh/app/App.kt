@@ -1,9 +1,15 @@
 package com.rusuh.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.navigation.compose.rememberNavController
 import com.rusuh.app.navigation.RusuhNavGraph
 import com.rusuh.app.ui.theme.RusuhTheme
+import org.koin.compose.koinInject
 
 /**
  * App entry composable: applies the theme and hosts the navigation graph.
@@ -13,8 +19,15 @@ import com.rusuh.app.ui.theme.RusuhTheme
  */
 @Composable
 fun App() {
-    RusuhTheme {
-        val navController = rememberNavController()
-        RusuhNavGraph(navController = navController)
+    val state: AppLanguageState = koinInject()
+    val language by state.language.collectAsState()
+    LaunchedEffect(language) { applyPlatformLanguage(language.tag) }
+    CompositionLocalProvider(LocalAppLanguage provides language) {
+        key(language) {
+            RusuhTheme {
+                val navController = rememberNavController()
+                RusuhNavGraph(navController = navController)
+            }
+        }
     }
 }

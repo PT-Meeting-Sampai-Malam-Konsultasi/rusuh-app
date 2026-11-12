@@ -1,5 +1,6 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.AppLanguageState
 import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.clock.ServerTimeSink
 import com.rusuh.app.data.network.ApiClient
@@ -7,7 +8,6 @@ import com.rusuh.app.data.network.ApiConfig
 import com.rusuh.app.data.network.AppEnvironment
 import com.rusuh.app.data.network.HostAuth
 import com.rusuh.app.data.network.LocaleProvider
-import com.rusuh.app.data.network.SystemLocaleProvider
 import com.rusuh.app.data.network.buildHostClient
 import com.rusuh.app.data.network.buildHttpClient
 import com.rusuh.app.data.network.session.ApiTokenRefresher
@@ -44,7 +44,8 @@ fun coreModule(): Module =
                 }
             }
         }
-        single<LocaleProvider> { SystemLocaleProvider() }
+        single { AppLanguageState { get() } }
+        single<LocaleProvider> { get<AppLanguageState>() }
         single { MonotonicServerClock() } binds arrayOf(ServerClock::class, ServerTimeSink::class)
         single { SessionEvents() }
         single {
