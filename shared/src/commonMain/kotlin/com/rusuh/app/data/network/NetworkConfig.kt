@@ -9,7 +9,7 @@ import com.rusuh.app.di.BackendMode
  * - `true`: HTTP to the local Mockoon server (`workspace-local/mockoon`). Android emulator
  *   `http://10.0.2.2:3000`, iOS simulator `http://localhost:3000`; for a physical Android device run
  *   `adb reverse tcp:3000 tcp:3000` and point the app at `http://localhost:3000`.
- * - `false`: HTTP to the real backend (`https://api.rusuh-tiket.web.id`, see [ApiConfig]).
+ * - `false`: HTTP to the real backend (`https://api.rusuh-tiket.web.id/v1`, see [ApiConfig]).
  *
  * The flag applies to DEBUG builds only. A release build ALWAYS talks to the real host ([AppEnvironment.Production])
  * on [BackendMode.Real], whatever [MOCK_API] says; [startup] enforces it and a Gradle guard

@@ -27,15 +27,21 @@ class ApiConfig(
     override fun toString(): String = "ApiConfig(baseUrl=$baseUrl, queueBaseUrl=$queueBaseUrl, payBaseUrl=$payBaseUrl)"
 
     companion object {
-        /** The real backend host (a skeleton today: every route answers 404 until the backend routes exist). */
+        /** The real backend host. Its queue and auth services answer; the core/booking routes were not deployed yet. */
         internal const val REAL_HOST_URL = "https://api.rusuh-tiket.web.id"
+
+        /**
+         * Every route lives under `/v1` (found in the staging web app's configuration; the OpenAPI file lists no
+         * server). Without it every call returns 404.
+         */
+        internal const val REAL_BASE_URL = "$REAL_HOST_URL/v1"
 
         // shortcut: the queue (`q.`) and payment (`pay.`) hosts are not confirmed yet, so every host points at the
         // one real host above. Give them their own constants here when the backend publishes them. Staging has no
         // host of its own either: it is the same real host as production.
-        internal const val REAL_API_URL = REAL_HOST_URL
-        internal const val REAL_QUEUE_URL = REAL_HOST_URL
-        internal const val REAL_PAY_URL = REAL_HOST_URL
+        internal const val REAL_API_URL = REAL_BASE_URL
+        internal const val REAL_QUEUE_URL = REAL_BASE_URL
+        internal const val REAL_PAY_URL = REAL_BASE_URL
 
         private val PORT_PATTERN = Regex(""":(\d+)$""")
         private const val MAX_PORT = 65535
