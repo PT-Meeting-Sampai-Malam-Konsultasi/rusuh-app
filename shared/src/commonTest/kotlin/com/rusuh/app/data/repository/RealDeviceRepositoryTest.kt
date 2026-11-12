@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 private const val DAY = 24 * 60 * 60 * 1_000L
 
 class RealDeviceRepositoryTest {
-    private val devicesLine = "POST /devices"
+    private val devicesLine = "POST /queue/devices"
 
     @Test
     fun registersOnTheFirstCallWithPlatformAndInstallIdAndStoresTheToken() =
@@ -30,7 +30,8 @@ class RealDeviceRepositoryTest {
             val body = Json.parseToJsonElement(h.backend.seen.single().body).jsonObject
             assertEquals("android", body.getValue("platform").jsonPrimitive.content)
             assertEquals("install-1", body.getValue("installId").jsonPrimitive.content)
-            assertEquals(2, body.size, "no attestation or Turnstile member is sent yet")
+            assertEquals("dev", body.getValue("attestation").jsonPrimitive.content)
+            assertEquals(3, body.size)
             assertNull(h.backend.seen.single().headers["X-Turnstile-Token"])
         }
 

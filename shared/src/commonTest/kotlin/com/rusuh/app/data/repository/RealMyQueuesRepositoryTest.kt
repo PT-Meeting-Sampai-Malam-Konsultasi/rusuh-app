@@ -57,7 +57,7 @@ class RealMyQueuesRepositoryTest {
     fun everyPhaseMapsFromTheStateAndTheNumbers() =
         runTest {
             val h = QueueHarness()
-            h.backend.on("GET /events", Reply.ok(EVENTS_JSON))
+            h.backend.on("GET /core/events", Reply.ok(EVENTS_JSON))
             h.joined("evt_samudra", "evt_full", "evt_almost", "evt_wr_open")
             h.at("evt_samudra", served = 100) // 300 back, rate 300/min: 1 minute
             h.at("evt_full", served = 190, state = "paused", reason = "stock")
@@ -131,7 +131,7 @@ class RealMyQueuesRepositoryTest {
     @Test
     fun theEventIdIsTheTitleWhenTheEventListCannotBeLoaded() =
         runTest {
-            val h = QueueHarness() // GET /events is a 404
+            val h = QueueHarness() // GET /core/events is a 404
             h.joined("evt_samudra")
             h.at("evt_samudra", served = 100)
 

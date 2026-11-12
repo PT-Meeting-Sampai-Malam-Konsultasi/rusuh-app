@@ -2,6 +2,8 @@ package com.rusuh.app.di
 
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.network.session.SessionManagerObserver
+import com.rusuh.app.data.platform.AttestationProvider
+import com.rusuh.app.data.platform.DevAttestationProvider
 import com.rusuh.app.data.platform.platformName
 import com.rusuh.app.data.remote.AuthApiService
 import com.rusuh.app.data.remote.DeviceApiService
@@ -81,13 +83,15 @@ fun dataModule(
     warn: (String) -> Unit = { println(it) },
 ): Module =
     module {
+        single<AttestationProvider> { DevAttestationProvider() }
+
         fun <T> notYetReal(
             repository: String,
             stub: () -> T,
         ): T = stubOrFail(repository, allowStubFallback, warn, stub)
 
         single { EventApiService(get(ApiClientQualifier.Api)) }
-        // /devices and the queue endpoints belong to the queue service (the `q.` host).
+        // Device registration and queue endpoints share the queue path prefix on the staging host.
         single { DeviceApiService(get(ApiClientQualifier.Queue)) }
         single { QueueApiService(get(ApiClientQualifier.Queue)) }
         // Auth is served by the core (api) host, like the refresh call of the session layer.
@@ -103,6 +107,7 @@ fun dataModule(
                 cache = get(),
                 serverClock = get(),
                 platform = platformName,
+                attestationProvider = get(),
             )
         }
 

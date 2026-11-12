@@ -29,7 +29,7 @@ private const val WR_ROOM = """"waitingRoomOpensAt": "2026-11-11T17:36:29+07:00"
 private const val SOLD_OUT_AT = """, "soldOutAt": "2026-11-09T12:41:00+07:00""""
 private const val SALE_ENDS_AT = """, "saleEndsAt": "2026-10-30T23:00:00+07:00""""
 
-/** The seven events of `GET /events`, one per state, as the mock serves them. */
+/** The seven events of `GET /core/events`, one per state, as the mock serves them. */
 val EVENT_FIXTURES: List<String> =
     listOf(
         event("evt_coming", "Langit Sore", "Senja Panjang Live", "coming_soon", 325000)
@@ -43,7 +43,7 @@ val EVENT_FIXTURES: List<String> =
         event("evt_ended", "Bayu Fest", "Edisi Perdana", "ended", 250000).withMembers(SALE_ENDS_AT),
     )
 
-/** `GET /events` with all seven events. */
+/** `GET /core/events` with all seven events. */
 val EVENTS_JSON: String =
     """{"items": [${EVENT_FIXTURES.joinToString(",")}], "serverNow": "2026-11-11T17:37:29+07:00"}"""
 

@@ -42,11 +42,15 @@ android {
             // offline demo. Empty keeps the default, real HTTP (see BackendMode and docs/data-layer.md).
             val backendMode = providers.gradleProperty("backendMode").getOrElse("")
             buildConfigField("String", "BACKEND_MODE", "\"$backendMode\"")
+            val mockApi = providers.gradleProperty("mockApi").getOrElse("")
+            require(mockApi.isEmpty() || mockApi == "true" || mockApi == "false") { "-PmockApi must be true or false" }
+            buildConfigField("String", "MOCK_API_OVERRIDE", "\"$mockApi\"")
         }
         getByName("release") {
             isMinifyEnabled = false
             // Never overridable: a release build is always Production on real HTTP (NetworkConfig.startup).
             buildConfigField("String", "BACKEND_MODE", "\"\"")
+            buildConfigField("String", "MOCK_API_OVERRIDE", "\"\"")
         }
     }
 
@@ -105,6 +109,9 @@ val verifyReleaseNeverUsesMockApi by tasks.registering {
         }
         check(Regex("""String\s+BACKEND_MODE\s*=\s*"";""").containsMatchIn(generated)) {
             "The release build must not override the backend mode: BuildConfig.BACKEND_MODE must be \"\""
+        }
+        check(Regex("""String\s+MOCK_API_OVERRIDE\s*=\s*"";""").containsMatchIn(generated)) {
+            "The release build must not override the mock API: BuildConfig.MOCK_API_OVERRIDE must be \"\""
         }
     }
 }

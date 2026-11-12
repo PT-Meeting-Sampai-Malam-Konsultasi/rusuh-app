@@ -9,7 +9,11 @@ class RusuhApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         // Mock or real host: NetworkConfig.MOCK_API in the shared module (debug only; release is always real).
-        initKoinForBuild(isDebug = BuildConfig.DEBUG, backendModeName = BuildConfig.BACKEND_MODE) {
+        initKoinForBuild(
+            isDebug = BuildConfig.DEBUG,
+            backendModeName = BuildConfig.BACKEND_MODE,
+            mockApiOverride = BuildConfig.MOCK_API_OVERRIDE.toBooleanStrictOrNull(),
+        ) {
             androidLogger()
             androidContext(this@RusuhApplication)
         }

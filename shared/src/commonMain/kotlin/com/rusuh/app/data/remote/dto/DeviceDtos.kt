@@ -3,16 +3,17 @@ package com.rusuh.app.data.remote.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Body of `POST /devices`. Mobile sends `installId`; the attestation member is not sent yet. */
+/** Body of `POST /queue/devices`. */
 @Serializable
 data class RegisterDeviceRequestDto(
     @SerialName("platform") val platform: String,
     @SerialName("installId") val installId: String,
+    @SerialName("attestation") val attestation: String,
 ) {
     override fun toString(): String = "RegisterDeviceRequestDto(platform=$platform, installId=<redacted>)"
 }
 
-/** Answer of `POST /devices` (201). `toString` hides the token. */
+/** Answer of `POST /queue/devices` (201). `toString` hides the token. */
 @Serializable
 data class DeviceTokenDto(
     @SerialName("deviceToken") val deviceToken: String = "",

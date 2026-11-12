@@ -11,7 +11,7 @@ import com.rusuh.app.feature.home.HomeEventItem
 import com.rusuh.app.feature.home.HomeRepository
 
 /**
- * [HomeRepository] over `GET /events`. The countdown on coming-soon cards counts from the response's `serverNow`
+ * [HomeRepository] over `GET /core/events`. The countdown on coming-soon cards counts from the response's `serverNow`
  * (the [serverClock] when the body has none and it is synced), and all copy follows the active language of
  * [localeProvider].
  * A failed call throws [DomainException], which the ViewModel shows as its error state with a retry.

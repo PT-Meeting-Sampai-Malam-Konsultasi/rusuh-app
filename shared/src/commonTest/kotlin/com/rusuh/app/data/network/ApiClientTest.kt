@@ -97,9 +97,9 @@ class ApiClientTest {
                     respond("""{}""", HttpStatusCode.OK, jsonHeaders)
                 }
 
-            client.get<Pong>("/events/42")
+            client.get<Pong>("/core/events/42")
 
-            assertEquals("https://api.test/v1/events/42", seen?.url.toString())
+            assertEquals("https://api.test/v1/core/events/42", seen?.url.toString())
             assertEquals(HttpMethod.Get, seen?.method)
             assertTrue(seen?.headers?.get(HttpHeaders.Accept)?.contains("application/json") == true)
         }
