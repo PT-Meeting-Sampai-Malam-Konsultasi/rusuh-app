@@ -7,13 +7,15 @@ import kotlin.coroutines.cancellation.CancellationException
  * their orders split into upcoming (soonest first) and past (latest first), or
  * [MyTickets.Empty] when they have none.
  *
- * @param isSignedIn whether an account session exists.
+ * @param isSignedIn whether an account session exists; suspend so it can wait for the cold-start session restore
+ * (`SessionManager.awaitSignedIn`).
  *
- * shortcut: defaults to signed in until the auth state seam (AUTH-00) exists.
+ * shortcut: the default is signed in, and the app module still uses it: TODO(AUTH-00 #77) wire `SessionManager`
+ * when the sign-in UI exists.
  */
 class GetMyTicketsUseCase(
     private val repository: TicketsRepository,
-    private val isSignedIn: () -> Boolean = { true },
+    private val isSignedIn: suspend () -> Boolean = { true },
 ) {
     suspend operator fun invoke(): MyTickets =
         if (isSignedIn()) classify(repository.getMyOrders()) else MyTickets.SignedOut

@@ -20,6 +20,8 @@ private const val IDX_ATTEMPTS_LEFT = 6
 private const val IDX_CONSENT = 7
 private const val IDX_SIGNED_IN = 8
 private const val IDX_ATTEMPTS = 9
+private const val IDX_ACCOUNT_NAME = 10
+private const val IDX_ACCOUNT_EMAIL = 11
 
 /** Flattens a step (or null, the closed flow) into primitives; inverse of [decodeSignInState]. */
 internal fun encodeSignInState(state: SignInUiState?): List<Any> {
@@ -86,7 +88,8 @@ internal fun decodeSignInState(saved: List<Any>): SignInUiState? {
 internal val PlaceholderSignInSaver: Saver<PlaceholderSignIn, List<Any>> =
     Saver(
         save = { signIn ->
-            encodeSignInState(signIn.state) + signIn.isSignedIn + signIn.attemptsLeft
+            encodeSignInState(signIn.state) + signIn.isSignedIn + signIn.attemptsLeft +
+                signIn.signedInName + signIn.signedInEmail
         },
         restore = { saved ->
             PlaceholderSignIn().also {
@@ -94,6 +97,8 @@ internal val PlaceholderSignInSaver: Saver<PlaceholderSignIn, List<Any>> =
                     restoredState = decodeSignInState(saved),
                     signedIn = saved[IDX_SIGNED_IN] as Boolean,
                     attempts = saved[IDX_ATTEMPTS] as Int,
+                    name = saved[IDX_ACCOUNT_NAME] as String,
+                    email = saved[IDX_ACCOUNT_EMAIL] as String,
                 )
             }
         },

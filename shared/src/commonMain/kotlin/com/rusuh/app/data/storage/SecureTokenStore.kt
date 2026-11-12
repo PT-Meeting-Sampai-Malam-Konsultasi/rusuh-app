@@ -27,6 +27,8 @@ class SecureTokenStore(
 
     override suspend fun setRefreshToken(token: String) = putGuarded(KEY_REFRESH, token, session)
 
+    override suspend fun clearRefreshToken() = sessionLock.withLock { store.remove(KEY_REFRESH) }
+
     override suspend fun getDeviceToken(): String? = store.getString(KEY_DEVICE)
 
     override suspend fun setDeviceToken(token: String) = sessionLock.withLock { store.putString(KEY_DEVICE, token) }

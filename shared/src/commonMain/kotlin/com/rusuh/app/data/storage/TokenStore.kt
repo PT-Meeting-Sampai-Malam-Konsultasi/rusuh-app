@@ -12,6 +12,9 @@ interface TokenStore {
 
     suspend fun setRefreshToken(token: String)
 
+    /** Removes only the refresh token (a login that came without one must not keep a stale one). */
+    suspend fun clearRefreshToken()
+
     suspend fun getDeviceToken(): String?
 
     suspend fun setDeviceToken(token: String)

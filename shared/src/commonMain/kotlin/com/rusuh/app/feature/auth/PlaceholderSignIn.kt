@@ -38,6 +38,21 @@ class PlaceholderSignIn(
     var isSignedIn: Boolean by mutableStateOf(false)
         private set
 
+    /** Name and email of the demo account once [isSignedIn] (what the profile page shows). */
+    var signedInName: String by mutableStateOf("")
+        private set
+    var signedInEmail: String by mutableStateOf("")
+        private set
+
+    /** Demo sign-out: back to the email step, signed out. */
+    fun signOut() {
+        isSignedIn = false
+        signedInName = ""
+        signedInEmail = ""
+        attemptsLeft = SignInPolicy.MAX_ATTEMPTS
+        state = SignInUiState.Email()
+    }
+
     fun open() {
         state = SignInUiState.Email()
     }
@@ -80,7 +95,11 @@ class PlaceholderSignIn(
         restoredState: SignInUiState?,
         signedIn: Boolean,
         attempts: Int,
+        name: String,
+        email: String,
     ) {
+        signedInName = name
+        signedInEmail = email
         state = restoredState
         isSignedIn = signedIn
         attemptsLeft = attempts
@@ -134,7 +153,9 @@ class PlaceholderSignIn(
                 (state as? SignInUiState.NewAccount)?.let { state = it.copy(consentAccepted = value) }
             },
             onCreateAccount = {
-                if (state is SignInUiState.NewAccount) {
+                (state as? SignInUiState.NewAccount)?.let {
+                    signedInName = it.fullName.trim()
+                    signedInEmail = it.email
                     state = null
                     isSignedIn = true
                 }
