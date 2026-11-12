@@ -1,9 +1,16 @@
 # Firebase App Distribution (Android demo builds)
 
-The `distribute` job in `.github/workflows/android-build.yml` sends an **offline demo APK** to testers on every push to
-`main` (and on manual dispatch from the Actions tab). The APK is a debug build with `-PbackendMode=Stub`: the in-process
-stub backend, so it works on any phone with no mock server or network (the Mockoon address `10.0.2.2` only works on the
-emulator). iOS is not distributed: a device install needs a signed build and the paid Apple Developer Program.
+The `distribute` job in `.github/workflows/android-build.yml` sends a debug APK to testers on every push to `main` and on
+manual dispatch (Actions > Android Build > Run workflow, input `backend`):
+
+- **live** (default for pushes): `-PmockApi=false`, the app talks to the staging API `https://api.rusuh-tiket.web.id/v1`.
+  Home events and login work today; Detail, Tickets and the queue still use stub data until the backend is complete
+  (the release note says so). Use this build to retest as the backend routes appear.
+- **stub**: `-PbackendMode=Stub`, an offline demo with the in-process stub backend (no network needed). The Mockoon
+  address `10.0.2.2` only works on the emulator, so a mock build is not distributed.
+
+Every build gets `versionCode` = the workflow run number (`-PversionCode`), so testers can tell builds apart.
+iOS is not distributed: a device install needs a signed build and the paid Apple Developer Program.
 
 ## One-time setup
 1. Firebase project `rusuh-app` with the Android app `com.rusuh.app.android`; App Distribution enabled.
