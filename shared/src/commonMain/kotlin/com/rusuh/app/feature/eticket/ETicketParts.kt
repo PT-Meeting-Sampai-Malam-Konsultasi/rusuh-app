@@ -41,7 +41,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rusuh.app.ui.components.QrCode
+import com.rusuh.app.ui.components.QrEncodingResult
 import com.rusuh.app.ui.components.brutalBox
+import com.rusuh.app.ui.components.encodeQr
 import com.rusuh.app.ui.theme.RusuhBrandColors
 import com.rusuh.app.ui.theme.RusuhBrandTextStyles
 import com.rusuh.app.ui.theme.RusuhColors
@@ -64,6 +66,7 @@ import rusuh_app.shared.generated.resources.eticket_intro
 import rusuh_app.shared.generated.resources.eticket_months_short
 import rusuh_app.shared.generated.resources.eticket_order_line
 import rusuh_app.shared.generated.resources.eticket_qr_description
+import rusuh_app.shared.generated.resources.eticket_qr_error
 import rusuh_app.shared.generated.resources.eticket_seating_seated
 import rusuh_app.shared.generated.resources.eticket_seating_standing
 import rusuh_app.shared.generated.resources.eticket_stamp_paid
@@ -298,6 +301,8 @@ private fun Fact(
 @Composable
 private fun QrSection(card: ETicketCardUi) {
     val description = stringResource(Res.string.eticket_qr_description, card.ticketCode)
+    val errorMessage = stringResource(Res.string.eticket_qr_error)
+    val spokenDescription = if (encodeQr(card.qrPayload) is QrEncodingResult.Failed) errorMessage else description
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
@@ -305,9 +310,9 @@ private fun QrSection(card: ETicketCardUi) {
             Modifier
                 .fillMaxWidth()
                 .padding(RusuhSpacing.xl)
-                .clearAndSetSemantics { contentDescription = description },
+                .clearAndSetSemantics { contentDescription = spokenDescription },
     ) {
-        QrCode(payload = card.qrPayload, contentDescription = description, size = QR_SIZE)
+        QrCode(payload = card.qrPayload, contentDescription = description, errorMessage = errorMessage, size = QR_SIZE)
         Text(
             text = card.ticketCode,
             style = RusuhBrandTextStyles.label.body().copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),

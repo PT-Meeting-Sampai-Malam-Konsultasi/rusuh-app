@@ -175,6 +175,8 @@
         <item quantity="other">%1$d active queues</item>
     </plurals>
     <string name="my_queues_logo_description">Rusuh</string>
+    <string name="eticket_page_title">My Tickets</string>
+    <string name="eticket_qr_error">The QR cannot be shown. Show the ticket code to the staff.</string>
     <string name="my_queues_language_group">Language</string>
     <string name="my_queues_language_id">ID</string>
     <string name="my_queues_language_en">EN</string>
