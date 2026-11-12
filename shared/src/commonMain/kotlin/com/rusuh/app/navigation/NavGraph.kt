@@ -8,7 +8,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -17,7 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -27,7 +25,10 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.rusuh.app.feature.auth.SignInSheet
+import com.rusuh.app.feature.account.AccountScreen
+import com.rusuh.app.feature.auth.SignInEventContext
+import com.rusuh.app.feature.auth.SignInScreen
+import com.rusuh.app.feature.auth.SignInUiState
 import com.rusuh.app.feature.auth.rememberPlaceholderSignIn
 import com.rusuh.app.feature.detail.DetailRoute
 import com.rusuh.app.feature.detail.DetailViewModel
@@ -46,12 +47,9 @@ import com.rusuh.app.feature.waitingroom.WaitingRoomViewModel
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
-import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
-import rusuh_app.shared.generated.resources.Res
-import rusuh_app.shared.generated.resources.tab_coming_soon
 
 /**
  * Main navigation graph for the Rusuh app.
@@ -108,6 +106,36 @@ fun RusuhNavGraph(navController: NavHostController) {
         }
 
         composable(
+            route = Screen.SignIn.route,
+            arguments =
+                listOf(
+                    navArgument(Screen.SignIn.ARG_EVENT_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+        ) {
+            // TODO(AUTH-00 #103): resolve the event from the ARG_EVENT_ID argument and add the
+            //  waiting-room entry point (navigate(Screen.SignIn.routeFor(eventId))); until then
+            //  nothing pushes this route and the banner shows a placeholder event.
+            val signIn = rememberPlaceholderSignIn(startOpen = true)
+            SignInScreen(
+                state = signIn.state ?: SignInUiState.Email(),
+                event = PLACEHOLDER_SIGN_IN_EVENT,
+                actions =
+                    signIn.actions.copy(
+                        onDismiss = { navController.popBackStack() },
+                        // TODO(AUTH-00 #103): continue to the queue / Detail once signed in.
+                        onCreateAccount = {
+                            signIn.actions.onCreateAccount()
+                            navController.popBackStack()
+                        },
+                    ),
+            )
+        }
+
+        composable(
             route = Screen.WaitingRoom.route,
             arguments = listOf(navArgument(Screen.WaitingRoom.ARG_EVENT_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
@@ -116,6 +144,7 @@ fun RusuhNavGraph(navController: NavHostController) {
             // so resolve once per event id to keep a single ViewModel for this destination.
             val koin = getKoin()
             val viewModel = remember(eventId) { koin.get<WaitingRoomViewModel> { parametersOf(eventId) } }
+            // TODO(AUTH-00 #103): open Screen.SignIn.routeFor(eventId) when the turn comes and the user is a guest.
             WaitingRoomRoute(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
@@ -179,33 +208,35 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
                     TicketsEffect.GoToEvents -> navController.switchTab(RusuhTab.Event)
                     // TODO(FR-22-M2 #71): navigate to the e-ticket page once the destination exists.
                     is TicketsEffect.OpenETicket -> Unit
-                    // TODO(AUTH-00 #74): navigate to sign-in once the auth flow exists.
-                    TicketsEffect.OpenSignIn -> Unit
+                    // The Account tab hosts the compact login (decision 2026-11-12).
+                    // TODO(AUTH-00 #77): return to the Tiket tab once signed in.
+                    TicketsEffect.OpenSignIn -> navController.switchTab(RusuhTab.Akun)
                 }
             }
         }
-        // Placeholder sign-in (local UI state only) until AUTH-00-M3 wires the real auth state.
-        val signIn = rememberPlaceholderSignIn()
-        Box(Modifier.fillMaxSize()) {
-            TicketsScreen(
-                state = state.ui,
-                // Inert for TalkBack while the sheet is open.
-                modifier = if (signIn.state != null) Modifier.clearAndSetSemantics {} else Modifier,
-                actions =
-                    TicketsActions(
-                        onViewETicket = { viewModel.dispatch(TicketsIntent.ViewETicket(it)) },
-                        onTabSelected = onTabSelected,
-                        onBrowseEvents = { viewModel.dispatch(TicketsIntent.BrowseEvents) },
-                        onSignIn = signIn::open,
-                        onRetry = { viewModel.dispatch(TicketsIntent.Retry) },
-                    ),
-            )
-            signIn.state?.let { SignInSheet(state = it, actions = signIn.actions) }
-        }
+        TicketsScreen(
+            state = state.ui,
+            actions =
+                TicketsActions(
+                    onViewETicket = { viewModel.dispatch(TicketsIntent.ViewETicket(it)) },
+                    onTabSelected = onTabSelected,
+                    onBrowseEvents = { viewModel.dispatch(TicketsIntent.BrowseEvents) },
+                    onSignIn = { viewModel.dispatch(TicketsIntent.SignIn) },
+                    onRetry = { viewModel.dispatch(TicketsIntent.Retry) },
+                ),
+        )
     }
 
     composable(Screen.Account.route) {
-        StubTabScreen(tab = RusuhTab.Akun, onTabSelected = onTabSelected)
+        // Placeholder login flow (local UI state) until AUTH-00-M3 (#77) provides the real state.
+        // Finishing it flips isSignedIn so the login -> Account page transition can be seen.
+        val signIn = rememberPlaceholderSignIn(startOpen = true)
+        AccountScreen(
+            isSignedIn = signIn.isSignedIn,
+            signInState = signIn.state ?: SignInUiState.Email(),
+            signInActions = signIn.actions,
+            onTabSelected = onTabSelected,
+        )
     }
 }
 
@@ -226,8 +257,7 @@ private fun NavHostController.switchTab(tab: RusuhTab) {
 
 /**
  * A minimal top-level Scaffold hosting the shared bottom bar for tab screens
- * that are just a title today (Tiket / Akun stubs) or that wrap an existing
- * screen (Home).
+ * that wrap an existing screen (Home).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -245,41 +275,6 @@ private fun TabScaffold(
     )
 }
 
-/** Placeholder content for a tab whose real screen is not built yet. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StubTabScreen(
-    tab: RusuhTab,
-    onTabSelected: (RusuhTab) -> Unit,
-) {
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(tab.label),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                },
-            )
-        },
-        bottomBar = { RusuhBottomBar(selectedTab = tab, onTabSelected = onTabSelected) },
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = stringResource(Res.string.tab_coming_soon, stringResource(tab.label)),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 @Composable
 private fun SplashPlaceholder() {
     Box(
@@ -289,3 +284,7 @@ private fun SplashPlaceholder() {
         Text("Splash Screen")
     }
 }
+
+/** Demo event for the banner of the full login until #103 resolves the real one (synthetic data). */
+private val PLACEHOLDER_SIGN_IN_EVENT =
+    SignInEventContext(name = "Samudra", tag = "Tur Gelombang 2026", openingTime = "10.00 WIB")
