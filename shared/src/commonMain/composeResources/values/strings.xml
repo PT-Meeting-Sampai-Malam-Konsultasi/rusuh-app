@@ -123,9 +123,6 @@
     <string name="detail_section_holders">Ticket holders</string>
     <string name="detail_holders_hint">Name and NIK as on the KTP. 1 NIK = 1 ticket per event — at the gate, your e-ticket is matched against the original KTP.</string>
     <string name="detail_ticket_label">Ticket %1$d · %2$s</string>
-    <string name="detail_holder_toggle_description">Who is this ticket for</string>
-    <string name="detail_holder_self">Myself</string>
-    <string name="detail_holder_other">Someone else</string>
     <string name="detail_name_label">Name as on KTP</string>
     <string name="detail_name_placeholder">Full name</string>
     <string name="detail_name_hint">Printed on the e-ticket.</string>

@@ -23,7 +23,6 @@ class DetailScreenTest {
             null,
             "m",
             categories,
-            "Nadia Saputri",
             "n@x.id",
             adminFeeRupiah = 10_000,
             reservedUnits = reserved,
@@ -73,25 +72,6 @@ class DetailScreenTest {
         form = form.withQuantity("fest-b", 3, 3)
         assertEquals(nikA, form.attendees[0].nik)
         assertEquals("", form.attendees[2].nik)
-    }
-
-    @Test
-    fun selfPrefillsOnlyTheNameNeverTheNik() {
-        val form =
-            DetailFormState()
-                .withQuantity("fest-b", 1, 3)
-                .withKind(0, AttendeeKind.Self, "Nadia Saputri")
-        assertEquals(AttendeeKind.Self, form.attendees[0].kind)
-        assertEquals("Nadia Saputri", form.attendees[0].name)
-        assertEquals("", form.attendees[0].nik)
-    }
-
-    @Test
-    fun switchingBackToOtherClearsOnlyAnAutofilledName() {
-        val self = DetailFormState().withQuantity("fest-b", 1, 3).withKind(0, AttendeeKind.Self, "Nadia")
-        assertEquals("", self.withKind(0, AttendeeKind.Other, "Nadia").attendees[0].name)
-        val edited = self.withName(0, "Raka")
-        assertEquals("Raka", edited.withKind(0, AttendeeKind.Other, "Nadia").attendees[0].name)
     }
 
     @Test
