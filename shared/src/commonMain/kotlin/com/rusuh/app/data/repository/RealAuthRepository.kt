@@ -61,8 +61,8 @@ class RealAuthRepository(
         return deviceGated({ api.requestOtp(body) }) { it.toDomainResult { dto -> dto.toDomain() }.emptyIsTechnical() }
     }
 
-    // TODO(AUTH-00 #77): a verifyOtp that completes after a logout signs the user back in. The state layer should keep
-    //  a generation counter (bumped by logout) and drop a result that belongs to an older one.
+    // A verifyOtp that completes after a logout signs the user back in: VerifyOtpUseCase guards it with a generation
+    // counter (bumped by SignOutUseCase) and ends the session again.
     override suspend fun verifyOtp(
         challengeId: String,
         code: String,

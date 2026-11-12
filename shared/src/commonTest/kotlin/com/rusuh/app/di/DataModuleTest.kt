@@ -186,9 +186,8 @@ class DataModuleTest {
         }
 
     @Test
-    fun theTicketsTabIsNotGatedByTheSessionYet() =
+    fun theTicketsTabFollowsTheSession() =
         runTest {
-            // TODO(AUTH-00 #77): once the sign-in UI is wired, GetMyTicketsUseCase follows SessionManager.
             val koin =
                 koinApplication {
                     allowOverride(true)
@@ -206,6 +205,9 @@ class DataModuleTest {
                 }.koin
 
             assertFalse(koin.get<SessionManager>().isSignedIn.value)
+            assertEquals(MyTickets.SignedOut, koin.get<GetMyTicketsUseCase>()())
+
+            koin.get<SessionManager>().startSession("access-1", "refresh-1")
             assertIs<MyTickets.Content>(koin.get<GetMyTicketsUseCase>()())
         }
 

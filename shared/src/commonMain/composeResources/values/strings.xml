@@ -293,4 +293,13 @@
     <string name="account_login_method_value">A 6-digit code to this email. No password.</string>
     <string name="account_sign_out">Sign out</string>
     <string name="account_delete">Delete account</string>
+    <string name="sign_in_error_network">Could not reach the server. Check your connection and try again.</string>
+    <string name="sign_in_error_rate_limited">Too many attempts. Try again in %1$s.</string>
+    <string name="sign_in_error_rate_limited_now">Too many attempts. Try again in a moment.</string>
+    <string name="sign_in_error_invalid">The request was rejected. Check what you entered and try again.</string>
+    <string name="sign_in_error_unknown">Something went wrong. Try again.</string>
+    <string name="account_session_expired">Your session ended. Sign in again.</string>
+    <string name="account_loading">Loading your account</string>
+    <string name="account_error_title">Could not load your account</string>
+    <string name="account_error_body">Check your connection and try again.</string>
 </resources>

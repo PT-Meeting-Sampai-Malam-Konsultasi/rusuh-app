@@ -9,9 +9,7 @@ import kotlin.coroutines.cancellation.CancellationException
  *
  * @param isSignedIn whether an account session exists; suspend so it can wait for the cold-start session restore
  * (`SessionManager.awaitSignedIn`).
- *
- * shortcut: the default is signed in, and the app module still uses it: TODO(AUTH-00 #77) wire `SessionManager`
- * when the sign-in UI exists.
+ * The app module passes `SessionManager::awaitSignedIn`; the default (signed in) is for tests and previews.
  */
 class GetMyTicketsUseCase(
     private val repository: TicketsRepository,
