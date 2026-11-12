@@ -2,12 +2,14 @@
 
 package com.rusuh.app.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
@@ -39,6 +41,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import com.rusuh.app.ui.theme.RusuhBrandTextStyles
 import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
@@ -57,14 +60,18 @@ import rusuh_app.shared.generated.resources.otp_input_progress
  * input beyond [length] is ignored. [onComplete] fires on the edit that yields [length]
  * digits, once per completed value (again only after the value changed away and back).
  * Paste works through the invisible text field laid over the boxes (long-press to paste);
- * non-digits are dropped. The keyboard is numeric. [autoFocus] requests focus and shows the
- * keyboard when the input enters the composition.
+ * non-digits are dropped. [separatorAfter] draws a decorative hyphen after that many boxes
+ * (Figma "482-091"); it is not part of the value. [strikethrough] draws each digit struck
+ * through and without the hard shadow (Figma "Code expired": the old code in disabled boxes).
+ * The keyboard is numeric. [autoFocus] requests focus and shows the keyboard when the input
+ * enters the composition.
  *
  * Accessibility: the boxes are hidden from the tree and the whole control is one text field
  * announcing "Verification code, N of 6 digits entered" (plus [errorMessage] in the error state).
  *
- * TODO(AUTH-00-M4): one-time-code autofill (Android SMS/email suggestions, iOS
- *  `.oneTimeCode`) needs platform text-field hooks Compose Multiplatform 1.7 lacks in common.
+ * TODO(AUTH-00 #77): one-time-code autofill (Android SMS/email suggestions, iOS
+ *  `.oneTimeCode`): Compose Multiplatform 1.7 has no common autofill-hint API, so it needs
+ *  platform text-field hooks (expect/actual) once the real flow exists.
  */
 @Composable
 fun OtpCodeInput(
@@ -75,6 +82,8 @@ fun OtpCodeInput(
     state: OtpCodeState = OtpCodeState.Default,
     errorMessage: String? = null,
     autoFocus: Boolean = false,
+    separatorAfter: Int? = null,
+    strikethrough: Boolean = false,
     onComplete: (String) -> Unit = {},
 ) {
     val digits = sanitizeOtpInput(value, length)
@@ -139,13 +148,34 @@ fun OtpCodeInput(
                                 digit = digits.getOrNull(index),
                                 active = focused && index == digits.length.coerceAtMost(length - 1),
                                 state = state,
+                                strikethrough = strikethrough,
                                 modifier = Modifier.weight(1f),
                             )
+                            if (separatorAfter != null && index == separatorAfter - 1 && index < length - 1) {
+                                OtpSeparator()
+                            }
                         }
                     }
                     Box(Modifier.matchParentSize()) { inner() }
                 }
             },
+        )
+    }
+}
+
+/** Hyphen between the two groups of boxes; centred on the boxes, not on the shadow strip. */
+@Composable
+private fun OtpSeparator() {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.height(RusuhSpacing.otpBoxHeight),
+    ) {
+        // The hyphen is drawn, not typed copy: a short ink bar.
+        Box(
+            Modifier
+                .width(RusuhSpacing.otpSeparatorWidth)
+                .height(RusuhSpacing.borderHeavy)
+                .background(RusuhColors.BrandInk),
         )
     }
 }
@@ -156,6 +186,7 @@ private fun OtpDigitBox(
     active: Boolean,
     state: OtpCodeState,
     modifier: Modifier = Modifier,
+    strikethrough: Boolean = false,
 ) {
     val isError = state == OtpCodeState.Error
     val borderColor =
@@ -173,7 +204,7 @@ private fun OtpDigitBox(
                 .brutalBox(
                     fill = if (isError) RusuhColors.BrandDangerSurface else RusuhColors.BrandCream,
                     borderColor = borderColor,
-                    shadow = if (digit != null) borderColor else null,
+                    shadow = if (digit != null && !strikethrough) borderColor else null,
                     shadowOffset = RusuhSpacing.shadowSm,
                 ),
     ) {
@@ -182,6 +213,7 @@ private fun OtpDigitBox(
                 text = digit.toString(),
                 style = RusuhBrandTextStyles.stat.display(),
                 color = if (isError) RusuhColors.BrandDanger else RusuhColors.BrandInk,
+                textDecoration = if (strikethrough) TextDecoration.LineThrough else null,
                 textAlign = TextAlign.Center,
             )
         }
