@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Indonesian (id) translation of the UI strings. Values are the original
-  hardcoded literals from the migrated screens (issue #51). EN base is in
-  values/strings.xml. Keep keys in sync with the EN base.
+  Indonesian translation (values-id folder for iOS resource resolution).
+  iOS's NSLocale.languageCode returns "id" for Indonesian, so CMP Resources
+  looks for values-id/. Keep this file IDENTICAL to values-in/strings.xml;
+  a unit test (LanguageStringParityTest) fails if they drift.
+  EN base is in values/strings.xml. Keep keys in sync with the EN base.
 -->
 <resources>
     <!-- App / brand -->

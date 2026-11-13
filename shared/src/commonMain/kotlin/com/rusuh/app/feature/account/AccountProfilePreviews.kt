@@ -13,7 +13,8 @@ import com.rusuh.app.ui.theme.RusuhTheme
 
 // Preview-style sample composables (no @Preview annotation: commonMain has no
 // uiTooling-preview dependency, same convention as the other feature previews).
-// The ID/EN variants follow the device language (strings live in values/ and values-id/).
+// The ID/EN variants follow the device language (strings live in values/,
+// values-id/, and values-in/).
 // Synthetic data only.
 
 private val sampleProfile =
