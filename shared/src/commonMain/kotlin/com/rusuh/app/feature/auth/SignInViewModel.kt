@@ -2,6 +2,7 @@ package com.rusuh.app.feature.auth
 
 import com.rusuh.app.analytics.Analytics
 import com.rusuh.app.analytics.AnalyticsEvents
+import com.rusuh.app.analytics.AnalyticsTracker
 import com.rusuh.app.analytics.NoOpAnalytics
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.AuthFailure
@@ -46,8 +47,10 @@ private const val MILLIS_PER_SECOND = 1_000L
  *   switches because the route keeps this ViewModel in its back-stack entry.
  * - shortcut: the name has no API to be saved, so it only goes to the device ([SaveDisplayNameUseCase]); the consent
  *   checkbox is not sent anywhere (the consent version travels with the code request).
+ *
+ * @param signInFrom analytics "from" parameter: where the user is signing in from (queue, order, account, tickets).
  */
-@Suppress("TooManyFunctions") // one small function per step transition
+@Suppress("TooManyFunctions", "LongParameterList")
 class SignInViewModel(
     private val requestOtp: RequestOtpUseCase,
     private val verifyOtp: VerifyOtpUseCase,
@@ -55,6 +58,8 @@ class SignInViewModel(
     private val observeSession: ObserveSessionUseCase,
     private val clock: ServerClock,
     private val analytics: Analytics = NoOpAnalytics,
+    private val tracker: AnalyticsTracker? = null,
+    private val signInFrom: String = AnalyticsEvents.FROM_ACCOUNT,
 ) : MviViewModel<SignInState, SignInIntent, SignInEffect>(SignInState()) {
     private var ticker: Job? = null
 
@@ -284,6 +289,7 @@ class SignInViewModel(
         analytics.setUserProperty(AnalyticsEvents.SIGNED_IN, "true")
         val email = emailOfCodeStep() ?: session.user.email
         if (session.isNewAccount) {
+            tracker?.signUp(signInFrom)
             // Signed in already, but the Account tab keeps the login until the name step is done.
             setState {
                 copy(
@@ -295,6 +301,7 @@ class SignInViewModel(
                 )
             }
         } else {
+            tracker?.login(signInFrom)
             setState { copy(isBusy = false, error = null, challenge = null, isFinished = true) }
             sendEffect(SignInEffect.SignedIn(isNewAccount = false))
         }

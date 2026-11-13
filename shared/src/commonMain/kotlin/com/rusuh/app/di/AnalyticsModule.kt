@@ -2,9 +2,11 @@ package com.rusuh.app.di
 
 import com.rusuh.app.analytics.Analytics
 import com.rusuh.app.analytics.AnalyticsConsentStore
+import com.rusuh.app.analytics.AnalyticsTracker
 import com.rusuh.app.analytics.ConsentAwareAnalytics
 import com.rusuh.app.analytics.NoOpAnalytics
 import com.rusuh.app.data.network.AppEnvironment
+import com.rusuh.app.data.network.LocaleProvider
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -25,4 +27,6 @@ fun analyticsModule(
             val delegate = platformAnalytics()
             ConsentAwareAnalytics(delegate, consentStore, environment, backendMode)
         }
+
+        single { AnalyticsTracker(get(), get<LocaleProvider>(), get()) }
     }
