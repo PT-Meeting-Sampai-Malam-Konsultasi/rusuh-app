@@ -40,11 +40,7 @@ class PaymentViewModelCoverageTest {
     ) : PaymentRepository {
         override suspend fun loadPayment(bookingId: String) = load
 
-        override suspend fun startSnap(
-            bookingId: String,
-            idempotencyKey: String,
-            method: PaymentMethod?,
-        ) = snap
+        override suspend fun startSnap(bookingId: String) = snap
 
         override fun observePaymentStatus(bookingId: String) = emptyFlow<PaymentStatusResult>()
     }
@@ -59,7 +55,7 @@ class PaymentViewModelCoverageTest {
                 null,
                 102,
             ),
-            null, Instant.parse(expiry), Instant.parse("2026-11-14T10:00:00Z"), "key",
+            Instant.parse(expiry), Instant.parse("2026-11-14T10:00:00Z"),
         )
 
     private fun vm(
@@ -144,13 +140,24 @@ class PaymentViewModelCoverageTest {
             val repo = Repo(DomainResult.Success(summary()))
             val viewModel = vm(repo)
             send(viewModel, PaymentIntent.Load, PaymentIntent.OpenSnap)
-            assertEquals(PaymentEffect.LaunchSnap(tx.redirectUrl), viewModel.effect.first())
+            assertEquals(PaymentEffect.LaunchSnap(requireNotNull(tx.redirectUrl)), viewModel.effect.first())
             repo.snap = DomainResult.Error(code = 503, errorCode = ErrorCode.PAYMENT_PROVIDER_BUSY, retryAfterSeconds = 12)
             send(viewModel, PaymentIntent.RetrySnap)
             assertEquals(12, assertIs<PaymentUiState.Ready>(viewModel.state.value.ui).busyError?.retryAfterSeconds)
             repo.snap = DomainResult.Error(code = 409, errorCode = ErrorCode.BOOKING_NOT_HELD)
             send(viewModel, PaymentIntent.RetrySnap)
             assertIs<PaymentUiState.Expired>(viewModel.state.value.ui)
+        }
+
+    @Test fun missingSnapRedirectShowsGenericError() =
+        runTest(dispatcher) {
+            val repo =
+                Repo(DomainResult.Success(summary())).apply {
+                    snap = DomainResult.Success(tx.copy(redirectUrl = null))
+                }
+            val viewModel = vm(repo)
+            send(viewModel, PaymentIntent.Load, PaymentIntent.OpenSnap)
+            assertEquals("Something went wrong", assertIs<PaymentUiState.Error>(viewModel.state.value.ui).message)
         }
 
     @Test fun cancellationHandlesSuccessAndNotCancellable() =
@@ -182,9 +189,7 @@ class PaymentViewModelCoverageTest {
     companion object {
         private val tx =
             SnapTransaction(
-                1,
-                "order",
-                PaymentMethod.QRIS,
+                "bk_test",
                 "token",
                 "https://pay.example.test/snap",
                 Instant.parse("2026-11-14T10:10:00Z"),

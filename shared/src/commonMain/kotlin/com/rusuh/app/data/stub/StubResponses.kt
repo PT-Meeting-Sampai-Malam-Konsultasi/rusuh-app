@@ -80,7 +80,6 @@ object StubResponses {
             StubRoute(HttpMethod.Post, "/core/bookings", StubResponse(201, StubJson.BOOKING_HELD)),
             StubRoute(HttpMethod.Get, "/core/bookings/active", StubResponse.ok(StubJson.BOOKINGS_ACTIVE)),
             StubRoute(HttpMethod.Get, "/core/bookings/{bookingId}", StubResponse.ok(StubJson.BOOKING_PAID)),
-            StubRoute(HttpMethod.Get, "/core/payments/{bookingId}/status", StubResponse.ok(StubJson.PAYMENT_STATUS)),
             StubRoute(HttpMethod.Get, "/core/tickets", StubResponse.ok(StubJson.TICKETS)),
             StubRoute(HttpMethod.Get, "/core/tickets/{ticketId}", StubResponse.ok(StubJson.TICKET_DETAIL)),
             StubRoute(HttpMethod.Post, "/queue/{eventId}/join", StubResponse.ok(StubJson.QUEUE_JOIN)),
@@ -106,9 +105,6 @@ object StubResponses {
                 StubResponse.ok(StubJson.CHECK_STATUS),
             ),
             StubRoute(HttpMethod.Delete, "/queue/{eventId}/me", StubResponse(204, contentType = null)),
-            StubRoute(HttpMethod.Post, "/core/payment-sessions", StubResponse(201, StubJson.PAYMENT_SESSION)),
-            StubRoute(HttpMethod.Get, "/core/payments/{bookingId}", StubResponse.ok(StubJson.PAYMENT_SUMMARY)),
-            StubRoute(HttpMethod.Post, "/core/payments/{bookingId}/snap", StubResponse(201, StubJson.PAYMENT_SNAP)),
         )
 
     /** True when some route serves [path] under another method (a request here is a 405, not a 404). */

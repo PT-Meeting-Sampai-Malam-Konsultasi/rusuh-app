@@ -63,16 +63,13 @@ class PaymentViewModelResumeCoverageTest {
                 }
             } else {
                 val loaded = (delegate.loadPayment(bookingId) as DomainResult.Success).data
-                val snap = (delegate.startSnap(bookingId, "synthetic-key", null) as DomainResult.Success).data
-                loaded.copy(currentSnap = snap).also { summary = it }.let { DomainResult.Success(it) }
+                loaded.copy(
+                    bookingStatus = BookingStatus.PAYMENT_PENDING,
+                ).also { summary = it }.let { DomainResult.Success(it) }
             }
         }
 
-        override suspend fun startSnap(
-            bookingId: String,
-            idempotencyKey: String,
-            method: com.rusuh.app.domain.model.PaymentMethod?,
-        ) = delegate.startSnap(bookingId, idempotencyKey, method)
+        override suspend fun startSnap(bookingId: String) = delegate.startSnap(bookingId)
 
         override fun observePaymentStatus(bookingId: String): Flow<PaymentStatusResult> {
             statusCount++

@@ -4,7 +4,6 @@ import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.domain.model.AttendeeInfo
 import com.rusuh.app.domain.model.BookingStatus
 import com.rusuh.app.domain.model.DomainResult
-import com.rusuh.app.domain.model.PaymentMethod
 import com.rusuh.app.domain.model.PaymentStatus
 import com.rusuh.app.domain.model.PaymentStatusResult
 import com.rusuh.app.domain.model.PaymentSummary
@@ -33,11 +32,8 @@ class StubPaymentRepository(
     override suspend fun loadPayment(bookingId: String): DomainResult<PaymentSummary> =
         DomainResult.Success(stubPaymentSummary(bookingId, nowInstant()))
 
-    override suspend fun startSnap(
-        bookingId: String,
-        idempotencyKey: String,
-        method: PaymentMethod?,
-    ): DomainResult<SnapTransaction> = DomainResult.Success(stubSnapTransaction(bookingId, nowInstant(), method))
+    override suspend fun startSnap(bookingId: String): DomainResult<SnapTransaction> =
+        DomainResult.Success(stubSnapTransaction(bookingId, nowInstant()))
 
     override fun observePaymentStatus(bookingId: String): Flow<PaymentStatusResult> =
         flow {
@@ -108,23 +104,18 @@ private fun stubPaymentSummary(
                 tax = null,
                 total = 3_015_000L,
             ),
-        currentSnap = null,
         expiresAt = now + 10.minutes,
         serverNow = now,
-        snapClientKey = "SB-Mid-client-rusuhDemoKey",
     )
 
 /** Stub Snap transaction matching the OpenAPI example (synthetic data). */
 private fun stubSnapTransaction(
     bookingId: String,
     now: Instant,
-    method: PaymentMethod?,
 ): SnapTransaction =
     SnapTransaction(
-        attemptId = 1,
-        orderId = "$bookingId-1",
-        method = method,
+        bookingId = bookingId,
         snapToken = "66e4fa55-fdac-4ef9-91b5-733b97d1b862",
         redirectUrl = "https://app.sandbox.midtrans.com/snap/v4/redirection/66e4fa55-fdac-4ef9-91b5-733b97d1b862",
-        gatewayExpiresAt = now + 10.minutes,
+        paymentExpiresAt = now + 10.minutes,
     )

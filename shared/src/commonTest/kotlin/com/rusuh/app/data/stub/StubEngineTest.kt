@@ -136,11 +136,11 @@ class StubEngineTest {
     fun paymentAndBookingActionsAreStubbed() =
         runTest {
             val cancel = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/core/bookings/bk_1/cancel"))
-            val snap = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/core/payments/bk_1/snap"))
+            val snap = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/core/bookings/bk_1/payment"))
             val device = assertIs<ApiResult.Success<JsonObject>>(api.post<JsonObject>("/queue/devices"))
 
             assertEquals("CANCELLED", cancel.data.text("status"))
-            assertEquals(201, snap.code)
+            assertEquals(200, snap.code)
             assertEquals(201, device.code)
             assertEquals("2026-12-14T10:40:00Z", device.data.text("expiresAt"))
         }

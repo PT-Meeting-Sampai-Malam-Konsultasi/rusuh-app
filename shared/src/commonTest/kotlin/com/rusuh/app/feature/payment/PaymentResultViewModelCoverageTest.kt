@@ -33,11 +33,7 @@ class PaymentResultViewModelCoverageTest {
     private class Repo(var status: PaymentStatusResult, var summary: DomainResult<PaymentSummary>) : PaymentRepository {
         override suspend fun loadPayment(bookingId: String) = summary
 
-        override suspend fun startSnap(
-            bookingId: String,
-            idempotencyKey: String,
-            method: PaymentMethod?,
-        ) = DomainResult.TechnicalError
+        override suspend fun startSnap(bookingId: String) = DomainResult.TechnicalError
 
         override fun observePaymentStatus(bookingId: String) = flowOf(status)
     }
@@ -56,7 +52,7 @@ class PaymentResultViewModelCoverageTest {
                 null,
                 1,
             ),
-            null, Instant.parse("2026-11-14T10:10:00Z"), Instant.parse("2026-11-14T10:00:00Z"), "key",
+            Instant.parse("2026-11-14T10:10:00Z"), Instant.parse("2026-11-14T10:00:00Z"),
         )
 
     private fun status(

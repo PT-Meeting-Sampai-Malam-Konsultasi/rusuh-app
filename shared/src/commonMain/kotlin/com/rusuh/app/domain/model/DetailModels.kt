@@ -109,11 +109,12 @@ enum class BookingStatus {
     CANCELLED,
     REFUND_PENDING,
     REFUNDED,
+    UNKNOWN,
     ;
 
     companion object {
         fun fromWire(value: String?): BookingStatus =
-            value?.let { v -> entries.firstOrNull { it.name.equals(v, ignoreCase = true) } } ?: SELECTION
+            value?.let { v -> entries.firstOrNull { it.name.equals(v, ignoreCase = true) } } ?: UNKNOWN
     }
 
     /** True when the booking is in a final state (no more changes possible). */

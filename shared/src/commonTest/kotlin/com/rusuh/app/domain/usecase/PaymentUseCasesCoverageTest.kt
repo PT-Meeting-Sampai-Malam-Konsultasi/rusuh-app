@@ -18,8 +18,6 @@ import kotlin.test.*
 class PaymentUseCasesCoverageTest {
     private class Repo : PaymentRepository {
         var booking = ""
-        var key = ""
-        var method: PaymentMethod? = null
         val summary =
             DomainResult.Success(
                 PaymentSummary(
@@ -31,14 +29,12 @@ class PaymentUseCasesCoverageTest {
                         null,
                         1,
                     ),
-                    null, Instant.parse("2026-11-14T10:10:00Z"), Instant.parse("2026-11-14T10:00:00Z"), "client",
+                    Instant.parse("2026-11-14T10:10:00Z"), Instant.parse("2026-11-14T10:00:00Z"),
                 ),
             )
         val transaction =
             SnapTransaction(
-                1,
-                "order",
-                PaymentMethod.QRIS,
+                "bk_test",
                 "token",
                 "https://pay.example.test/snap",
                 Instant.parse("2026-11-14T10:10:00Z"),
@@ -49,14 +45,8 @@ class PaymentUseCasesCoverageTest {
             return summary
         }
 
-        override suspend fun startSnap(
-            bookingId: String,
-            idempotencyKey: String,
-            method: PaymentMethod?,
-        ): DomainResult<SnapTransaction> {
+        override suspend fun startSnap(bookingId: String): DomainResult<SnapTransaction> {
             booking = bookingId
-            key = idempotencyKey
-            this.method = method
             return DomainResult.Success(transaction)
         }
 
@@ -78,16 +68,11 @@ class PaymentUseCasesCoverageTest {
             assertEquals(BookingStatus.PAID, ObservePaymentStatusUseCase(repo)("bk_test").first().bookingStatus)
         }
 
-    @Test fun startReturnsGeneratedKeyAndRetryReusesProvidedKey() =
+    @Test fun startDelegatesWithoutClientIdempotencyKey() =
         runTest {
             val repo = Repo()
             val useCase = StartSnapPaymentUseCase(repo)
-            val result = useCase.invoke("bk_test", PaymentMethod.QRIS)
-            assertIs<DomainResult.Success<SnapTransaction>>(result.result)
-            assertTrue(result.idempotencyKey.isNotBlank())
-            assertEquals(result.idempotencyKey, repo.key)
-            assertEquals(PaymentMethod.QRIS, repo.method)
-            assertEquals(DomainResult.Success(repo.transaction), useCase.invokeWithKey("bk_test", "stable-key"))
-            assertEquals("stable-key", repo.key)
+            assertEquals(DomainResult.Success(repo.transaction), useCase("bk_test"))
+            assertEquals("bk_test", repo.booking)
         }
 }

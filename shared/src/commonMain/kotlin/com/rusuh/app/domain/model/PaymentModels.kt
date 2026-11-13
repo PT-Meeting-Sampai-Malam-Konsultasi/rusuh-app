@@ -4,7 +4,7 @@ import kotlinx.datetime.Instant
 
 /**
  * Domain model for the payment summary shown on the handoff screen.
- * Mapped from [com.rusuh.app.data.remote.dto.PaymentViewDto].
+ * Mapped from a booking record and the locally stored account email.
  */
 data class PaymentSummary(
     val bookingId: String,
@@ -16,10 +16,10 @@ data class PaymentSummary(
     val attendees: List<AttendeeInfo>,
     val customerEmail: String?,
     val price: PriceBreakdown,
-    val currentSnap: SnapTransaction?,
     val expiresAt: Instant,
     val serverNow: Instant,
-    val snapClientKey: String,
+    val bookingStatus: BookingStatus = BookingStatus.SELECTION,
+    val refundRequired: Boolean = false,
 )
 
 /** One attendee line in the payment summary: category + masked NIK. */
@@ -50,44 +50,17 @@ data class PriceLine(
 
 /**
  * Midtrans Snap transaction details.
- * Mapped from [com.rusuh.app.data.remote.dto.SnapTransactionDto].
+ * Mapped from the booking payment-entry response.
  */
 data class SnapTransaction(
-    val attemptId: Int,
-    val orderId: String,
-    val method: PaymentMethod?,
+    val bookingId: String,
     val snapToken: String,
-    val redirectUrl: String,
-    val gatewayExpiresAt: Instant,
+    val redirectUrl: String?,
+    val paymentExpiresAt: Instant,
 )
 
 /**
- * Payment method as defined in the API contract.
- * The Snap page shows a subset based on the backend config.
- */
-enum class PaymentMethod {
-    QRIS,
-    GOPAY,
-    SHOPEEPAY,
-    BCA_VA,
-    MANDIRI_VA,
-    BNI_VA,
-    BRI_VA,
-    PERMATA_VA,
-    CIMB_VA,
-    CARD,
-    ;
-
-    companion object {
-        /** Parse from wire value (lowercase), null for unseen strings. */
-        fun fromWire(value: String?): PaymentMethod? =
-            value?.let { v -> entries.firstOrNull { it.name.equals(v, ignoreCase = true) } }
-    }
-}
-
-/**
- * Result of polling `GET /core/payments/{bookingId}/status`.
- * Mapped from [com.rusuh.app.data.remote.dto.PaymentStatusDto].
+ * Result of checking payment status through the booking API.
  */
 data class PaymentStatusResult(
     val bookingStatus: BookingStatus,

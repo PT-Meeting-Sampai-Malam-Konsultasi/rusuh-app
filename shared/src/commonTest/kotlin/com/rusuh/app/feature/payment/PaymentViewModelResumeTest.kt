@@ -67,11 +67,7 @@ class PaymentViewModelResumeTest {
             return result
         }
 
-        override suspend fun startSnap(
-            bookingId: String,
-            idempotencyKey: String,
-            method: com.rusuh.app.domain.model.PaymentMethod?,
-        ) = delegate.startSnap(bookingId, idempotencyKey, method)
+        override suspend fun startSnap(bookingId: String) = delegate.startSnap(bookingId)
 
         override fun observePaymentStatus(bookingId: String): Flow<PaymentStatusResult> {
             statusCount++
