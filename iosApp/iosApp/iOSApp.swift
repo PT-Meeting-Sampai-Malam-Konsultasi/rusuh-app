@@ -19,15 +19,19 @@ struct ContentView: View {
 @main
 struct iOSApp: App {
     init() {
-        // Mock or real host: NetworkConfig.MOCK_API in the shared module (debug only; release is always real).
+        // Debug builds use the live API by default. Scheme environment variables (Xcode: Edit Scheme > Run):
+        //   MOCK_API=true       use the local Mockoon server (http://localhost:3000)
+        //   BACKEND_MODE=Stub   offline demo data
+        // Release builds always use the live API.
         #if DEBUG
-        // Optional offline demo: set BACKEND_MODE=Stub in the Xcode scheme environment.
+        let environment = ProcessInfo.processInfo.environment
         KoinIosKt.doInitKoin(
             isDebug: true,
-            backendModeName: ProcessInfo.processInfo.environment["BACKEND_MODE"]
+            backendModeName: environment["BACKEND_MODE"],
+            useMockServer: environment["MOCK_API"] == "true"
         )
         #else
-        KoinIosKt.doInitKoin(isDebug: false, backendModeName: nil)
+        KoinIosKt.doInitKoin(isDebug: false, backendModeName: nil, useMockServer: false)
         #endif
     }
 
