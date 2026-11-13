@@ -119,4 +119,5 @@ data class AttendeeDto(
 @Serializable
 data class ActiveBookingsResponseDto(
     @SerialName("items") val items: List<BookingDto> = emptyList(),
+    @SerialName("serverNow") val serverNow: String = "",
 )

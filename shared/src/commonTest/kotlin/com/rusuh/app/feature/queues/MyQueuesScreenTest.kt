@@ -1,5 +1,6 @@
 package com.rusuh.app.feature.queues
 
+import com.rusuh.app.domain.model.OrderInProgress
 import com.rusuh.app.ui.components.QueueListPhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,6 +24,15 @@ class MyQueuesScreenTest {
     @Test
     fun contentStateCarriesThePlaceholderQueues() {
         val state = MyQueuesUiState.Content(placeholderQueues())
+        assertEquals(placeholderQueues().size, state.queues.size)
+    }
+
+    @Test
+    fun contentStatePresentsResumeRowsBeforeQueueRows() {
+        val order = OrderInProgress("evt-order", remainingMillis = 60_000)
+        val state = MyQueuesUiState.Content(placeholderQueues(), listOf(order))
+
+        assertEquals(listOf(order), state.orders)
         assertEquals(placeholderQueues().size, state.queues.size)
     }
 

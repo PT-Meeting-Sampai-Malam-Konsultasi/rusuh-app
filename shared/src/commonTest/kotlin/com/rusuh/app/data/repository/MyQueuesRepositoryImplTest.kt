@@ -1,5 +1,6 @@
 package com.rusuh.app.data.repository
 
+import com.rusuh.app.data.cache.AdmissionInfo
 import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.MyQueue
@@ -16,6 +17,69 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MyQueuesRepositoryImplTest {
+    @Test
+    fun resumeListContainsStoredAdmissionAndActiveHeldBookingUsingServerTime() =
+        runTest {
+            val h = QueueHarness()
+            h.queueCache.setAdmission(
+                AdmissionInfo("evt_order", "slot-1", 3, 1_794_653_100_000),
+            )
+            h.backend.on(
+                "GET /core/bookings/active",
+                Reply.ok(
+                    "{\"serverNow\":\"2026-11-14T10:40:00Z\",\"items\":[{" +
+                        "\"bookingId\":\"booking-1\",\"eventId\":\"evt_pay\",\"status\":\"HELD\"," +
+                        "\"expiresAt\":\"2026-11-14T10:50:00Z\",\"serverNow\":\"2026-11-14T10:40:00Z\"}]}",
+                ),
+            )
+
+            val rows = h.myQueues.getOrdersInProgress()
+
+            assertEquals(listOf("evt_order", "evt_pay"), rows.map { it.eventId })
+            assertEquals(300_000, rows.first().remainingMillis)
+            assertEquals(600_000, rows.last().remainingMillis)
+            assertEquals("booking-1", rows.last().bookingId)
+        }
+
+    @Test
+    fun anOfflineActiveBookingsCallStillReturnsTheStoredAdmission() =
+        runTest {
+            val h = QueueHarness(synced = false)
+            h.queueCache.setAdmission(
+                AdmissionInfo("evt_order", "slot-1", 3, h.clock.nowMillis() + 60_000),
+            )
+            h.backend.on("GET /core/bookings/active", Reply.offline())
+
+            val order = h.myQueues.getOrdersInProgress().single()
+            assertEquals("evt_order", order.eventId)
+            assertNull(order.remainingMillis)
+        }
+
+    @Test
+    fun anUnauthorizedActiveBookingsCallDoesNotExposeHeldBookings() =
+        runTest {
+            val h = QueueHarness()
+            h.backend.on("GET /core/bookings/active", Reply.problem(401, "UNAUTHORIZED"))
+
+            assertEquals(emptyList(), h.myQueues.getOrdersInProgress())
+        }
+
+    @Test
+    fun anExpiredHeldBookingIsNotResumable() =
+        runTest {
+            val h = QueueHarness()
+            h.backend.on(
+                "GET /core/bookings/active",
+                Reply.ok(
+                    "{\"serverNow\":\"2026-11-14T10:40:00Z\",\"items\":[{" +
+                        "\"bookingId\":\"booking-1\",\"eventId\":\"evt_pay\",\"status\":\"HELD\"," +
+                        "\"expiresAt\":\"2026-11-14T10:39:00Z\",\"serverNow\":\"2026-11-14T10:40:00Z\"}]}",
+                ),
+            )
+
+            assertEquals(emptyList(), h.myQueues.getOrdersInProgress())
+        }
+
     private suspend fun QueueHarness.joined(vararg ids: String) {
         ids.forEach { id ->
             tokens.setQueueToken(id, "token-$id")
