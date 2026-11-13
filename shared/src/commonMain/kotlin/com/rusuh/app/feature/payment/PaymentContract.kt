@@ -63,6 +63,8 @@ sealed interface PaymentIntent : MviIntent {
     data object GoHome : PaymentIntent
 
     data object CancelBooking : PaymentIntent
+
+    data object SnapClosed : PaymentIntent
 }
 
 /** Side effects emitted by the Payment ViewModel. */

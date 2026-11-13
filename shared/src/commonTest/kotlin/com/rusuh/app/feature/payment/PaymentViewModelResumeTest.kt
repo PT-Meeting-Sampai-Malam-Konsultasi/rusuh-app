@@ -148,4 +148,24 @@ class PaymentViewModelResumeTest {
             assertIs<PaymentUiState.Success>(viewModel.state.value.ui)
             assertEquals(1, repository.statusCount)
         }
+
+    @Test
+    fun closingSnapRefreshesBookingAndShowsPaidResult() =
+        runTest(dispatcher) {
+            val repository =
+                FakeRepository().apply {
+                    status = BookingStatus.PAID
+                    paymentStatus = PaymentStatus.SETTLED
+                }
+            val viewModel = viewModel(repository)
+            viewModel.dispatch(PaymentIntent.Load)
+            testScheduler.advanceUntilIdle()
+            viewModel.dispatch(PaymentIntent.OpenSnap)
+            testScheduler.advanceUntilIdle()
+            viewModel.dispatch(PaymentIntent.SnapClosed)
+            testScheduler.advanceUntilIdle()
+
+            assertIs<PaymentUiState.Success>(viewModel.state.value.ui)
+            assertEquals(2, repository.loadCount)
+        }
 }

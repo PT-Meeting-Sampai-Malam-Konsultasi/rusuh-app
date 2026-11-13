@@ -51,6 +51,7 @@ class PaymentViewModel(
             PaymentIntent.QueueAgain -> queueAgain()
             PaymentIntent.GoHome -> sendEffect(PaymentEffect.NavigateToHome)
             PaymentIntent.CancelBooking -> cancel()
+            PaymentIntent.SnapClosed -> refreshAfterResume()
         }
     }
 

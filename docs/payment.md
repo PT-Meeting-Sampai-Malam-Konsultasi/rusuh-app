@@ -7,9 +7,9 @@ Payment handoff to Midtrans Snap (FR-06-M4 #45, FR-06-M5 #98, FR-25-M1 #85, FR-2
 Payment follows the Midtrans Web UI (Snap hosted page) flow:
 1. User reaches the Payment screen after ticket selection
 2. App shows order summary with a 10-minute countdown
-3. User taps "Continue to payment" → opens Snap page in system tab
-4. The app returns to the foreground or receives the return link
-5. The app refreshes the server deadline and checks status once; pending status stays on Payment
+3. User taps "Continue to payment" → opens Snap inside the full-screen in-app WebView
+4. The WebView keeps HTTPS navigation inside, opens wallet/bank app links externally, and closes on a payment result callback
+5. The Payment screen refreshes the booking and checks status; the booking response is authoritative and pending stays on Payment
 
 The Midtrans mobile SDK is NOT used (it is being retired). The backend creates the Snap
 transaction, so no Midtrans server key is needed in the app.
@@ -125,8 +125,7 @@ The `PaymentResult` route:
 
 Malformed or foreign URLs (wrong scheme/host, missing bookingId) are ignored.
 
-Returning with Back or closing the system tab triggers an `ON_RESUME` refresh even when the domain
-association files are unavailable. No status requests run while the app is backgrounded. A pending
+Closing the in-app WebView or returning from an external wallet/bank app triggers the existing resume refresh. The WebView recognizes the return URL as a close signal even when the domain association files are unavailable. No status requests run while the app is backgrounded. A pending
 status is checked again only on a later resume.
 
 ## Screen States
@@ -164,11 +163,12 @@ This prevents timezone issues and device clock manipulation.
 - ViewModel state transitions
 - Countdown expiry handling
 - URL/return parsing (bookingId extraction)
-- PaymentPageLauncher fake for testing
+- Payment navigation decisions for HTTPS, callback, wallet, blocked cleartext, and contact URLs
+- Payment ViewModel resume refresh after returning from the WebView
 
 ### Not Verified (Requires Backend)
 - Live API calls (routes return 404)
-- Actual Custom Tab / SFSafariViewController launch
+- Actual Android WebView / iOS WKWebView rendering and wallet app handoff
 - Real App Link / Universal Link handling
 - Midtrans Snap page interaction
 - GoPay/e-wallet deeplinks
@@ -201,8 +201,7 @@ To test the payment flow locally:
 3. Add the status polling route (`GET /core/payments/:bookingId/status`) — script
    it to return PENDING 2-3 times, then PAID.
 
-4. Create a fake Snap page (simple HTML) that redirects to `rusuh://payment-result?bookingId=...`
-   after a button click.
+4. The stub Snap response opens the Midtrans sandbox HTTPS URL. For a local callback exercise, point the stub response to an HTTPS test page with a button that redirects to `https://app.rusuh.id/payment-result?bookingId=bk_01JB2Y6Z8Q`. A result callback closes the WebView; it does not decide paid/pending/expired.
 
 5. Run with mock mode: `./gradlew :androidApp:assembleDebug -PmockApi=true`
 
@@ -227,11 +226,12 @@ To test the payment flow locally:
 - `feature/payment/PaymentResultViewModel.kt` — result screen ViewModel
 - `feature/payment/PaymentScreen.kt` — UI composables
 - `feature/payment/PaymentRoute.kt` — route wiring
-- `feature/payment/PaymentPageLauncher.kt` — interface for browser launch
+- `feature/payment/PaymentNavigationDecision.kt` — shared navigation policy
+- `feature/payment/PaymentSnapWebView.kt` — platform WebView boundary
 
 ### Platform
-- `androidMain/.../AndroidPaymentPageLauncher.kt` — Chrome Custom Tabs
-- `iosMain/.../IosPaymentPageLauncher.kt` — SFSafariViewController
+- `androidMain/.../PaymentSnapWebView.android.kt` — Android WebView
+- `iosMain/.../PaymentSnapWebView.ios.kt` — WKWebView and navigation delegate
 
 ### Navigation
 - `navigation/Screen.kt` — `Payment` and `PaymentResult` routes
@@ -253,3 +253,13 @@ For the full flow to work, the backend must:
 3. Host the App Link / Universal Link domain files at `https://app.rusuh.id/.well-known/`
 
 4. For GoPay, set the mobile deeplink callback appropriately
+
+## Manual WebView Checks
+
+1. Run Stub mode (`./gradlew :androidApp:assembleStagingDebug -PbackendMode=Stub`) and open a held booking's Payment screen.
+2. Continue to payment and confirm the Snap HTTPS page is rendered in-app with no address bar.
+3. Use an HTTPS test page with links to another HTTPS URL and a `gojek://` or `shopeeid://` URL. HTTPS stays in-app; the app link opens externally when installed, and the app shows a notice when missing.
+4. Confirm a matching payment-result URL closes the WebView and returns to Payment. Confirm its next state follows booking status after refresh.
+5. Leave the page open until the server-driven timer expires and confirm it closes into Expired.
+6. Turn off networking while loading and confirm Retry and Close appear. Check an invalid certificate is rejected.
+7. Repeat on Android and iOS; run the shared URL decision tests with `:shared:testDebugUnitTest`.

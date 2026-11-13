@@ -473,6 +473,12 @@
     <string name="account_analytics_label">Analytics</string>
     <string name="account_analytics_enabled">Enabled</string>
     <string name="account_analytics_disabled">Disabled</string>
+    <string name="payment_leave_title">Leave the payment page?</string>
+    <string name="payment_leave_body">Your payment may still be processing. You can return to check its status.</string>
+    <string name="payment_close">Close</string>
+    <string name="payment_retry">Retry</string>
+    <string name="payment_web_error">This page could not be loaded. Check your connection and try again.</string>
+    <string name="payment_external_missing">No app is available to open this payment link.</string>
     <string name="continue_booking">Continue booking</string>
     <string name="continue_payment">Continue payment</string>
     <string name="order_time_remaining">%1$d seconds remaining</string>
