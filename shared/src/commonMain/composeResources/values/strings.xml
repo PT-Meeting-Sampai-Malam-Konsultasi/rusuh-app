@@ -265,6 +265,8 @@
         <item quantity="other">%1$d %2$s tickets are issued, each under its own holder’s NIK. We also emailed the e-ticket to %3$s.</item>
     </plurals>
     <string name="eticket_add_to_calendar">Add to calendar</string>
+    <string name="eticket_add_to_calendar_description">Add event to calendar</string>
+    <string name="eticket_no_calendar_app">No calendar app available</string>
     <string name="eticket_order_line">Order %1$s · %2$s · %3$s</string>
     <string name="eticket_ticket_label">TICKET %1$d/%2$d</string>
     <string name="eticket_holder_label">HOLDER</string>

@@ -263,6 +263,8 @@
         <item quantity="other">%1$d tiket %2$s sudah atas nama pemegang NIK masing-masing. Kami juga mengirim e-tiket ke %3$s.</item>
     </plurals>
     <string name="eticket_add_to_calendar">Tambah ke kalender</string>
+    <string name="eticket_add_to_calendar_description">Tambahkan acara ke kalender</string>
+    <string name="eticket_no_calendar_app">Tidak ada aplikasi kalender</string>
     <string name="eticket_order_line">Pesanan %1$s · %2$s · %3$s</string>
     <string name="eticket_ticket_label">TIKET %1$d/%2$d</string>
     <string name="eticket_holder_label">PEMEGANG</string>

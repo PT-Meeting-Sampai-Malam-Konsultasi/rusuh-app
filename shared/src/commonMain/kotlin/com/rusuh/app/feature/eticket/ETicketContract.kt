@@ -8,6 +8,8 @@ import com.rusuh.app.mvi.MviState
 /** MVI state for the e-ticket page; [ui] is exactly what [ETicketScreen] renders. */
 data class ETicketState(
     val ui: ETicketUiState = ETicketUiState.Loading,
+    /** The order data, kept for calendar event creation after content is loaded. */
+    val order: ETicketOrder? = null,
 ) : MviState
 
 /** User intents on the e-ticket page. */
@@ -20,12 +22,21 @@ sealed interface ETicketIntent : MviIntent {
 
     /** Leave the page (the not-found action); the system back gesture is handled by navigation. */
     data object Back : ETicketIntent
+
+    /** Add the event to the device calendar. */
+    data object AddToCalendar : ETicketIntent
 }
 
 /** One-time side effects on the e-ticket page. */
 sealed interface ETicketEffect : MviEffect {
     /** Return to the Tiket tab. */
     data object NavigateBack : ETicketEffect
+
+    /** Launch the calendar with the given event data. */
+    data class LaunchCalendar(val event: CalendarEvent) : ETicketEffect
+
+    /** No calendar app is available to handle the request. */
+    data object NoCalendarApp : ETicketEffect
 }
 
 /** What the e-ticket page can show. */
