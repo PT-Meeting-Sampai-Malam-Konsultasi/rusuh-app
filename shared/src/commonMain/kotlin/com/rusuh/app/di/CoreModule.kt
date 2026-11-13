@@ -29,7 +29,7 @@ import org.koin.dsl.onClose
  * keeps singleton instances inside the module object, so each Koin start (and each test) needs a fresh one.
  *
  * Plugins: the shared client sends `Accept-Language` and records `serverNow` into the one [ServerClock] (the
- * [MonotonicServerClock] bound here; `dataModule` replaces both the clock and the client in stub mode); each host
+ * [MonotonicServerClock] bound here; `stubDataModule` replaces both the clock and the client in stub mode); each host
  * client adds the token headers and the single-flight 401 refresh (see [HostAuth]). Everything is built through
  * `ClientBuilder`.
  */

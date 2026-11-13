@@ -59,7 +59,7 @@ class AuthWiringTest {
                 },
                 storageModule,
                 coreModule(),
-                dataModule(BackendMode.Stub, true) { },
+                *dataModules(BackendMode.Stub, true) { }.toTypedArray(),
                 appModule,
             )
         }.koin
