@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +36,9 @@ import com.rusuh.app.ui.theme.body
 import com.rusuh.app.ui.theme.display
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.account_analytics_disabled
+import rusuh_app.shared.generated.resources.account_analytics_enabled
+import rusuh_app.shared.generated.resources.account_analytics_label
 import rusuh_app.shared.generated.resources.account_change_email
 import rusuh_app.shared.generated.resources.account_delete
 import rusuh_app.shared.generated.resources.account_email_label
@@ -68,6 +72,8 @@ fun AccountProfileContent(
         ProfileHeader(profile)
         Spacer(Modifier.height(RusuhSpacing.xxl))
         SignInSection(profile, actions.onChangeEmail)
+        Spacer(Modifier.height(RusuhSpacing.xxl))
+        AnalyticsRow(profile.analyticsEnabled, actions.onToggleAnalytics)
         Spacer(Modifier.height(RusuhSpacing.xxl))
         AccountButtons(actions)
     }
@@ -242,6 +248,43 @@ private fun AccountButtons(actions: AccountProfileActions) {
         }
         // TODO(ACCOUNT-00 #104): no delete-account endpoint in the contract yet: null callback = plain text.
         UnderlinedLink(text = stringResource(Res.string.account_delete), onClick = actions.onDeleteAccount)
+    }
+}
+
+@Composable
+internal fun AnalyticsRow(
+    enabled: Boolean,
+    onToggle: ((Boolean) -> Unit)?,
+) {
+    val valueText =
+        stringResource(
+            if (enabled) Res.string.account_analytics_enabled else Res.string.account_analytics_disabled,
+        )
+    Column(
+        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.xs),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .let { base ->
+                    if (onToggle != null) {
+                        base.toggleable(value = enabled, role = Role.Switch, onValueChange = onToggle)
+                    } else {
+                        base
+                    }
+                }
+                .padding(vertical = RusuhSpacing.lg)
+                .semantics(mergeDescendants = true) {},
+    ) {
+        Text(
+            text = stringResource(Res.string.account_analytics_label),
+            style = RusuhBrandTextStyles.eyebrow.body(),
+            color = RusuhColors.BrandSubtle,
+        )
+        Text(
+            text = valueText,
+            style = RusuhBrandTextStyles.subtitle.display(),
+            color = RusuhColors.BrandInk,
+        )
     }
 }
 

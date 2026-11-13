@@ -1,5 +1,8 @@
 package com.rusuh.app.feature.auth
 
+import com.rusuh.app.analytics.Analytics
+import com.rusuh.app.analytics.AnalyticsEvents
+import com.rusuh.app.analytics.NoOpAnalytics
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.AuthFailure
 import com.rusuh.app.domain.model.AuthSession
@@ -51,6 +54,7 @@ class SignInViewModel(
     private val saveDisplayName: SaveDisplayNameUseCase,
     private val observeSession: ObserveSessionUseCase,
     private val clock: ServerClock,
+    private val analytics: Analytics = NoOpAnalytics,
 ) : MviViewModel<SignInState, SignInIntent, SignInEffect>(SignInState()) {
     private var ticker: Job? = null
 
@@ -276,6 +280,8 @@ class SignInViewModel(
     }
 
     private fun onVerified(session: AuthSession) {
+        analytics.setUserId(session.user.userId)
+        analytics.setUserProperty(AnalyticsEvents.SIGNED_IN, "true")
         val email = emailOfCodeStep() ?: session.user.email
         if (session.isNewAccount) {
             // Signed in already, but the Account tab keeps the login until the name step is done.

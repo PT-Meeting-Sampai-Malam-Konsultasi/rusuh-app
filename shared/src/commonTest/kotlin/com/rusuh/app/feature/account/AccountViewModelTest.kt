@@ -1,5 +1,9 @@
 package com.rusuh.app.feature.account
 
+import com.rusuh.app.analytics.Analytics
+import com.rusuh.app.analytics.AnalyticsConsent
+import com.rusuh.app.analytics.AnalyticsConsentStore
+import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.domain.model.AccountSummary
 import com.rusuh.app.domain.model.AuthUser
 import com.rusuh.app.domain.model.DomainResult
@@ -50,11 +54,16 @@ class AccountViewModelTest {
         val names = FakeDisplayNames()
         val observer = FakeSessionObserver(phase)
         val generation = AuthGeneration()
+        val prefs = FakeAppPreferences()
+        val consentStore = AnalyticsConsentStore(prefs)
+        val analytics = FakeAnalytics()
         val viewModel =
             AccountViewModel(
                 getProfile = GetProfileUseCase(repository, names),
                 signOut = SignOutUseCase(repository, generation, names),
                 observeSession = ObserveSessionUseCase(observer),
+                consentStore = consentStore,
+                analytics = analytics,
             )
 
         init {
@@ -93,7 +102,10 @@ class AccountViewModelTest {
             val f = fixture()
             f.observer.current.value = SessionPhase.SignedOut
             runCurrent()
-            assertEquals(AccountBody.SignedOut(sessionExpired = false), f.state.toBody())
+            assertEquals(
+                AccountBody.SignedOut(sessionExpired = false, analyticsEnabled = false),
+                f.state.toBody(),
+            )
             f.viewModel.clear()
         }
 
@@ -118,12 +130,15 @@ class AccountViewModelTest {
             f.repository.onMe = { DomainResult.Success(TEST_USER.copy(fullName = "Sari Wulandari")) }
             f.observer.current.value = SessionPhase.SignedIn
             runCurrent()
-            assertEquals(AccountBody.ProfileLoading, f.state.toBody())
+            assertEquals(AccountBody.ProfileLoading(analyticsEnabled = false), f.state.toBody())
 
             send(f, AccountIntent.LoadProfile)
 
             val body = assertIs<AccountBody.Profile>(f.state.toBody())
-            assertEquals(AccountProfileUi("Sari Wulandari", TEST_EMAIL, emailVerified = true), body.profile)
+            assertEquals(
+                AccountProfileUi("Sari Wulandari", TEST_EMAIL, emailVerified = true, analyticsEnabled = false),
+                body.profile,
+            )
             f.viewModel.clear()
         }
 
@@ -214,7 +229,7 @@ class AccountViewModelTest {
             val f = fixture(SessionPhase.SignedIn)
             f.repository.onMe = { DomainResult.NetworkError }
             send(f, AccountIntent.LoadProfile)
-            assertEquals(AccountBody.ProfileError, f.state.toBody())
+            assertEquals(AccountBody.ProfileError(analyticsEnabled = false), f.state.toBody())
 
             f.repository.onMe = { DomainResult.Success(TEST_USER) }
             send(f, AccountIntent.RetryProfile)
@@ -238,7 +253,10 @@ class AccountViewModelTest {
             runCurrent()
 
             assertEquals(ProfileLoad.Idle, f.state.profile)
-            assertEquals(AccountBody.SignedOut(sessionExpired = false), f.state.toBody())
+            assertEquals(
+                AccountBody.SignedOut(sessionExpired = false, analyticsEnabled = false),
+                f.state.toBody(),
+            )
             f.viewModel.clear()
         }
 
@@ -254,7 +272,10 @@ class AccountViewModelTest {
             assertEquals(1, f.repository.logouts)
             assertEquals(1, f.names.clears)
             assertNull(f.names.name)
-            assertEquals(AccountBody.SignedOut(sessionExpired = false), f.state.toBody())
+            assertEquals(
+                AccountBody.SignedOut(sessionExpired = false, analyticsEnabled = false),
+                f.state.toBody(),
+            )
             assertFalse(f.state.isSigningOut)
             f.viewModel.clear()
         }
@@ -299,7 +320,10 @@ class AccountViewModelTest {
             f.observer.current.value = SessionPhase.SignedOut
             runCurrent()
 
-            assertEquals(AccountBody.SignedOut(sessionExpired = true), f.state.toBody())
+            assertEquals(
+                AccountBody.SignedOut(sessionExpired = true, analyticsEnabled = false),
+                f.state.toBody(),
+            )
 
             // Signing in again clears the message.
             f.observer.current.value = SessionPhase.SignedIn
@@ -307,6 +331,45 @@ class AccountViewModelTest {
             assertFalse(f.state.sessionExpiredNotice)
             f.viewModel.clear()
         }
+
+    @Test
+    fun signOutClearsUserId() =
+        runTest(dispatcher) {
+            val f = fixture(SessionPhase.SignedIn)
+            f.analytics.setTestUserId("usr_123")
+            send(f, AccountIntent.SignOut)
+            assertNull(f.analytics.recordedUserId)
+            f.viewModel.clear()
+        }
+
+    @Test
+    fun setAnalyticsConsentUpdatesStoreAndEnablesCollection() =
+        runTest(dispatcher) {
+            val f = fixture(SessionPhase.SignedOut)
+            send(f, AccountIntent.SetAnalyticsConsent(true))
+            assertEquals(AnalyticsConsent.Granted, f.consentStore.consent.value)
+            assertEquals(true, f.analytics.collectionEnabled)
+            assertEquals(true, assertIs<AccountBody.SignedOut>(f.state.toBody()).analyticsEnabled)
+            f.viewModel.clear()
+        }
+
+    @Test
+    fun setAnalyticsConsentUpdatesStoreAndDisablesCollection() =
+        runTest(dispatcher) {
+            val f = fixture(SessionPhase.SignedIn)
+            send(f, AccountIntent.SetAnalyticsConsent(false))
+            assertEquals(AnalyticsConsent.Denied, f.consentStore.consent.value)
+            assertEquals(false, f.analytics.collectionEnabled)
+            f.viewModel.clear()
+        }
+
+    @Test
+    fun signedOutBodyReflectsStoredAnalyticsConsent() {
+        assertEquals(
+            AccountBody.SignedOut(sessionExpired = false, analyticsEnabled = true),
+            AccountState(phase = SessionPhase.SignedOut, analyticsConsent = AnalyticsConsent.Granted).toBody(),
+        )
+    }
 
     // --- Pure state mapping ---
 
@@ -316,25 +379,28 @@ class AccountViewModelTest {
     fun theBodyMapsEverySessionAndProfileCombination() {
         val loaded = ProfileLoad.Loaded(summary())
         assertEquals(AccountBody.Restoring, AccountState(phase = SessionPhase.Restoring).toBody())
-        assertEquals(AccountBody.SignedOut(false), AccountState(phase = SessionPhase.SignedOut).toBody())
         assertEquals(
-            AccountBody.SignedOut(true),
+            AccountBody.SignedOut(sessionExpired = false, analyticsEnabled = false),
+            AccountState(phase = SessionPhase.SignedOut).toBody(),
+        )
+        assertEquals(
+            AccountBody.SignedOut(sessionExpired = true, analyticsEnabled = false),
             AccountState(phase = SessionPhase.SignedOut, sessionExpiredNotice = true).toBody(),
         )
         assertEquals(
-            AccountBody.ProfileLoading,
+            AccountBody.ProfileLoading(analyticsEnabled = false),
             AccountState(phase = SessionPhase.SignedIn, profile = ProfileLoad.Idle).toBody(),
         )
         assertEquals(
-            AccountBody.ProfileLoading,
+            AccountBody.ProfileLoading(analyticsEnabled = false),
             AccountState(phase = SessionPhase.SignedIn, profile = ProfileLoad.Loading).toBody(),
         )
         assertEquals(
-            AccountBody.Profile(AccountProfileUi("Sari Wulandari", TEST_EMAIL, true)),
+            AccountBody.Profile(AccountProfileUi("Sari Wulandari", TEST_EMAIL, true, analyticsEnabled = false)),
             AccountState(phase = SessionPhase.SignedIn, profile = loaded).toBody(),
         )
         assertEquals(
-            AccountBody.ProfileError,
+            AccountBody.ProfileError(analyticsEnabled = false),
             AccountState(phase = SessionPhase.SignedIn, profile = ProfileLoad.Failed).toBody(),
         )
     }
@@ -342,7 +408,10 @@ class AccountViewModelTest {
     @Test
     fun theNameStepKeepsTheLoginOnScreenWhileTheSessionExists() {
         val state = AccountState(phase = SessionPhase.SignedIn, profile = ProfileLoad.Loaded(summary()))
-        assertEquals(AccountBody.SignedOut(false), state.toBody(signInHoldsAccountPage = true))
+        assertEquals(
+            AccountBody.SignedOut(sessionExpired = false, analyticsEnabled = false),
+            state.toBody(signInHoldsAccountPage = true),
+        )
     }
 
     @Test
@@ -366,4 +435,32 @@ class AccountViewModelTest {
             assertNull(loaded.profile.name)
             f.viewModel.clear()
         }
+}
+
+private class FakeAnalytics : Analytics {
+    private var userIdValue: String? = null
+    val recordedUserId: String? get() = userIdValue
+    var collectionEnabled: Boolean? = null
+
+    fun setTestUserId(id: String?) {
+        userIdValue = id
+    }
+
+    override fun log(
+        event: String,
+        params: Map<String, Any>,
+    ) = Unit
+
+    override fun setUserId(id: String?) {
+        userIdValue = id
+    }
+
+    override fun setUserProperty(
+        name: String,
+        value: String?,
+    ) = Unit
+
+    override fun setCollectionEnabled(enabled: Boolean) {
+        collectionEnabled = enabled
+    }
 }

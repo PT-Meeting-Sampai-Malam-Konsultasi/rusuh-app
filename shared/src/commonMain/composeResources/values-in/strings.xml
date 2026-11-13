@@ -445,4 +445,22 @@
     <string name="payment_expired_queue_again">Antre lagi →</string>
     <string name="payment_expired_home">Ke beranda</string>
     <string name="payment_error_load">Tidak bisa memuat detail pembayaran. Silakan coba lagi.</string>
+
+    <!-- Analytics consent screen -->
+    <string name="consent_title">Bantu kami memperbaiki</string>
+    <string name="consent_body">Kami menggunakan analitik untuk memperbaiki aplikasi. Pilihan Anda disimpan dan dapat diubah kapan saja di pengaturan Akun.</string>
+    <string name="consent_collected_title">Yang kami kumpulkan</string>
+    <string name="consent_collected_item_1">Halaman yang Anda kunjungi</string>
+    <string name="consent_collected_item_2">Langkah antrian dan pembelian</string>
+    <string name="consent_collected_item_3">Bahasa aplikasi</string>
+    <string name="consent_not_collected_title">Yang tidak pernah kami kumpulkan</string>
+    <string name="consent_not_collected_item_1">Email, nama, NIK, atau telepon</string>
+    <string name="consent_not_collected_item_2">Token atau kata sandi</string>
+    <string name="consent_accept">Terima</string>
+    <string name="consent_decline">Tolak</string>
+
+    <!-- Account analytics toggle -->
+    <string name="account_analytics_label">Analitik</string>
+    <string name="account_analytics_enabled">Aktif</string>
+    <string name="account_analytics_disabled">Nonaktif</string>
 </resources>

@@ -24,7 +24,10 @@ internal expect fun ProvideAppLanguageResources(
     content: @Composable () -> Unit,
 )
 
-class AppLanguageState(private val preferences: () -> AppPreferences) : LocaleProvider {
+class AppLanguageState(
+    private val onLanguageChanged: (AppLanguage) -> Unit = {},
+    private val preferences: () -> AppPreferences,
+) : LocaleProvider {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutableLanguage = MutableStateFlow(AppLanguage.fromCode(platformLanguageCode()))
     val language: StateFlow<AppLanguage> = mutableLanguage.asStateFlow()
@@ -34,6 +37,7 @@ class AppLanguageState(private val preferences: () -> AppPreferences) : LocalePr
             runCatching { preferences().get(KEY) }.getOrNull()?.let { stored ->
                 mutableLanguage.value = AppLanguage.entries.firstOrNull { it.tag == stored } ?: mutableLanguage.value
             }
+            onLanguageChanged(mutableLanguage.value)
         }
     }
 
@@ -41,6 +45,7 @@ class AppLanguageState(private val preferences: () -> AppPreferences) : LocalePr
 
     fun select(language: AppLanguage) {
         mutableLanguage.value = language
+        onLanguageChanged(language)
         scope.launch { runCatching { preferences().set(KEY, language.tag) } }
     }
 

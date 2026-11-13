@@ -12,6 +12,7 @@ data class AccountProfileUi(
     val name: String,
     val email: String,
     val emailVerified: Boolean,
+    val analyticsEnabled: Boolean = false,
 )
 
 /**
@@ -27,4 +28,5 @@ class AccountProfileActions(
     val onSignOut: () -> Unit,
     val onChangeEmail: (() -> Unit)? = null,
     val onDeleteAccount: (() -> Unit)? = null,
+    val onToggleAnalytics: ((Boolean) -> Unit)? = null,
 )

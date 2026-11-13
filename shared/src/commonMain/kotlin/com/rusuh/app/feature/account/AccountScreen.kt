@@ -97,12 +97,20 @@ fun AccountContent(
     onRetryProfile: () -> Unit = {},
 ) {
     when (body) {
-        AccountBody.Restoring, AccountBody.ProfileLoading ->
+        AccountBody.Restoring, is AccountBody.ProfileLoading ->
             CenteredMessage(stringResource(Res.string.account_loading), modifier)
         is AccountBody.SignedOut ->
-            CompactSignIn(signInState, signInStatus, signInActions, body.sessionExpired, modifier)
+            CompactSignIn(
+                signInState,
+                signInStatus,
+                signInActions,
+                body.sessionExpired,
+                body.analyticsEnabled,
+                profileActions.onToggleAnalytics,
+                modifier,
+            )
         is AccountBody.Profile -> AccountProfileContent(body.profile, profileActions, modifier)
-        AccountBody.ProfileError -> ProfileError(onRetryProfile, modifier)
+        is AccountBody.ProfileError -> ProfileError(onRetryProfile, modifier)
     }
 }
 
@@ -113,6 +121,8 @@ private fun CompactSignIn(
     status: SignInStatus,
     actions: SignInActions,
     sessionExpired: Boolean,
+    analyticsEnabled: Boolean,
+    onToggleAnalytics: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -128,6 +138,8 @@ private fun CompactSignIn(
             Spacer(Modifier.height(RusuhSpacing.xl))
         }
         SignInContent(state = state, actions = actions, variant = SignInVariant.Compact, status = status)
+        Spacer(Modifier.height(RusuhSpacing.xxl))
+        AnalyticsRow(analyticsEnabled, onToggleAnalytics)
     }
 }
 

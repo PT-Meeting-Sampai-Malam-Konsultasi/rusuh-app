@@ -7,6 +7,9 @@ import io.ktor.http.encodeURLParameter
 sealed class Screen(val route: String) {
     data object Splash : Screen("splash")
 
+    /** Analytics consent, shown once at first launch when consent is Unknown. */
+    data object Consent : Screen("consent")
+
     // --- Top-level tab destinations (each hosts the shared RusuhBottomBar). ---
 
     /** Event tab — the Home screen. */
