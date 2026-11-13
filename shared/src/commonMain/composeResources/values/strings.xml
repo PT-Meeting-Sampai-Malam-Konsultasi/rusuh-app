@@ -428,6 +428,7 @@
 
     <!-- Payment screen -->
     <string name="payment_title">Payment</string>
+    <string name="payment_open_in_browser">Open in browser</string>
     <string name="payment_loading">Verifying your order…</string>
     <string name="payment_timer_description">Time left %1$s</string>
     <string name="payment_pay_via_midtrans">Pay via Midtrans</string>

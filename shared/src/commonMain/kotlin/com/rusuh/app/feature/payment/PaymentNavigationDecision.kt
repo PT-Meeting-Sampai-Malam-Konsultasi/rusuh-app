@@ -21,6 +21,10 @@ fun decidePaymentNavigation(
     val scheme = url.protocol.name.lowercase()
     if (scheme == "https" || scheme == "http") {
         if (scheme != "https") return PaymentNavigationDecision.Block
+        val host = url.host.lowercase()
+        if (host == "gojek.link" || host == "gopay.co.id" || host.endsWith(".gopay.co.id")) {
+            return PaymentNavigationDecision.OpenExternal(value)
+        }
         val resultUrl =
             url.host == "app.rusuh.id" && url.encodedPath == "/payment-result" &&
                 url.parameters["bookingId"] == bookingId

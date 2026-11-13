@@ -102,6 +102,9 @@ Path: `/payment-result?bookingId={bookingId}`
 The backend must include the app domain in `callbacks.finish` when creating the Snap
 transaction. For GoPay, the callback URL is also set there.
 
+The backend must also set GoPay's `callback_url` to the app payment-result URL for the booking. The Snap WebView
+does not support saving QR or barcode images yet; users can scan them from another device.
+
 Domain files required for production:
 - Android: `assetlinks.json` at `https://app.rusuh.id/.well-known/assetlinks.json`
 - iOS: `apple-app-site-association` at `https://app.rusuh.id/.well-known/apple-app-site-association`
@@ -252,7 +255,7 @@ For the full flow to work, the backend must:
 
 3. Host the App Link / Universal Link domain files at `https://app.rusuh.id/.well-known/`
 
-4. For GoPay, set the mobile deeplink callback appropriately
+4. Set GoPay's `callback_url` to `https://app.rusuh.id/payment-result?bookingId={orderId}`
 
 ## Manual WebView Checks
 
