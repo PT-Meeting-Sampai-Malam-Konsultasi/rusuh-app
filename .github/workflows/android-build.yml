@@ -30,8 +30,8 @@ jobs:
           name: app-debug-apk
           path: androidApp/build/outputs/apk/*/debug/*.apk
 
-  # Sends a build to Firebase App Distribution: the LIVE staging API by default (Home events and login work today,
-  # Detail/Tickets/queue still use stub data until the backend is complete), or the offline stub demo on manual dispatch.
+  # Sends a build to Firebase App Distribution: the LIVE staging API by default (Home, login, queue, Detail and Tickets use the
+  # real API; only payment falls back to stub data until its routes are deployed), or the offline stub demo on manual dispatch.
   # Runs on pushes to main and on manual dispatch. It does nothing until the repo secrets exist, so it can never
   # break CI. Setup and key rotation: docs/firebase-distribution.md.
   distribute:
@@ -80,7 +80,7 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$CREDS"
           APK="$(ls androidApp/build/outputs/apk/staging/debug/*.apk | head -n 1)"
           FIRST_LINE="$(printf '%s' "${COMMIT_MESSAGE:-manual run}" | head -n 1)"
-          if [ "$BUILD_BACKEND" = "stub" ]; then LABEL="OFFLINE DEMO (stub data)"; else LABEL="LIVE staging API (Detail, Tickets and queue still on stub data)"; fi
+          if [ "$BUILD_BACKEND" = "stub" ]; then LABEL="OFFLINE DEMO (stub data)"; else LABEL="LIVE staging API (payment still on stub data)"; fi
           NOTES="${LABEL}. ${COMMIT_SHA:0:7}: ${FIRST_LINE}"
           npx --yes firebase-tools@13 appdistribution:distribute "$APK" \
             --app "$FIREBASE_APP_ID" \

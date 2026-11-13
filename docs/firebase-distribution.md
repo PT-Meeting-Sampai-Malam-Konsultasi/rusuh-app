@@ -4,8 +4,8 @@ The `distribute` job in `.github/workflows/android-build.yml` sends a **staging 
 `main` and on manual dispatch (Actions > Android Build > Run workflow, input `backend`):
 
 - **live** (default for pushes): `-PmockApi=false`, the app talks to the staging API `https://api.rusuh-tiket.web.id/v1`.
-  Home events and login work today; Detail, Tickets and the queue still use stub data until the backend is complete
-  (the release note says so). Use this build to retest as the backend routes appear.
+  Home, login, the queue, Detail and Tickets use the real API; only payment still uses stub data until its routes are
+  deployed (the release note says so). Use this build to retest as the backend routes appear.
 - **stub**: `-PbackendMode=Stub`, an offline demo with the in-process stub backend (no network needed). The Mockoon
   address `10.0.2.2` only works on the emulator, so a mock build is not distributed.
 
