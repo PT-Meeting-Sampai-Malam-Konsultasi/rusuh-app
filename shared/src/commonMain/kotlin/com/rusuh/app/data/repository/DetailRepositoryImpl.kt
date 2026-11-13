@@ -227,6 +227,8 @@ class DetailRepositoryImpl(
     ): AttendeeValidation? =
         when {
             statusCode == 422 && errorCode == ErrorCode.NIK_INVALID -> AttendeeValidation.NikInvalid
+            // The live staging API answers a malformed NIK or name with 400 VALIDATION_FAILED, not 422.
+            statusCode == HTTP_BAD_REQUEST && errorCode == ErrorCode.VALIDATION_FAILED -> AttendeeValidation.NikInvalid
             statusCode == 409 && errorCode == ErrorCode.NIK_SEAT_TAKEN -> AttendeeValidation.NikSeatTaken
             statusCode == 409 && errorCode == ErrorCode.DUPLICATE_NIK -> AttendeeValidation.ServerDuplicateNik
             statusCode == HTTP_SERVICE_UNAVAILABLE && errorCode == ErrorCode.DUKCAPIL_UNAVAILABLE ->
@@ -301,6 +303,7 @@ class DetailRepositoryImpl(
     }
 
     private companion object {
+        const val HTTP_BAD_REQUEST = 400
         const val HTTP_UNAUTHORIZED = 401
         const val HTTP_FORBIDDEN = 403
         const val HTTP_GONE = 410
