@@ -237,11 +237,11 @@ Release builds always use `Production` + `Real` over HTTPS.
   expired). shortcut: The Ticket schema does not include order number (`orderCode`), total, payment method, paid-at
   time, or contact email; these fields are left blank/placeholder in the domain model. The UI degrades gracefully.
 - Temporary fallback (`shortcut:`): a repository without a real implementation resolves to its stub in `Real` mode and
-  logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)` once. `PaymentRepository` is the
-  only one left: the payment routes (`/core/payments/...`) are NOT deployed on the live staging backend (they return
-  404), so it uses stub data. The constant `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`) lists `PaymentRepository`;
-  flipping to the real repository is a one-line change once the routes go live (replace the `stubOrFail` binding with
-  `PaymentRepositoryImpl(get())` and remove from the list). The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES`
+  logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)` once. Payment API and repository
+  implement `GET /core/bookings/{bookingId}`, `POST /core/bookings/{bookingId}/payment`, and
+  `POST /core/bookings/{bookingId}/check-status`, but live staging has not deployed these routes, so
+  `PaymentRepository` remains on the stub in `Real` mode. The retired `/core/payments/...` routes are not called. The
+  constant `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`) lists this fallback. `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES`
   (default `true`) controls the fallback; set it to `false`, or pass `liveDataModule(allowStubFallback = false)`,
   for the strict behaviour: resolving a repository without a real implementation throws
   `RealRepositoryNotAvailableException`.
@@ -268,7 +268,7 @@ Release builds always use `Production` + `Real` over HTTPS.
 - My Queues reads entries in parallel (at most 4). An entry is dropped on 401/410/closed (and forgotten), left out but
   kept on 404 or a transient failure; the load fails only when every entry failed.
 - `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`, checked against the bindings by `DataModuleTest`) contains
-  `PaymentRepository`: the payment routes are not deployed on live staging (404). `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
+  `PaymentRepository` until the booking payment routes are deployed. `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
 - Mockoon (`workspace-local/mockoon`) simulates a moving queue: the frontier is SEQUENTIAL (served 100, 130, ..., two
   paused polls, then `served >= seq`), claim answers 409 `NOT_YET` once and then 200. Restart it to replay the sequence.
 - TODO(FR-04-M4 #30): the last 2,000 places also get SSE (ADR-0015); only polling is implemented.

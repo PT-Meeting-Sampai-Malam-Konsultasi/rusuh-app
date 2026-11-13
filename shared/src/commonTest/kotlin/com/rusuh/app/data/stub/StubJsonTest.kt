@@ -95,7 +95,6 @@ class StubJsonTest {
             it.jsonObject.keys("ticketId", "ticketCode", "holderName", "qrPayload", "issuedAt")
         }
         assertEquals(2, obj(StubJson.TICKETS).getValue("items").jsonArray.size)
-        obj(StubJson.PAYMENT_STATUS).keys("bookingStatus", "paymentStatus", "returnUrl", "serverNow")
     }
 
     @Test
@@ -114,22 +113,17 @@ class StubJsonTest {
     @Test
     fun paymentPayloadsAndActions() {
         obj(StubJson.DEVICE).keys("deviceToken", "expiresAt")
-        obj(StubJson.PAYMENT_SESSION).keys("handoffCode", "expiresAt", "payUrl")
         obj(StubJson.BOOKING_PAYMENT).keys("bookingId", "snapToken", "paymentExpiresAt", "redirectUrl", "serverNow")
-        obj(StubJson.PAYMENT_SUMMARY).keys("bookingId", "orderCode", "price", "expiresAt", "csrfToken")
-        obj(StubJson.PAYMENT_SNAP).keys("attemptId", "orderId", "method", "snapToken", "gatewayExpiresAt")
         assertEquals("CANCELLED", obj(StubJson.BOOKING_CANCELLED).getValue("status").jsonPrimitive.content)
     }
 
     @Test
     fun enumValuesStayInsideTheSpecLists() {
-        // Lists copied from the contract's EventState, QueueState, BookingStatus, PaymentStatus and PaymentMethod.
+        // Lists copied from the contract's EventState, QueueState, BookingStatus, PaymentStatus and payment method.
         val eventStates =
             setOf("coming_soon", "waiting_room_open", "on_sale", "almost_gone", "temporarily_full", "sold_out", "ended")
         val queueStates = setOf("preopen", "open", "paused", "closed")
         val bookingStatuses = setOf("SELECTION", "PAYMENT_PENDING", "HELD", "PAID", "EXPIRED", "CANCELLED")
-        val paymentStatuses =
-            setOf("none", "pending", "settled", "denied", "expired", "cancelled", "failed", "paid_after_expiry")
         val paymentMethods =
             setOf(
                 "qris", "gopay", "shopeepay", "bca_va", "mandiri_va",
@@ -152,10 +146,7 @@ class StubJsonTest {
         ).forEach {
             assertTrue(obj(it).text("status") in bookingStatuses)
         }
-        assertTrue(obj(StubJson.PAYMENT_STATUS).text("bookingStatus") in bookingStatuses)
-        assertTrue(obj(StubJson.PAYMENT_STATUS).text("paymentStatus") in paymentStatuses)
         assertTrue(obj(StubJson.BOOKING_PAID).text("paymentMethod") in paymentMethods)
-        assertTrue(obj(StubJson.PAYMENT_SNAP).text("method") in paymentMethods)
     }
 
     @Test

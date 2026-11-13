@@ -62,7 +62,7 @@ class AuthWiringTest {
                 },
                 storageModule,
                 coreModule(),
-                *dataModules(BackendMode.Stub, true) { }.toTypedArray(),
+                *dataModules(BackendMode.Stub).toTypedArray(),
                 analyticsModule(BackendMode.Stub) { NoOpAnalytics },
                 crashReporterModule(BackendMode.Stub) { NoOpCrashReporter },
                 appModule,

@@ -1,268 +1,46 @@
 # Payment Integration
 
-Payment handoff to Midtrans Snap (FR-06-M4 #45, FR-06-M5 #98, FR-25-M1 #85, FR-21-M1 #84).
+Payment uses the booking API and Midtrans Snap hosted page. The backend creates the booking in `SELECTION` for five
+minutes; entering payment atomically holds inventory, changes it to `PAYMENT_PENDING` for ten minutes, and returns the
+first Snap token. The screen treats `PAYMENT_PENDING` as an active payment booking.
 
-## Overview
+## API flow
 
-Payment follows the Midtrans Web UI (Snap hosted page) flow:
-1. User reaches the Payment screen after ticket selection
-2. App shows order summary with a 10-minute countdown
-3. User taps "Continue to payment" → opens Snap inside the full-screen in-app WebView
-4. The WebView keeps HTTPS navigation inside, opens wallet/bank app links externally, and closes on a payment result callback
-5. The Payment screen refreshes the booking and checks status; the booking response is authoritative and pending stays on Payment
+All routes use the core API host. Bearer auth is supplied by the shared auth plugin. Payment entry and status checks
+also send `X-Admission-Token` from `TokenStore`.
 
-The Midtrans mobile SDK is NOT used (it is being retired). The backend creates the Snap
-transaction, so no Midtrans server key is needed in the app.
+- `GET /core/bookings/{bookingId}` loads the payment summary. Order code, price, attendees, expiry, and server time
+  come from the booking. Contact email comes from `AccountEmailStore`.
+- `POST /core/bookings/{bookingId}/payment` has no request body and no idempotency header. It returns `snapToken`,
+  `paymentExpiresAt`, `serverNow`, and an optional `redirectUrl`. The backend operation is idempotent while pending.
+- `POST /core/bookings/{bookingId}/check-status` rechecks Midtrans and returns the authoritative booking. If the
+  check call fails, the repository falls back to `GET /core/bookings/{bookingId}`.
 
-## API Contract
+`redirectUrl` is opened in the existing in-app WebView. The app has no safe URL builder for a token-only response;
+when `redirectUrl` is absent the screen shows its generic error. `Booking` does not include event name, event date,
+venue, timezone, or customer email, so event metadata stays unavailable and the email is supplied locally.
 
-All endpoints require a Bearer token. Currently NOT deployed on live staging (404).
+## Status and countdown
 
-**Stub fallback**: Because the payment routes return 404 on the live backend, `PaymentRepository` uses
-`StubPaymentRepository` in `BackendMode.Real` (listed in `REPOSITORIES_STILL_ON_STUBS` in `DataModule.kt`).
-Flipping to the real repository is a one-line change: replace the `stubOrFail` binding with
-`PaymentRepositoryImpl(get())` and remove `"PaymentRepository"` from `REPOSITORIES_STILL_ON_STUBS`.
+Booking statuses include `SELECTION`, `PAYMENT_PENDING`, `HELD`, `PAID`, `EXPIRED`, and `CANCELLED`. Unknown wire
+statuses map to `UNKNOWN` without failing decoding. `PAYMENT_PENDING` follows the existing held-payment screen path.
 
-### GET /core/payments/{bookingId}
+The countdown uses `expiresAt` and `serverNow` from the booking. Elapsed time is measured with the monotonic clock, so
+remaining time is not affected by device clock changes or timezone settings. Returning from Snap refreshes the booking
+and performs one check-status call; the existing poller continues until a final booking state.
 
-Returns `PaymentView`: order summary, price breakdown, countdown, Snap client key.
+## Return handling
 
-```json
-{
-  "bookingId": "bk_01JB2Y6Z8Q",
-  "orderCode": "RSH-26-084731",
-  "eventName": "Samudra",
-  "eventStartsAt": "2026-12-12T12:00:00Z",
-  "venueShort": "GBK",
-  "timezone": "Asia/Jakarta",
-  "attendees": [
-    { "categoryId": "cat_festival_b", "categoryName": "Festival B", "fullName": "Rina Wulandari", "nikMasked": "3174 •••• •••• 0004" }
-  ],
-  "customerEmail": "rina.wulandari@example.com",
-  "price": {
-    "lines": [{ "categoryId": "cat_festival_b", "name": "Festival B", "quantity": 2, "unitPrice": {"amount": 1500000, "currency": "IDR"}, "lineTotal": {"amount": 3000000, "currency": "IDR"} }],
-    "ticketSubtotal": {"amount": 3000000, "currency": "IDR"},
-    "adminFee": {"amount": 15000, "currency": "IDR"},
-    "total": {"amount": 3015000, "currency": "IDR"}
-  },
-  "currentSnap": null,
-  "expiresAt": "2026-11-14T10:50:00Z",
-  "serverNow": "2026-11-14T10:40:00Z",
-  "csrfToken": "...",
-  "snapClientKey": "SB-Mid-client-..."
-}
-```
+The WebView closes on the existing app return link. URL parameters are never trusted as payment status; the app reads
+the booking from the API after return. Closing Snap or returning from an external wallet triggers the existing resume
+refresh. No status requests run while the app is backgrounded.
 
-### POST /core/payments/{bookingId}/snap
+## Stub mode and verification
 
-Creates (or returns) the Midtrans Snap transaction. Requires `Idempotency-Key` header.
+Stub mode uses the in-process payment repository; MockEngine fixtures cover the booking read, payment entry, and status
+check with synthetic masked attendee data. Real mode keeps the payment repository on its stub until live staging deploys
+the routes. The old `/core/payments/{id}`, `/snap`, and `/status` routes are not registered. Mockoon-independent API
+tests cover paths, auth headers, empty request bodies, mapping, repository fallback, and ViewModel transitions.
 
-Request body (optional):
-```json
-{ "method": "qris" }  // pre-select payment method, or null to let user pick
-```
-
-Response (201):
-```json
-{
-  "attemptId": 1,
-  "orderId": "bk_01JB2Y6Z8Q-1",
-  "method": null,
-  "snapToken": "66e4fa55-fdac-4ef9-91b5-733b97d1b862",
-  "redirectUrl": "https://app.sandbox.midtrans.com/snap/v4/redirection/66e4fa55-fdac-4ef9-91b5-733b97d1b862",
-  "gatewayExpiresAt": "2026-11-14T10:50:00Z"
-}
-```
-
-Errors:
-- 409 `BOOKING_NOT_HELD` — booking expired or not in PAYMENT_PENDING state
-- 503 `PAYMENT_PROVIDER_BUSY` — Midtrans unavailable, retry with same idempotency key
-
-### GET /core/payments/{bookingId}/status
-
-Poll every 3-5 seconds with jitter. Stops when status is final.
-
-Response:
-```json
-{
-  "bookingStatus": "PAID",        // SELECTION, PAYMENT_PENDING, PAID, EXPIRED, CANCELLED
-  "paymentStatus": "settled",     // none, pending, settled, denied, expired, cancelled, failed, paid_after_expiry
-  "returnUrl": "https://app.rusuh.id/payment-result?bookingId=bk_01JB2Y6Z8Q",
-  "serverNow": "2026-11-14T10:45:00Z"
-}
-```
-
-## Return Handling (Deep Links)
-
-### App Link / Universal Link (Production)
-
-Domain: `https://app.rusuh.id`
-Path: `/payment-result?bookingId={bookingId}`
-
-The backend must include the app domain in `callbacks.finish` when creating the Snap
-transaction. For GoPay, the callback URL is also set there.
-
-The backend must also set GoPay's `callback_url` to the app payment-result URL for the booking. The Snap WebView
-does not support saving QR or barcode images yet; users can scan them from another device.
-
-Domain files required for production:
-- Android: `assetlinks.json` at `https://app.rusuh.id/.well-known/assetlinks.json`
-- iOS: `apple-app-site-association` at `https://app.rusuh.id/.well-known/apple-app-site-association`
-
-### Custom Scheme (Local / Debug)
-
-For local builds where the domain files don't exist:
-- Scheme: `rusuh://payment-result?bookingId={bookingId}`
-
-Declared in:
-- Android: `AndroidManifest.xml` intent-filter on MainActivity
-- iOS: `Info.plist` CFBundleURLTypes
-
-### Navigation
-
-The `PaymentResult` route:
-1. NEVER trusts the URL parameters (could be spoofed)
-2. Extracts only the `bookingId`
-3. Calls `GET /payments/{bookingId}/status` to get actual status
-4. Shows the appropriate result screen
-
-Malformed or foreign URLs (wrong scheme/host, missing bookingId) are ignored.
-
-Closing the in-app WebView or returning from an external wallet/bank app triggers the existing resume refresh. The WebView recognizes the return URL as a close signal even when the domain association files are unavailable. No status requests run while the app is backgrounded. A pending
-status is checked again only on a later resume.
-
-## Screen States
-
-| State | Description | User Action |
-|-------|-------------|-------------|
-| Loading | Fetching payment summary | — |
-| Ready | Shows order summary + countdown | Tap "Continue to payment" |
-| Verifying | Polling after return from Snap | Wait |
-| Success | PAID: tickets issued | Go to Tiket tab |
-| Expired | Booking not paid in time | Queue again / Go home |
-| Error | Network or load failure | Retry |
-
-### Expired with Refund Notice (ADR-0009)
-
-If `paymentStatus` is `paid_after_expiry`, the payment arrived after the 10-minute window.
-The booking is still cancelled, but a refund notice is shown with the customer email.
-
-## Countdown
-
-The countdown is driven by server time, not the device clock:
-1. `expiresAt` and `serverNow` come from the API
-2. Elapsed time is computed from the monotonic clock since receipt
-3. Remaining = `expiresAt - (serverNow + elapsed)`
-
-This prevents timezone issues and device clock manipulation.
-
-## What is Verified vs Not
-
-### Verified (Unit Tests)
-- DTO parsing from contract examples
-- Mapper correctness (DTO → domain)
-- Repository stub behavior
-- Polling logic with virtual time
-- ViewModel state transitions
-- Countdown expiry handling
-- URL/return parsing (bookingId extraction)
-- Payment navigation decisions for HTTPS, callback, wallet, blocked cleartext, and contact URLs
-- Payment ViewModel resume refresh after returning from the WebView
-
-### Not Verified (Requires Backend)
-- Live API calls (routes return 404)
-- Actual Android WebView / iOS WKWebView rendering and wallet app handoff
-- Real App Link / Universal Link handling
-- Midtrans Snap page interaction
-- GoPay/e-wallet deeplinks
-
-## Local Testing with Mockoon
-
-To test the payment flow locally:
-
-1. Add routes to the Mockoon mock server (`workspace-local/mockoon/rusuh-mock.json`):
-
-```json
-{
-  "uuid": "payment-view",
-  "type": "http",
-  "documentation": "GET /core/payments/{bookingId}",
-  "method": "get",
-  "endpoint": "v1/core/payments/:bookingId",
-  "responses": [
-    {
-      "uuid": "payment-view-200",
-      "body": "{ \"bookingId\": \"{{urlParam 'bookingId'}}\", \"orderCode\": \"RSH-26-084731\", ... }",
-      "statusCode": 200
-    }
-  ]
-}
-```
-
-2. Add the Snap creation route (`POST /core/payments/:bookingId/snap`)
-
-3. Add the status polling route (`GET /core/payments/:bookingId/status`) — script
-   it to return PENDING 2-3 times, then PAID.
-
-4. The stub Snap response opens the Midtrans sandbox HTTPS URL. For a local callback exercise, point the stub response to an HTTPS test page with a button that redirects to `https://app.rusuh.id/payment-result?bookingId=bk_01JB2Y6Z8Q`. A result callback closes the WebView; it does not decide paid/pending/expired.
-
-5. Run with mock mode: `./gradlew :androidApp:assembleDebug -PmockApi=true`
-
-## Files
-
-### Data Layer
-- `data/remote/PaymentApiService.kt` — HTTP calls
-- `data/remote/dto/PaymentDtos.kt` — DTOs (uses `MoneyDto` from EventDtos)
-- `data/remote/mapper/PaymentMapper.kt` — DTO → domain
-- `data/repository/PaymentRepositoryImpl.kt` — network implementation
-- `data/repository/StubPaymentRepository.kt` — offline demo
-
-### Domain Layer
-- `domain/model/PaymentModels.kt` — domain models
-- `domain/repository/PaymentRepository.kt` — interface
-- `domain/usecase/PaymentUseCases.kt` — LoadPayment, StartSnapPayment, ObservePaymentStatus
-
-### Feature Layer
-- `feature/payment/PaymentContract.kt` — MVI contract
-- `feature/payment/PaymentViewModel.kt` — main screen ViewModel
-- `feature/payment/PaymentResultContract.kt` — result screen contract
-- `feature/payment/PaymentResultViewModel.kt` — result screen ViewModel
-- `feature/payment/PaymentScreen.kt` — UI composables
-- `feature/payment/PaymentRoute.kt` — route wiring
-- `feature/payment/PaymentNavigationDecision.kt` — shared navigation policy
-- `feature/payment/PaymentSnapWebView.kt` — platform WebView boundary
-
-### Platform
-- `androidMain/.../PaymentSnapWebView.android.kt` — Android WebView
-- `iosMain/.../PaymentSnapWebView.ios.kt` — WKWebView and navigation delegate
-
-### Navigation
-- `navigation/Screen.kt` — `Payment` and `PaymentResult` routes
-- `navigation/NavGraph.kt` — route registrations
-
-## Backend Setup Required
-
-For the full flow to work, the backend must:
-
-1. Deploy the payment routes (`/core/payments/...`)
-
-2. Set `callbacks.finish` to include the app domain when creating Snap transactions:
-   ```
-   callbacks: {
-     finish: "https://app.rusuh.id/payment-result?bookingId={orderId}"
-   }
-   ```
-
-3. Host the App Link / Universal Link domain files at `https://app.rusuh.id/.well-known/`
-
-4. Set GoPay's `callback_url` to `https://app.rusuh.id/payment-result?bookingId={orderId}`
-
-## Manual WebView Checks
-
-1. Run Stub mode (`./gradlew :androidApp:assembleStagingDebug -PbackendMode=Stub`) and open a held booking's Payment screen.
-2. Continue to payment and confirm the Snap HTTPS page is rendered in-app with no address bar.
-3. Use an HTTPS test page with links to another HTTPS URL and a `gojek://` or `shopeeid://` URL. HTTPS stays in-app; the app link opens externally when installed, and the app shows a notice when missing.
-4. Confirm a matching payment-result URL closes the WebView and returns to Payment. Confirm its next state follows booking status after refresh.
-5. Leave the page open until the server-driven timer expires and confirm it closes into Expired.
-6. Turn off networking while loading and confirm Retry and Close appear. Check an invalid certificate is rejected.
-7. Repeat on Android and iOS; run the shared URL decision tests with `:shared:testDebugUnitTest`.
+Live staging payment behavior and actual Midtrans/WebView handoff remain unverified because payment deployment and
+queue admission are not available on staging. Contract fields that are absent from `Booking` are listed above.

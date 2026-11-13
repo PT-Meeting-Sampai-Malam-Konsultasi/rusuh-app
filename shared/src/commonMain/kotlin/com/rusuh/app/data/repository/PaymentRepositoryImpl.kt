@@ -2,11 +2,13 @@ package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.remote.PaymentApiService
 import com.rusuh.app.data.remote.mapper.toDomain
+import com.rusuh.app.data.remote.mapper.toPaymentStatus
+import com.rusuh.app.data.remote.mapper.toPaymentSummary
 import com.rusuh.app.domain.model.DomainResult
-import com.rusuh.app.domain.model.PaymentMethod
 import com.rusuh.app.domain.model.PaymentStatusResult
 import com.rusuh.app.domain.model.PaymentSummary
 import com.rusuh.app.domain.model.SnapTransaction
+import com.rusuh.app.domain.repository.AccountEmailStore
 import com.rusuh.app.domain.repository.PaymentRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -26,23 +28,18 @@ import kotlin.random.Random
  */
 class PaymentRepositoryImpl(
     private val api: PaymentApiService,
+    private val accountEmails: AccountEmailStore,
     private val pollIntervalMs: Long = DEFAULT_POLL_INTERVAL_MS,
     private val jitterMs: Long = DEFAULT_JITTER_MS,
     private val random: Random = Random.Default,
 ) : PaymentRepository {
-    override suspend fun loadPayment(bookingId: String): DomainResult<PaymentSummary> =
-        api.getPayment(bookingId).toDomainResult { it.toDomain() }
+    override suspend fun loadPayment(bookingId: String): DomainResult<PaymentSummary> {
+        val email = accountEmails.email()
+        return api.getBooking(bookingId).toDomainResult { it.toPaymentSummary(email) }
+    }
 
-    override suspend fun startSnap(
-        bookingId: String,
-        idempotencyKey: String,
-        method: PaymentMethod?,
-    ): DomainResult<SnapTransaction> =
-        api.startSnap(
-            bookingId = bookingId,
-            idempotencyKey = idempotencyKey,
-            method = method?.name?.lowercase(),
-        ).toDomainResult { it.toDomain() }
+    override suspend fun startSnap(bookingId: String): DomainResult<SnapTransaction> =
+        api.startSnap(bookingId).toDomainResult { it.toDomain() }
 
     override fun observePaymentStatus(bookingId: String): Flow<PaymentStatusResult> =
         flow {
@@ -76,7 +73,10 @@ class PaymentRepositoryImpl(
         bookingId: String,
         currentFailures: Int,
     ): PollResult {
-        val result = api.getPaymentStatus(bookingId).toDomainResult { it.toDomain() }
+        val primary = api.checkStatus(bookingId)
+        val result =
+            (if (primary is com.rusuh.app.data.network.ApiResult.Success) primary else api.getBooking(bookingId))
+                .toDomainResult { it.toPaymentStatus() }
 
         return when (result) {
             is DomainResult.Success -> PollResult.Success(result.data)

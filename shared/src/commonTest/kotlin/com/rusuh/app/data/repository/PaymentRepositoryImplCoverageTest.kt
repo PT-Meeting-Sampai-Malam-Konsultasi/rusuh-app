@@ -8,7 +8,9 @@
 package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.remote.PaymentApiService
+import com.rusuh.app.data.storage.InMemoryTokenStore
 import com.rusuh.app.domain.model.*
+import com.rusuh.app.domain.repository.AccountEmailStore
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -19,10 +21,10 @@ class PaymentRepositoryImplCoverageTest {
         runTest {
             val backend =
                 FakeBackend().apply {
-                    on("GET /core/payments/bk_test", Reply.ok(PAYMENT))
-                    on("GET /core/payments/bk_missing", Reply.notFound())
+                    on("GET /core/bookings/bk_test", Reply.ok(BOOKING))
+                    on("GET /core/bookings/bk_missing", Reply.notFound())
                 }
-            val repository = PaymentRepositoryImpl(PaymentApiService(backend.api))
+            val repository = repository(backend.api)
             val result = repository.loadPayment("bk_test")
             assertIs<DomainResult.Success<PaymentSummary>>(result, backend.seen.firstOrNull()?.line.orEmpty())
             val loaded = (result as DomainResult.Success).data
@@ -34,31 +36,77 @@ class PaymentRepositoryImplCoverageTest {
         runTest {
             val backend =
                 FakeBackend().apply {
-                    on("POST /core/payments/bk_test/snap", Reply.created(SNAP))
-                    on("GET /core/payments/bk_test/status", Reply.ok(STATUS))
+                    on("POST /core/bookings/bk_test/payment", Reply.ok(SNAP))
+                    on("GET /core/bookings/bk_test", Reply.ok(PAID))
                 }
-            val repository = PaymentRepositoryImpl(PaymentApiService(backend.api), pollIntervalMs = 0, jitterMs = 0)
+            val repository = PaymentRepositoryImpl(service(backend.api), emails, pollIntervalMs = 0, jitterMs = 0)
             val snap =
                 assertIs<DomainResult.Success<SnapTransaction>>(
-                    repository.startSnap("bk_test", "key", PaymentMethod.QRIS),
+                    repository.startSnap("bk_test"),
                 ).data
-            assertEquals(PaymentMethod.QRIS, snap.method)
+            assertEquals("https://pay.example.test/snap", snap.redirectUrl)
             val statuses = repository.observePaymentStatus("bk_test").toList()
             assertEquals(BookingStatus.PAID, statuses.single().bookingStatus)
         }
 
     @Test fun offlineLoadMapsToNetworkError() =
         runTest {
-            val backend = FakeBackend().apply { on("GET /core/payments/bk_test", Reply.offline()) }
+            val backend = FakeBackend().apply { on("GET /core/bookings/bk_test", Reply.offline()) }
             assertEquals(
                 DomainResult.NetworkError,
-                PaymentRepositoryImpl(PaymentApiService(backend.api)).loadPayment("bk_test"),
+                repository(backend.api).loadPayment("bk_test"),
             )
         }
 
+    @Test fun paymentConflictKeepsContractErrorCodeAndExtras() =
+        runTest {
+            val backend =
+                FakeBackend().apply {
+                    on("POST /core/bookings/bk_conflict/payment", Reply.problem(409, "CATEGORY_SOLD_OUT"))
+                }
+            val result = assertIs<DomainResult.Error>(repository(backend.api).startSnap("bk_conflict"))
+            assertEquals(409, result.code)
+            assertEquals(ErrorCode.CATEGORY_SOLD_OUT, result.errorCode)
+        }
+
+    private suspend fun service(api: com.rusuh.app.data.network.ApiClient): PaymentApiService =
+        PaymentApiService(api, InMemoryTokenStore().apply { setAdmissionToken("adm") })
+
+    private suspend fun repository(api: com.rusuh.app.data.network.ApiClient) =
+        PaymentRepositoryImpl(
+            service(api),
+            emails,
+        )
+
+    private val emails =
+        object : AccountEmailStore {
+            override suspend fun email() = "rina@example.com"
+
+            override suspend fun saveEmail(
+                userId: String,
+                email: String,
+            ) = Unit
+
+            override suspend fun clearEmail() = Unit
+        }
+
     private companion object {
-        const val PAYMENT = """{"bookingId":"bk_test","orderCode":"RSH-TEST","price":{"lines":[],"ticketSubtotal":{"amount":1},"adminFee":{"amount":0},"total":{"amount":1}},"expiresAt":"2026-11-14T10:10:00Z","serverNow":"2026-11-14T10:00:00Z","csrfToken":"csrf","snapClientKey":"client"}"""
-        const val SNAP = """{"attemptId":1,"orderId":"order_test","method":"qris","snapToken":"token_test","redirectUrl":"https://pay.example.test/snap","gatewayExpiresAt":"2026-11-14T10:10:00Z"}"""
-        const val STATUS = """{"bookingStatus":"PAID","paymentStatus":"SETTLED","serverNow":"2026-11-14T10:00:00Z"}"""
+        const val BOOKING =
+            """
+            {"bookingId":"bk_test","eventId":"evt","status":"PAYMENT_PENDING","orderCode":"RSH-TEST",
+             "attendees":[],"price":{"lines":[],"ticketSubtotal":{"amount":1},"adminFee":{"amount":0},"total":{"amount":1}},
+             "expiresAt":"2026-11-14T10:10:00Z","createdAt":"2026-11-14T10:00:00Z","serverNow":"2026-11-14T10:00:00Z"}
+            """
+        const val PAID =
+            """
+            {"bookingId":"bk_test","eventId":"evt","status":"PAID","orderCode":"RSH-TEST","attendees":[],
+             "price":{"lines":[],"ticketSubtotal":{"amount":1},"adminFee":{"amount":0},"total":{"amount":1}},
+             "expiresAt":null,"createdAt":"2026-11-14T10:00:00Z","serverNow":"2026-11-14T10:00:00Z"}
+            """
+        const val SNAP =
+            """
+            {"bookingId":"bk_test","snapToken":"token_test","paymentExpiresAt":"2026-11-14T10:10:00Z",
+             "redirectUrl":"https://pay.example.test/snap","serverNow":"2026-11-14T10:00:00Z"}
+            """
     }
 }

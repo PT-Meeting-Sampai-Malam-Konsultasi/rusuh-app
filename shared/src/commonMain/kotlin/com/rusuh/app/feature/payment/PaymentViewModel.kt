@@ -39,7 +39,6 @@ class PaymentViewModel(
     private var summary: PaymentSummary? = null
     private var serverNowAtReceive: Instant = Instant.DISTANT_PAST
     private var receivedAtMillis: Long = 0L
-    private var lastIdempotencyKey: String? = null
     private var backSent = false
     private var lastPaymentType: String? = null
 
@@ -97,7 +96,7 @@ class PaymentViewModel(
         when (val result = loadPayment(bookingId)) {
             is DomainResult.Success -> {
                 handleLoadSuccess(result.data)
-                if (result.data.currentSnap != null) {
+                if (result.data.bookingStatus == BookingStatus.PAYMENT_PENDING) {
                     checkStatusOnce(result.data)
                 }
             }
@@ -113,21 +112,31 @@ class PaymentViewModel(
         receivedAtMillis = monotonicMillis()
         val remaining = computeRemainingSeconds(data.expiresAt)
 
-        if (remaining <= 0) {
-            setExpiredState(data.toUi(), data.customerEmail, refundRequired = false)
-        } else {
-            val hasOpenedSnap = data.currentSnap != null
-            setState {
-                copy(
-                    ui =
-                        PaymentUiState.Ready(
-                            summary = data.toUi(),
-                            hasOpenedSnap = hasOpenedSnap,
-                        ),
-                    remainingSeconds = remaining,
-                    cancelError = null,
-                    isCancelling = false,
-                )
+        when {
+            data.bookingStatus.isPaid -> {
+                trackPurchase(data)
+                setState {
+                    copy(ui = PaymentUiState.Success(data.orderCode, data.eventName, data.attendees.size, bookingId))
+                }
+            }
+            data.bookingStatus == BookingStatus.EXPIRED || data.bookingStatus == BookingStatus.CANCELLED ->
+                setExpiredState(data.toUi(), data.customerEmail, data.refundRequired)
+            remaining <= 0 ->
+                setExpiredState(data.toUi(), data.customerEmail, refundRequired = false)
+            else -> {
+                val hasOpenedSnap = data.bookingStatus == BookingStatus.PAYMENT_PENDING
+                setState {
+                    copy(
+                        ui =
+                            PaymentUiState.Ready(
+                                summary = data.toUi(),
+                                hasOpenedSnap = hasOpenedSnap,
+                            ),
+                        remainingSeconds = remaining,
+                        cancelError = null,
+                        isCancelling = false,
+                    )
+                }
             }
         }
     }
@@ -174,7 +183,7 @@ class PaymentViewModel(
         setState { copy(isSnapLaunching = true) }
         clearBusyError()
 
-        val snapResult = fetchSnapResult()
+        val snapResult = startSnapPayment(bookingId)
         handleSnapResult(snapResult, currentSummary)
     }
 
@@ -185,15 +194,6 @@ class PaymentViewModel(
         }
     }
 
-    private suspend fun fetchSnapResult(): DomainResult<com.rusuh.app.domain.model.SnapTransaction> =
-        if (lastIdempotencyKey != null) {
-            startSnapPayment.invokeWithKey(bookingId, lastIdempotencyKey!!)
-        } else {
-            val result = startSnapPayment.invoke(bookingId)
-            lastIdempotencyKey = result.idempotencyKey
-            result.result
-        }
-
     private fun handleSnapResult(
         snapResult: DomainResult<com.rusuh.app.domain.model.SnapTransaction>,
         currentSummary: PaymentSummary,
@@ -202,15 +202,20 @@ class PaymentViewModel(
 
         when (snapResult) {
             is DomainResult.Success -> {
+                val redirectUrl = snapResult.data.redirectUrl
+                if (redirectUrl.isNullOrBlank()) {
+                    setGenericError()
+                    return
+                }
                 markSnapOpened()
-                val method = snapResult.data.method?.name?.lowercase() ?: "unknown"
-                lastPaymentType = method
-                tracker?.addPaymentInfo(currentSummary.price.total, method)
-                sendEffect(PaymentEffect.LaunchSnap(snapResult.data.redirectUrl))
+                lastPaymentType = "unknown"
+                tracker?.addPaymentInfo(currentSummary.price.total, "unknown")
+                sendEffect(PaymentEffect.LaunchSnap(redirectUrl))
             }
-            is DomainResult.Error -> handleSnapError(snapResult.errorCode, snapResult.retryAfterSeconds, currentSummary)
-            is DomainResult.NetworkError -> setBusyErrorAndClearKey()
-            is DomainResult.Empty, is DomainResult.TechnicalError -> lastIdempotencyKey = null
+            is DomainResult.Error ->
+                handleSnapError(snapResult.code, snapResult.errorCode, snapResult.retryAfterSeconds, currentSummary)
+            is DomainResult.NetworkError -> setBusyError(null)
+            is DomainResult.Empty, is DomainResult.TechnicalError -> setGenericError()
         }
     }
 
@@ -222,6 +227,7 @@ class PaymentViewModel(
     }
 
     private fun handleSnapError(
+        code: Int,
         errorCode: ErrorCode?,
         retryAfterSeconds: Int?,
         currentSummary: PaymentSummary,
@@ -229,9 +235,12 @@ class PaymentViewModel(
         when (errorCode) {
             ErrorCode.PAYMENT_PROVIDER_BUSY -> setBusyError(retryAfterSeconds)
             ErrorCode.BOOKING_NOT_HELD -> setExpiredState(currentSummary.toUi(), currentSummary.customerEmail, false)
-            else -> setBusyError(null)
+            ErrorCode.ADMISSION_INVALID,
+            ErrorCode.CATEGORY_SOLD_OUT,
+            ErrorCode.NIK_SEAT_TAKEN,
+            -> setGenericError()
+            else -> if (code == HTTP_SERVICE_UNAVAILABLE) setBusyError(retryAfterSeconds) else setGenericError()
         }
-        lastIdempotencyKey = null
     }
 
     private fun setBusyError(retryAfterSeconds: Int?) {
@@ -239,11 +248,6 @@ class PaymentViewModel(
         if (ui is PaymentUiState.Ready) {
             setState { copy(ui = ui.copy(busyError = BusyError(retryAfterSeconds))) }
         }
-    }
-
-    private fun setBusyErrorAndClearKey() {
-        setBusyError(null)
-        lastIdempotencyKey = null
     }
 
     @Suppress("ReturnCount", "SwallowedException")
@@ -391,6 +395,8 @@ class PaymentViewModel(
         sendEffect(PaymentEffect.NavigateToHome)
     }
 }
+
+private const val HTTP_SERVICE_UNAVAILABLE = 503
 
 private fun PaymentSummary.toUi(): PaymentSummaryUi =
     PaymentSummaryUi(

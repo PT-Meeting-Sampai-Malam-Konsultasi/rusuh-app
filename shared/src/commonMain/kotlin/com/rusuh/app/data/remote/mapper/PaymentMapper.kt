@@ -1,14 +1,12 @@
 package com.rusuh.app.data.remote.mapper
 
 import com.rusuh.app.data.remote.dto.AttendeeDto
-import com.rusuh.app.data.remote.dto.PaymentStatusDto
-import com.rusuh.app.data.remote.dto.PaymentViewDto
+import com.rusuh.app.data.remote.dto.BookingDto
+import com.rusuh.app.data.remote.dto.EnterPaymentDto
 import com.rusuh.app.data.remote.dto.PriceBreakdownDto
 import com.rusuh.app.data.remote.dto.PriceLineDto
-import com.rusuh.app.data.remote.dto.SnapTransactionDto
 import com.rusuh.app.domain.model.AttendeeInfo
 import com.rusuh.app.domain.model.BookingStatus
-import com.rusuh.app.domain.model.PaymentMethod
 import com.rusuh.app.domain.model.PaymentStatus
 import com.rusuh.app.domain.model.PaymentStatusResult
 import com.rusuh.app.domain.model.PaymentSummary
@@ -17,41 +15,45 @@ import com.rusuh.app.domain.model.PriceLine
 import com.rusuh.app.domain.model.SnapTransaction
 import kotlinx.datetime.Instant
 
-/** Maps [PaymentViewDto] to [PaymentSummary]. */
-fun PaymentViewDto.toDomain(): PaymentSummary =
+/** Maps the booking record and local account email to the payment summary. */
+fun BookingDto.toPaymentSummary(customerEmail: String?): PaymentSummary =
     PaymentSummary(
         bookingId = bookingId,
-        orderCode = orderCode,
-        eventName = eventName,
-        eventStartsAt = eventStartsAt?.parseInstantOrNull(),
-        venueShort = venueShort,
-        timezone = timezone,
+        orderCode = orderCode.orEmpty(),
+        eventName = null,
+        eventStartsAt = null,
+        venueShort = null,
+        timezone = null,
         attendees = attendees.map { it.toDomain() },
         customerEmail = customerEmail,
         price = price.toDomain(),
-        currentSnap = currentSnap?.toDomain(),
-        expiresAt = expiresAt.parseInstant(),
+        expiresAt = (expiresAt ?: serverNow).parseInstant(),
         serverNow = serverNow.parseInstant(),
-        snapClientKey = snapClientKey,
+        bookingStatus = BookingStatus.fromWire(status),
+        refundRequired = refundRequired,
     )
 
-/** Maps [SnapTransactionDto] to [SnapTransaction]. */
-fun SnapTransactionDto.toDomain(): SnapTransaction =
+/** Maps a payment entry response to the web handoff model. */
+fun EnterPaymentDto.toDomain(): SnapTransaction =
     SnapTransaction(
-        attemptId = attemptId,
-        orderId = orderId,
-        method = PaymentMethod.fromWire(method),
+        bookingId = bookingId,
         snapToken = snapToken,
         redirectUrl = redirectUrl,
-        gatewayExpiresAt = gatewayExpiresAt.parseInstant(),
+        paymentExpiresAt = paymentExpiresAt.parseInstant(),
     )
 
-/** Maps [PaymentStatusDto] to [PaymentStatusResult]. */
-fun PaymentStatusDto.toDomain(): PaymentStatusResult =
+/** Maps the authoritative booking returned by status checks. */
+fun BookingDto.toPaymentStatus(): PaymentStatusResult =
     PaymentStatusResult(
-        bookingStatus = BookingStatus.fromWire(bookingStatus),
-        paymentStatus = PaymentStatus.fromWire(paymentStatus),
-        returnUrl = returnUrl,
+        bookingStatus = BookingStatus.fromWire(status),
+        paymentStatus =
+            when {
+                status.equals("PAID", true) -> PaymentStatus.SETTLED
+                refundRequired -> PaymentStatus.PAID_AFTER_EXPIRY
+                status.equals("PAYMENT_PENDING", true) -> PaymentStatus.PENDING
+                else -> PaymentStatus.NONE
+            },
+        returnUrl = null,
         serverNow = serverNow.parseInstant(),
     )
 
@@ -86,7 +88,3 @@ fun PriceLineDto.toDomain(): PriceLine =
 
 /** Parses an ISO 8601 instant string; throws on invalid input. */
 private fun String.parseInstant(): Instant = Instant.parse(this)
-
-/** Parses an ISO 8601 instant string; null on invalid or blank input. */
-private fun String.parseInstantOrNull(): Instant? =
-    takeIf { it.isNotBlank() }?.runCatching { Instant.parse(this) }?.getOrNull()

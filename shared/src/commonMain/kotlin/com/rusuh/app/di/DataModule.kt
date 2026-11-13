@@ -18,6 +18,7 @@ import com.rusuh.app.data.repository.DetailRepositoryImpl
 import com.rusuh.app.data.repository.DeviceRepositoryImpl
 import com.rusuh.app.data.repository.HomeRepositoryImpl
 import com.rusuh.app.data.repository.MyQueuesRepositoryImpl
+import com.rusuh.app.data.repository.PaymentRepositoryImpl
 import com.rusuh.app.data.repository.QueueRepositoryImpl
 import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.repository.StubDetailRepository
@@ -48,27 +49,13 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 import org.koin.dsl.onClose
 
-/**
- * While a repository has no network implementation, [BackendMode.Real] resolves its stub and logs a warning instead of
- * crashing. Only PaymentRepository is left: the payment routes return 404 on the live backend. Remove the fallback
- * once they are deployed.
- */
-const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
-
-/** Repositories that still resolve to fake data in [BackendMode.Real]; kept in sync with [liveDataModule] by tests. */
-val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("PaymentRepository")
-
 /** [commonDataModule] plus [stubDataModule] or [liveDataModule] for [mode]. Load after `coreModule()`. */
-fun dataModules(
-    mode: BackendMode,
-    allowStubFallback: Boolean = ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES,
-    warn: (String) -> Unit = { println(it) },
-): List<Module> =
+fun dataModules(mode: BackendMode): List<Module> =
     listOf(
         commonDataModule(),
         when (mode) {
             BackendMode.Stub -> stubDataModule()
-            BackendMode.Real -> liveDataModule(allowStubFallback, warn)
+            BackendMode.Real -> liveDataModule()
         },
     )
 
@@ -83,7 +70,7 @@ fun commonDataModule(): Module =
         single { AuthApiService(get(ApiClientQualifier.Api)) }
         single { TicketApiService(get(ApiClientQualifier.Api)) }
         single { BookingApiService(get(ApiClientQualifier.Api), get()) }
-        single { PaymentApiService(get(ApiClientQualifier.Api)) }
+        single { PaymentApiService(get(ApiClientQualifier.Api), get()) }
         single { AuthGeneration() }
         single<SessionObserver> { SessionManagerObserver(get(), get()) }
         single<DeviceRepository> {
@@ -119,10 +106,7 @@ fun stubDataModule(): Module =
     }
 
 /** Network mode: repositories over HTTP, secure token store, server clock from `coreModule`. */
-fun liveDataModule(
-    allowStubFallback: Boolean = ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES,
-    warn: (String) -> Unit = { println(it) },
-): Module =
+fun liveDataModule(): Module =
     module {
         single { SessionManager(tokenStore = get(), events = get()) } onClose { it?.close() }
         single<SessionStateProvider> { get<SessionManager>() }
@@ -140,23 +124,5 @@ fun liveDataModule(
         }
         single<TicketsRepository> { TicketsRepositoryImpl(get(), get(), get(), get()) }
         single<DetailRepository> { DetailRepositoryImpl(get(), get(), get(), get(), get()) }
-        single<PaymentRepository> {
-            stubOrFail("PaymentRepository", allowStubFallback, warn) {
-                StubPaymentRepository(StubClock.ticking())
-            }
-        }
+        single<PaymentRepository> { PaymentRepositoryImpl(get(), get()) }
     }
-
-private fun <T> stubOrFail(
-    repository: String,
-    allowStubFallback: Boolean,
-    warn: (String) -> Unit,
-    stub: () -> T,
-): T {
-    if (!allowStubFallback) throw RealRepositoryNotAvailableException(repository)
-    warn(
-        "WARNING: $repository has no real implementation yet; BackendMode.Real is using its STUB (fake data). " +
-            "Temporary, see ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES.",
-    )
-    return stub()
-}
