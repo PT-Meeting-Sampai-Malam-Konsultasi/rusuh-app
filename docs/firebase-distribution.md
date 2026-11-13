@@ -102,4 +102,28 @@ adb shell setprop debug.firebase.analytics.app .none.
 
 Crash reports and non-fatal errors follow the same analytics consent: reports are collected only after consent is granted. Denial disables Crashlytics collection. The app records unexpected technical failures; ordinary validation and business errors are excluded. Crash messages are scrubbed for email addresses, 16-digit values, and JWT-like strings. User IDs, when available, are account IDs only.
 
-To verify in staging, grant analytics consent and tap the Account debug action **Send test crash**, then reopen the app. The report should appear in the Firebase Crashlytics dashboard within minutes. **Send test non-fatal** sends a non-fatal sample. Production does not expose these actions. The Crashlytics Gradle plugin uploads mapping files with the production minified release build; ensure CI has `androidApp/google-services.json` and runs the production release task.
+### Custom keys
+
+Crashlytics reports include these keys for triage:
+- `flavor`: Staging or Production
+- `backend_mode`: Real or Stub
+- `language`: the app's locale tag (e.g. `en`, `id`)
+- `app_version`: from `BuildConfig.VERSION_NAME`
+- `version_code`: from `BuildConfig.VERSION_CODE`
+
+No personal data (email, name, NIK, phone, tokens) is ever set as a key.
+
+### Verifying the setup
+
+In staging, grant analytics consent and tap the Account debug action **Send test crash**, then reopen the app. The report should appear in the Firebase Crashlytics dashboard within minutes. **Send test non-fatal** sends a non-fatal sample. Production does not expose these actions.
+
+### Mapping file upload (deobfuscation)
+
+The `com.google.firebase.crashlytics` Gradle plugin uploads ProGuard/R8 mapping files automatically when building a minified release. The production release build (`assembleProductionRelease` or `bundleProductionRelease`) is minified; staging debug is not.
+
+CI requirements:
+- `androidApp/google-services.json` must exist (from the `GOOGLE_SERVICES_JSON` secret).
+- Run the production release task (e.g. `./gradlew assembleProductionRelease`) to trigger the upload.
+- The plugin reads Firebase config from `google-services.json` and uploads to the project automatically.
+
+To verify: after a release build, check Firebase Console > Crashlytics > the app > Settings > Mapping files. Each version code should have an uploaded mapping.

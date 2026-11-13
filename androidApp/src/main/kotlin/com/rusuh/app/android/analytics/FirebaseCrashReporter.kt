@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.rusuh.app.android.BuildConfig
 import com.rusuh.app.crash.CrashReporter
 import com.rusuh.app.crash.SafeCrashReporter
 
@@ -39,6 +40,11 @@ class FirebaseCrashReporter(context: Context) : CrashReporter {
                 }
             },
         )
+
+    init {
+        crashlytics?.setCustomKey("app_version", BuildConfig.VERSION_NAME)
+        crashlytics?.setCustomKey("version_code", BuildConfig.VERSION_CODE.toString())
+    }
 
     override fun recordNonFatal(throwable: Throwable) = safe.recordNonFatal(throwable)
 
