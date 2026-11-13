@@ -160,8 +160,16 @@ sealed interface AttendeeValidationStatus {
     /** Server rejected the NIK (invalid format, seat taken, or duplicate). */
     data class Rejected(val reason: RejectedReason) : AttendeeValidationStatus
 
-    /** Server call failed (network/503); user can retry. */
-    data object Unavailable : AttendeeValidationStatus
+    /** The check could not be done; [reason] tells the user why. They can retry. */
+    data class Unavailable(val reason: UnavailableReason = UnavailableReason.SERVER) : AttendeeValidationStatus
+}
+
+/** Why an attendee check could not be completed. */
+enum class UnavailableReason {
+    NETWORK,
+    SERVICE,
+    TOO_MANY_ATTEMPTS,
+    SERVER,
 }
 
 /** Reason why the server rejected an attendee's NIK. */
