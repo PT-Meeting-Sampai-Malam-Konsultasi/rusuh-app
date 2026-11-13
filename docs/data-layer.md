@@ -186,6 +186,14 @@ In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `
 
 ### Live API (staging) notes
 
+### Resuming an order from My Queues
+
+My Queues reads `QueueCache` admission facts and `GET /core/bookings/active` together with queue entries. Only an
+unexpired stored admission or a HELD booking is exposed as resumable. The admission token remains in `TokenStore`;
+attendee names and NIKs are never cached. Continue booking calls the idempotent queue claim again only for the stored
+event, refreshing its token before opening Detail. Continue payment opens the existing Payment route by booking ID.
+The UI counts down from server-provided expiry and server time; it drops expired resume rows locally.
+
 All services share `https://api.rusuh-tiket.web.id/v1`: core routes use `/core/...` (public event list and detail;
 categories, tickets and bookings require auth), auth uses `/auth/...`, and queue uses `/queue/...`. Verified live
 queue routes include `/queue/devices` and `/queue/{eventId}/join|me|frontier|claim|stream`; queue currently returns
