@@ -82,6 +82,8 @@ class QueueHarness(
             tokens = tokens,
             cache = queueCache,
             localeProvider = locale,
+            bookingApi = com.rusuh.app.data.remote.BookingApiService(backend.api, tokens),
+            serverClock = clock,
         )
 
     /** The happy-path device and event routes every queue test needs. */

@@ -53,6 +53,33 @@ class QueueRepositoryImplTest {
     }
 
     @Test
+    fun resumingRequiresStoredAdmissionAndRefreshesTheTokenFromTheSameClaim() =
+        runTest {
+            val h = QueueHarness()
+            h.tokens.setQueueToken(EVT, "queue-token")
+            h.queueCache.setAdmission(AdmissionInfo(EVT, "old-slot", 3, FIXTURE_NOW_MILLIS + 300_000))
+            h.backend.on(claimLine, Reply.ok(ADMISSION_JSON))
+
+            assertTrue(h.queue.resumeAdmission(EVT))
+            assertEquals("mock-admission-token", h.tokens.getAdmissionToken())
+            assertEquals("s_mock_01", h.queueCache.getAdmission()?.slotId)
+            assertEquals(1, h.backend.callsTo(claimLine))
+        }
+
+    @Test
+    fun expiredResumeClaimDropsTheStoredAdmission() =
+        runTest {
+            val h = QueueHarness()
+            h.tokens.setQueueToken(EVT, "queue-token")
+            h.queueCache.setAdmission(AdmissionInfo(EVT, "slot-1", 3, FIXTURE_NOW_MILLIS + 300_000))
+            h.backend.on(claimLine, Reply.problem(410, "EXPIRED"))
+
+            assertEquals(false, h.queue.resumeAdmission(EVT))
+            assertNull(h.queueCache.getAdmission())
+            assertNull(h.tokens.getAdmissionToken())
+        }
+
+    @Test
     fun theWaitingRoomCountsDownLikeTheMockAndEndsWithTheClaimedTurn() =
         runTest {
             // The Mockoon sequence: 100..400 in steps of 30 with the operator pausing twice, then served >= seq.

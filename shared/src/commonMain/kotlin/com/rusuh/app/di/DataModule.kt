@@ -129,7 +129,7 @@ fun liveDataModule(
         single<HomeRepository> { HomeRepositoryImpl(get(), get(), get()) }
         single<QueueRepository> { QueueRepositoryImpl(get(), get(), get(), get(), get(), get(), get()) }
         single<WaitingRoomRepository> { get<QueueRepository>() }
-        single<MyQueuesRepository> { MyQueuesRepositoryImpl(get(), get(), get(), get(), get()) }
+        single<MyQueuesRepository> { MyQueuesRepositoryImpl(get(), get(), get(), get(), get(), get(), get()) }
         single<AuthRepository> {
             AuthRepositoryImpl(
                 api = get(),
