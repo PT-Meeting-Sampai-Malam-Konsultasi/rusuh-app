@@ -277,9 +277,109 @@ class QueueRepositoryImplTest {
             val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
             assertEquals(
                 com.rusuh.app.domain.repository.QueueClaimOutcome.Missed,
-                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
             )
             assertEquals(1, h.backend.callsTo(claimLine))
+        }
+
+    @Test
+    fun aClosedClaimClearsTheQueueToken() =
+        runTest {
+            val h = QueueHarness()
+            h.script(listOf(frontierJson(400)), claim = listOf(Reply.problem(410, "QUEUE_CLOSED")))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Closed,
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
+            )
+            assertNull(h.tokens.getQueueToken(EVT))
+        }
+
+    @Test
+    fun retryEndingInNoStockReturnsToWaiting() =
+        runTest {
+            val h = QueueHarness()
+            h.script(
+                listOf(frontierJson(400), frontierJson(400)),
+                claim = listOf(Reply.problem(409, "NOT_YET"), Reply.problem(409, "NO_STOCK")),
+            )
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.BackToWaiting,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
+            assertEquals(QueueState.Open, h.queue.observePlace(EVT).first().state)
+        }
+
+    @Test
+    fun deviceRejectedOnTheLastRetryRegistersAgainThenAdmits() =
+        runTest {
+            val h = QueueHarness()
+            h.script(
+                listOf(frontierJson(400)),
+                claim =
+                    listOf(
+                        Reply.problem(409, "NOT_YET"),
+                        Reply.problem(401, "DEVICE_REJECTED"),
+                        Reply.ok(ADMISSION_JSON),
+                    ),
+            )
+            h.backend.on("POST /queue/devices", Reply.created(DEVICE_JSON), Reply.created(DEVICE_JSON))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Admitted,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
+            assertEquals(2, h.backend.callsTo("POST /queue/devices"))
+            assertEquals(3, h.backend.callsTo(claimLine))
+        }
+
+    @Test
+    fun deviceReRegistrationCanReturnToWaitingAfterTheLastRetry() =
+        runTest {
+            val h = QueueHarness()
+            h.script(
+                listOf(frontierJson(400)),
+                claim =
+                    listOf(
+                        Reply.problem(409, "NOT_YET"),
+                        Reply.problem(401, "DEVICE_REJECTED"),
+                        Reply.problem(409, "NO_STOCK"),
+                    ),
+            )
+            h.backend.on("POST /queue/devices", Reply.created(DEVICE_JSON), Reply.created(DEVICE_JSON))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.BackToWaiting,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
+        }
+
+    @Test
+    fun aMissAfterDeviceReRegistrationClearsThePlace() =
+        runTest {
+            val h = QueueHarness()
+            h.script(
+                listOf(frontierJson(400)),
+                claim =
+                    listOf(
+                        Reply.problem(409, "NOT_YET"),
+                        Reply.problem(401, "DEVICE_REJECTED"),
+                        Reply.problem(410, "MISSED"),
+                    ),
+            )
+            h.backend.on("POST /queue/devices", Reply.created(DEVICE_JSON), Reply.created(DEVICE_JSON))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Missed,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
+            assertNull(h.tokens.getQueueToken(EVT))
         }
 
     @Test

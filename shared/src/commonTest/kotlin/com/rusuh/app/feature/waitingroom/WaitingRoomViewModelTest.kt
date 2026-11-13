@@ -54,6 +54,8 @@ class WaitingRoomViewModelTest {
     private var leaveResult: DomainResult<Unit> = DomainResult.Success(Unit)
     private val leaves = mutableListOf<String>()
     private var claims = 0
+    private var claimOutcome: QueueClaimOutcome = QueueClaimOutcome.Admitted
+    private var claimFailure: Throwable? = null
 
     private val queueRepository =
         object : QueueRepository {
@@ -61,7 +63,11 @@ class WaitingRoomViewModelTest {
                 eventId: String,
                 turnExpiresAtEpochMillis: Long,
                 serverNowEpochMillis: Long,
-            ) = QueueClaimOutcome.Admitted.also { claims++ }
+            ): QueueClaimOutcome {
+                claims++
+                claimFailure?.let { throw it }
+                return claimOutcome
+            }
 
             override fun observePlace(eventId: String): Flow<QueuePlace> = emptyFlow()
 
@@ -424,6 +430,121 @@ class WaitingRoomViewModelTest {
             runCurrent()
             assertEquals(WaitingRoomEffect.NavigateToDetail("evt"), vm.effect.first())
             assertEquals(1, claims)
+        }
+
+    @Test
+    fun automaticClaimWaitsUntilTheLastFiveSeconds() =
+        runTest(dispatcher) {
+            claimOutcome = QueueClaimOutcome.BackToWaiting
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            vm.dispatch(WaitingRoomIntent.ScreenActive)
+            runCurrent()
+
+            advanceTimeBy(54_999L)
+            now = 54_999L
+            runCurrent()
+            assertEquals(0, claims)
+
+            advanceTimeBy(1L)
+            now = 55_000L
+            runCurrent()
+            assertEquals(1, claims)
+            assertEquals(WaitingRoomEffect.ShowNoStock, vm.effect.first())
+        }
+
+    @Test
+    fun successfulClaimOpensDetailImmediately() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            vm.dispatch(WaitingRoomIntent.ScreenActive)
+            now = 1_000L
+            vm.dispatch(WaitingRoomIntent.ChooseTicketsNow)
+            runCurrent()
+
+            assertEquals(1, claims)
+            assertEquals(WaitingRoomEffect.NavigateToDetail("evt"), vm.effect.first())
+        }
+
+    @Test
+    fun failedClaimCanBeRetriedAndMissedOutcomeEndsTheTurn() =
+        runTest(dispatcher) {
+            claimFailure = IllegalStateException("temporary")
+            claimOutcome = QueueClaimOutcome.Missed
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            vm.dispatch(WaitingRoomIntent.ScreenActive)
+            vm.dispatch(WaitingRoomIntent.ChooseTicketsNow)
+            runCurrent()
+
+            assertEquals(1, claims)
+            assertEquals(WaitingRoomEffect.ShowRefreshError, vm.effect.first())
+            claimFailure = null
+            vm.dispatch(WaitingRoomIntent.ChooseTicketsNow)
+            runCurrent()
+            assertEquals(2, claims)
+            assertIs<WaitingRoomPhase.MissedTurn>(vm.phase())
+        }
+
+    @Test
+    fun leavingTheScreenCancelsTheScheduledClaim() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            vm.dispatch(WaitingRoomIntent.ScreenActive)
+            runCurrent()
+            vm.dispatch(WaitingRoomIntent.ScreenInactive)
+            advanceTimeBy(60_000L)
+            now = 60_000L
+            runCurrent()
+
+            assertEquals(0, claims)
+        }
+
+    @Test
+    fun aClosedClaimShowsTheSoldOutPhase() =
+        runTest(dispatcher) {
+            claimOutcome = QueueClaimOutcome.Closed
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            vm.dispatch(WaitingRoomIntent.ScreenActive)
+            vm.dispatch(WaitingRoomIntent.ChooseTicketsNow)
+            runCurrent()
+
+            assertIs<WaitingRoomPhase.SoldOut>(vm.phase())
+        }
+
+    @Test
+    fun aClaimSignInFailureRequestsSignIn() =
+        runTest(dispatcher) {
+            claimFailure = SignInRequiredException()
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            vm.dispatch(WaitingRoomIntent.ScreenActive)
+            vm.dispatch(WaitingRoomIntent.ChooseTicketsNow)
+            runCurrent()
+
+            assertEquals(WaitingRoomEffect.ReSignIn("evt"), vm.effect.first())
+        }
+
+    @Test
+    fun tickingAtTheTurnDeadlineMarksItMissed() =
+        runTest(dispatcher) {
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+            now = 60_000L
+            vm.dispatch(WaitingRoomIntent.Tick)
+            runCurrent()
+
+            assertIs<WaitingRoomPhase.MissedTurn>(vm.phase())
         }
 
     private companion object {
