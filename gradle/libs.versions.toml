@@ -11,6 +11,12 @@ detekt = "1.23.7"
 kover = "0.8.3"
 kotlinTest = "2.0.21"
 navigation = "2.8.0-alpha10"
+robolectric = "4.14.1"
+androidxTest = "1.6.1"
+androidxTestExt = "1.2.1"
+composeUiTest = "1.7.0"
+junit4 = "4.13.2"
+androidxTestRunner = "1.6.2"
 
 android-minSdk = "24"
 android-targetSdk = "34"
@@ -36,6 +42,13 @@ ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "k
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
+androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "composeUiTest" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "composeUiTest" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTest" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExt" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
+junit4 = { module = "junit:junit", version.ref = "junit4" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
