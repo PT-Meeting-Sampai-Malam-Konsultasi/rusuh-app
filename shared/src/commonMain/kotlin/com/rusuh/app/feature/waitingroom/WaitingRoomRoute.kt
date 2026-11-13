@@ -32,12 +32,14 @@ private const val TICK_MILLIS = 1_000L
  *
  * [WaitingRoomEffect.NavigateToDetail] (the turn's "choose tickets" action) goes to [onChooseTickets].
  */
+@Suppress("LongParameterList") // Navigation callbacks for a route composable.
 @Composable
 fun WaitingRoomRoute(
     viewModel: WaitingRoomViewModel,
     onBack: () -> Unit,
     onBrowseEvents: () -> Unit,
     onChooseTickets: (String) -> Unit,
+    onSignIn: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
@@ -63,6 +65,7 @@ fun WaitingRoomRoute(
             when (effect) {
                 WaitingRoomEffect.NavigateBack -> currentOnBack()
                 WaitingRoomEffect.NavigateToEvents -> currentOnBrowseEvents()
+                is WaitingRoomEffect.OpenSignIn -> onSignIn(effect.eventId)
                 // TODO(AUTH-00 #77): SignInRequired opens the sign-in sheet; until then it shows the same message.
                 WaitingRoomEffect.ShowRefreshError, WaitingRoomEffect.SignInRequired ->
                     scope.launch {

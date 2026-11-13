@@ -186,6 +186,7 @@ fun RusuhNavGraph(navController: NavHostController) {
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
+                onSignIn = { id -> navController.navigate(Screen.SignIn.routeFor(id)) },
                 // The turn: go to Detail and drop the Waiting Room so Back does not return into it.
                 onChooseTickets = { id ->
                     navController.navigate(Screen.Detail.routeFor(id)) {
