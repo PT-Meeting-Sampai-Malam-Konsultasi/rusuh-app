@@ -416,7 +416,10 @@
     <string name="detail_validation_nik_invalid">NIK tidak valid. Periksa 16 digit.</string>
     <string name="detail_validation_seat_taken">NIK ini sudah memiliki tiket maksimum untuk acara ini.</string>
     <string name="detail_validation_duplicate">NIK ini sudah dipakai tiket lain di pesanan ini.</string>
-    <string name="detail_validation_unavailable">Verifikasi tidak tersedia.</string>
+    <string name="detail_validation_unavailable">NIK belum bisa diperiksa saat ini.</string>
+    <string name="detail_validation_unavailable_network">Tidak ada koneksi internet. Periksa lalu coba lagi.</string>
+    <string name="detail_validation_unavailable_service">Layanan pemeriksaan identitas sedang gangguan. Coba lagi sebentar lagi.</string>
+    <string name="detail_validation_unavailable_rate">Terlalu banyak percobaan. Tunggu semenit lalu coba lagi.</string>
     <string name="detail_validation_retry">Coba lagi</string>
 
     <!-- Payment screen -->

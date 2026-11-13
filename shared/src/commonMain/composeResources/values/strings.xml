@@ -420,7 +420,10 @@
     <string name="detail_validation_nik_invalid">NIK not valid. Check the 16 digits.</string>
     <string name="detail_validation_seat_taken">This NIK already has the maximum tickets for this event.</string>
     <string name="detail_validation_duplicate">This NIK is already used by another ticket in this order.</string>
-    <string name="detail_validation_unavailable">Verification unavailable.</string>
+    <string name="detail_validation_unavailable">Could not check this NIK right now.</string>
+    <string name="detail_validation_unavailable_network">No internet connection. Check it and retry.</string>
+    <string name="detail_validation_unavailable_service">The ID check service is down right now. Retry in a moment.</string>
+    <string name="detail_validation_unavailable_rate">Too many attempts. Wait a minute, then retry.</string>
     <string name="detail_validation_retry">Retry</string>
 
     <!-- Payment screen -->

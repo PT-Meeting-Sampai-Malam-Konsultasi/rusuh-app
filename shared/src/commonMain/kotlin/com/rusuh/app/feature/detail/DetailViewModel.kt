@@ -247,7 +247,7 @@ class DetailViewModel(
         } catch (
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {
-            setState { copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Unavailable)) }
+            setState { copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Unavailable())) }
             null
         }
     }
@@ -285,7 +285,8 @@ class DetailViewModel(
                 sendEffect(DetailEffect.NavigateToQueue(eventId))
             }
             else -> {
-                setState { copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Unavailable)) }
+                val reason = result.toUnavailableReason()
+                setState { copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Unavailable(reason))) }
             }
         }
     }
@@ -469,3 +470,11 @@ class DetailViewModel(
         override fun toString(): String = "CachedValidation(key=$key, token=<redacted>)"
     }
 }
+
+private fun AttendeeValidation.toUnavailableReason(): UnavailableReason =
+    when (this) {
+        AttendeeValidation.NetworkError -> UnavailableReason.NETWORK
+        AttendeeValidation.DukcapilUnavailable -> UnavailableReason.SERVICE
+        is AttendeeValidation.RateLimited -> UnavailableReason.TOO_MANY_ATTEMPTS
+        else -> UnavailableReason.SERVER
+    }
