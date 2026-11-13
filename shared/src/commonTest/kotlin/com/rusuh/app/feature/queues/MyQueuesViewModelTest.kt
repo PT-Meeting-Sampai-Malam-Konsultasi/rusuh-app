@@ -2,6 +2,7 @@ package com.rusuh.app.feature.queues
 
 import com.rusuh.app.domain.model.MyQueue
 import com.rusuh.app.domain.model.MyQueuePhase
+import com.rusuh.app.domain.model.OrderInProgress
 import com.rusuh.app.domain.repository.MyQueuesRepository
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
 import com.rusuh.app.ui.components.QueueListPhase
@@ -200,6 +201,26 @@ class MyQueuesViewModelTest {
             testScheduler.advanceUntilIdle()
             assertNull(rest.tryReceive().getOrNull(), "each effect is delivered exactly once")
             rest.cancel()
+        }
+
+    @Test
+    fun continueBookingUsesTheStoredOrderWindow() =
+        runTest(dispatcher) {
+            val order = OrderInProgress("evt-order", remainingMillis = 60_000)
+            val repository =
+                object : MyQueuesRepository {
+                    override suspend fun getMyQueues(): List<MyQueue> = emptyList()
+
+                    override suspend fun getOrdersInProgress(): List<OrderInProgress> = listOf(order)
+                }
+            val vm = MyQueuesViewModel(GetMyQueuesUseCase(repository))
+            vm.dispatch(MyQueuesIntent.Load)
+            testScheduler.runCurrent()
+
+            assertEquals(listOf(order), vm.state.value.ordersInProgress)
+            vm.dispatch(MyQueuesIntent.ContinueOrder(order))
+            testScheduler.runCurrent()
+            assertEquals(MyQueuesEffect.ContinueBooking("evt-order"), vm.effect.first())
         }
 
     @Test

@@ -465,4 +465,8 @@
     <string name="account_analytics_label">Analitik</string>
     <string name="account_analytics_enabled">Aktif</string>
     <string name="account_analytics_disabled">Nonaktif</string>
+    <string name="continue_booking">Lanjutkan pemesanan</string>
+    <string name="continue_payment">Lanjutkan pembayaran</string>
+    <string name="order_time_remaining">Sisa %1$d detik</string>
+    <string name="resume_expired_notice">Waktu pemesanan habis. Antri lagi.</string>
 </resources>

@@ -11,6 +11,9 @@ interface QueueRepository : WaitingRoomRepository {
         serverNowEpochMillis: Long,
     ): QueueClaimOutcome
 
+    /** Re-claims a previously admitted order after an app restart. */
+    suspend fun resumeAdmission(eventId: String): Boolean = false
+
     /**
      * Leaves the queue of [eventId] (`DELETE /queue/{eventId}/me`, idempotent) and forgets the stored place. A
      * device that never joined succeeds without a call.

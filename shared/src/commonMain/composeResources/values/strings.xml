@@ -469,4 +469,8 @@
     <string name="account_analytics_label">Analytics</string>
     <string name="account_analytics_enabled">Enabled</string>
     <string name="account_analytics_disabled">Disabled</string>
+    <string name="continue_booking">Continue booking</string>
+    <string name="continue_payment">Continue payment</string>
+    <string name="order_time_remaining">%1$d seconds remaining</string>
+    <string name="resume_expired_notice">Order expired. Join the queue again.</string>
 </resources>

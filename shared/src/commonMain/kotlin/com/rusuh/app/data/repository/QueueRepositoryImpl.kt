@@ -70,6 +70,26 @@ class QueueRepositoryImpl(
             flow { Poller(eventId, this).run() }
         }
 
+    @Suppress("ReturnCount")
+    override suspend fun resumeAdmission(eventId: String): Boolean {
+        if (eventId.isBlank() || cache.getAdmission()?.eventId != eventId) return false
+        return try {
+            when (calls.claim(eventId)) {
+                is ClaimStep.Admitted -> true
+                else -> {
+                    calls.forgetAdmissionOf(eventId)
+                    false
+                }
+            }
+        } catch (failure: DomainException) {
+            if ((failure.result as? DomainResult.Error)?.code == HTTP_CONFLICT) {
+                calls.forgetAdmissionOf(eventId)
+                return false
+            }
+            throw failure
+        }
+    }
+
     override suspend fun leave(eventId: String): DomainResult<Unit> {
         val token = tokens.getQueueToken(eventId)
         val result = if (token == null) DomainResult.Success(Unit) else calls.leave(eventId, token)
@@ -323,6 +343,7 @@ class QueueRepositoryImpl(
     }
 
     private companion object {
+        const val HTTP_CONFLICT = 409
         const val TURN_WINDOW_MILLIS = 60_000L
         const val ME_JITTER_MILLIS = 30_000L
     }
