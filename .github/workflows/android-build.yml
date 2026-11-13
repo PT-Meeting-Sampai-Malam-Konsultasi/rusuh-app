@@ -21,14 +21,14 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build debug APK
+      - name: Build debug APKs (both flavors)
         run: ./gradlew :androidApp:assembleDebug --stacktrace
       - name: Guard cleartext config (debug only)
         run: ./gradlew :androidApp:verifyNoCleartextOutsideDebug :androidApp:verifyMergedManifestsHaveInternet --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: androidApp/build/outputs/apk/debug/*.apk
+          path: androidApp/build/outputs/apk/*/debug/*.apk
 
   # Sends a build to Firebase App Distribution: the LIVE staging API by default (Home events and login work today,
   # Detail/Tickets/queue still use stub data until the backend is complete), or the offline stub demo on manual dispatch.
@@ -59,9 +59,9 @@ jobs:
           BACKEND="${BACKEND_INPUT:-live}"
           if [ "$BACKEND" = "stub" ]; then echo "GRADLE_BACKEND_ARGS=-PbackendMode=Stub" >> "$GITHUB_ENV"; else echo "GRADLE_BACKEND_ARGS=-PmockApi=false" >> "$GITHUB_ENV"; fi
           echo "BUILD_BACKEND=$BACKEND" >> "$GITHUB_ENV"
-      - name: Build APK (debug)
+      - name: Build staging APK (debug)
         if: env.HAS_FIREBASE == 'true'
-        run: ./gradlew :androidApp:assembleDebug $GRADLE_BACKEND_ARGS -PversionCode=${{ github.run_number }} --stacktrace
+        run: ./gradlew :androidApp:assembleStagingDebug $GRADLE_BACKEND_ARGS -PversionCode=${{ github.run_number }} --stacktrace
       - name: Upload to Firebase App Distribution
         if: env.HAS_FIREBASE == 'true'
         env:
@@ -78,7 +78,7 @@ jobs:
           umask 077
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$CREDS"
           export GOOGLE_APPLICATION_CREDENTIALS="$CREDS"
-          APK="$(ls androidApp/build/outputs/apk/debug/*.apk | head -n 1)"
+          APK="$(ls androidApp/build/outputs/apk/staging/debug/*.apk | head -n 1)"
           FIRST_LINE="$(printf '%s' "${COMMIT_MESSAGE:-manual run}" | head -n 1)"
           if [ "$BUILD_BACKEND" = "stub" ]; then LABEL="OFFLINE DEMO (stub data)"; else LABEL="LIVE staging API (Detail, Tickets and queue still on stub data)"; fi
           NOTES="${LABEL}. ${COMMIT_SHA:0:7}: ${FIRST_LINE}"

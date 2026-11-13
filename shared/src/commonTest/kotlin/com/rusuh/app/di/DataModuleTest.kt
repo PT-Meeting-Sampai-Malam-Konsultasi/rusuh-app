@@ -10,6 +10,7 @@ import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.remote.AuthApiService
 import com.rusuh.app.data.remote.dto.RequestOtpDto
 import com.rusuh.app.data.repository.RealAuthRepository
+import com.rusuh.app.data.repository.RealDetailRepository
 import com.rusuh.app.data.repository.RealDeviceRepository
 import com.rusuh.app.data.repository.RealHomeRepository
 import com.rusuh.app.data.repository.RealMyQueuesRepository
@@ -99,13 +100,11 @@ class DataModuleTest {
             "DeviceRepository" to DeviceRepository::class,
             "AuthRepository" to AuthRepository::class,
             "TicketsRepository" to TicketsRepository::class,
+            "DetailRepository" to DetailRepository::class,
         )
 
     /** Repositories that still fall back to their stub in [BackendMode.Real]. */
-    private val stubOnlyRepositories: Map<String, KClass<*>> =
-        mapOf(
-            "DetailRepository" to DetailRepository::class,
-        )
+    private val stubOnlyRepositories: Map<String, KClass<*>> = emptyMap()
 
     private val repositories: Map<String, KClass<*>> = realRepositories + stubOnlyRepositories
 
@@ -145,7 +144,7 @@ class DataModuleTest {
     }
 
     @Test
-    fun realModeBindsTheNetworkImplementationsForHomeQueueMyQueuesAndDevice() {
+    fun realModeBindsTheNetworkImplementationsForAllRepositories() {
         val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
 
         assertIs<RealHomeRepository>(koin.get<HomeRepository>())
@@ -154,6 +153,7 @@ class DataModuleTest {
         assertIs<RealDeviceRepository>(koin.get<DeviceRepository>())
         assertIs<RealAuthRepository>(koin.get<AuthRepository>())
         assertIs<RealTicketsRepository>(koin.get<TicketsRepository>())
+        assertIs<RealDetailRepository>(koin.get<DetailRepository>())
         assertSame<Any>(koin.get<QueueRepository>(), koin.get<WaitingRoomRepository>(), "one queue behind both seams")
         assertTrue(warnings.isEmpty(), "no stub is used for these: $warnings")
     }
@@ -241,19 +241,12 @@ class DataModuleTest {
         }
 
     @Test
-    fun strictRealModeFailsLoudlyOnlyForTheRepositoriesWithoutANetworkImplementation() {
+    fun strictRealModeResolvesAllRepositoriesWithoutFallback() {
         val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
 
-        stubOnlyRepositories.forEach { (name, type) ->
-            val failure = assertFailsWith<Exception>(name) { koin.get<Any>(type) }
-            val messages = generateSequence<Throwable>(failure) { it.cause }.mapNotNull { it.message }.toList()
-            assertTrue(
-                messages.any { "No real implementation of $name yet" in it && "BackendMode.Stub" in it },
-                "$name: $messages",
-            )
-        }
-        realRepositories.values.forEach { type -> koin.get<Any>(type) } // resolves without the strict failure
-        assertTrue(warnings.isEmpty())
+        // All repositories should resolve to their real implementations without any warnings
+        realRepositories.values.forEach { type -> koin.get<Any>(type) }
+        assertTrue(warnings.isEmpty(), "no stub fallback should be used: $warnings")
     }
 
     @Test
@@ -262,25 +255,14 @@ class DataModuleTest {
     }
 
     @Test
-    fun strictRealModeKeepsFailingOnASecondResolution() {
-        val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
-
-        assertFailsWith<Exception> { koin.get<DetailRepository>() }
-        assertFailsWith<Exception> { koin.get<DetailRepository>() }
-    }
-
-    @Test
-    fun realModeFallsBackToTheStubOnlyForDetailAndTicketsAndWarnsOncePerRepository() {
+    fun realModeResolvesAllRepositoriesWithoutWarnings() {
         val koin = koin(AppEnvironment.Staging, BackendMode.Real)
 
         repositories.values.forEach { type -> koin.get<Any>(type) }
         repositories.values.forEach { type -> koin.get<Any>(type) } // singletons: no second warning
 
-        assertEquals(stubOnlyRepositories.size, warnings.size, "$warnings")
-        stubOnlyRepositories.keys.forEach { name ->
-            assertTrue(warnings.count { it.startsWith("WARNING: $name ") && "STUB" in it } == 1, "$name: $warnings")
-        }
-        assertTrue(warnings.none { realName -> realRepositories.keys.any { it in realName } }, "$warnings")
+        // No warnings because all repositories have real implementations now
+        assertTrue(warnings.isEmpty(), "no stub fallback should be used: $warnings")
     }
 
     @Test

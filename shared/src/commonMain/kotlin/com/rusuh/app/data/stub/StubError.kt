@@ -109,6 +109,38 @@ enum class StubError(
             "The NIK format is wrong, or the NIK was not found.",
         ),
     ),
+    DuplicateNik(
+        problem(
+            409,
+            "NIK yang sama dipakai lebih dari sekali",
+            "DUPLICATE_NIK",
+            "Each attendee in an order needs a different NIK.",
+        ),
+    ),
+    AttendeeNotValidated(
+        problem(
+            409,
+            "Data pemegang tiket belum divalidasi",
+            "ATTENDEE_NOT_VALIDATED",
+            "Validate every attendee before holding the booking.",
+        ),
+    ),
+    AccountHasActiveBooking(
+        problem(
+            409,
+            "Anda masih punya pesanan aktif",
+            "ACCOUNT_HAS_ACTIVE_BOOKING",
+            "Finish or cancel the active booking first.",
+        ),
+    ),
+    AdmissionInvalid(
+        problem(
+            403,
+            "Admission tidak berlaku",
+            "ADMISSION_INVALID",
+            "Missing, expired or not matching a live slot; back to the waiting room.",
+        ),
+    ),
 
     /** 429 with `Retry-After: 30`. */
     RateLimited(

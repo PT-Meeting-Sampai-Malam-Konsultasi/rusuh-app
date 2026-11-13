@@ -36,28 +36,73 @@ android {
         buildConfig = true
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // FLAVOR DIMENSION: "environment"
+    // ─────────────────────────────────────────────────────────────────────────
+    flavorDimensions += "environment"
+
+    productFlavors {
+        create("staging") {
+            dimension = "environment"
+            // Same applicationId for both flavors (same Firebase app).
+            applicationId = "com.rusuh.app.android"
+            // Launcher name via resValue so we don't need per-flavor res folders.
+            resValue("string", "app_name", "Rusuh Staging")
+            // ENVIRONMENT tells NetworkConfig which API to use: Staging flavor = "Staging".
+            buildConfigField("String", "ENVIRONMENT", "\"Staging\"")
+            // Staging allows mock/stub in debug builds (controlled by isDebug && this flag).
+            buildConfigField("Boolean", "ALLOW_DEBUG_OPTIONS", "true")
+        }
+        create("production") {
+            dimension = "environment"
+            applicationId = "com.rusuh.app.android"
+            resValue("string", "app_name", "Rusuh")
+            // Production flavor = "Production" environment always.
+            buildConfigField("String", "ENVIRONMENT", "\"Production\"")
+            // Production never allows mock/stub, even in debug builds.
+            buildConfigField("Boolean", "ALLOW_DEBUG_OPTIONS", "false")
+        }
+    }
+
     buildTypes {
-        // Mock or real host: NetworkConfig.MOCK_API in :shared, debug builds only (see docs/data-layer.md).
         getByName("debug") {
-            // Optional debug-only backend mode override, e.g. ./gradlew assembleDebug -PbackendMode=Stub for the
-            // offline demo. Empty keeps the default, real HTTP (see BackendMode and docs/data-layer.md).
-            val backendMode = providers.gradleProperty("backendMode").getOrElse("")
-            buildConfigField("String", "BACKEND_MODE", "\"$backendMode\"")
-            val mockApi = providers.gradleProperty("mockApi").getOrElse("")
-            require(mockApi.isEmpty() || mockApi == "true" || mockApi == "false") { "-PmockApi must be true or false" }
-            buildConfigField("String", "MOCK_API_OVERRIDE", "\"$mockApi\"")
+            // Note: BACKEND_MODE and MOCK_API_OVERRIDE are set per-variant below to support
+            // production flavor ignoring these flags.
         }
         getByName("release") {
             isMinifyEnabled = false
-            // Never overridable: a release build is always Production on real HTTP (NetworkConfig.startup).
-            buildConfigField("String", "BACKEND_MODE", "\"\"")
-            buildConfigField("String", "MOCK_API_OVERRIDE", "\"\"")
+            // Note: BACKEND_MODE and MOCK_API_OVERRIDE are set per-variant below.
         }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+// Read the Gradle properties once for use in variant configuration.
+val backendModeProp = providers.gradleProperty("backendMode").getOrElse("")
+val mockApiProp = providers.gradleProperty("mockApi").getOrElse("")
+require(mockApiProp.isEmpty() || mockApiProp == "true" || mockApiProp == "false") {
+    "-PmockApi must be true or false"
+}
+
+// Configure BACKEND_MODE and MOCK_API_OVERRIDE per variant.
+// Staging debug: uses the Gradle properties (allows mock/stub).
+// Production (any build type) and all release builds: always empty (no overrides).
+android.applicationVariants.configureEach {
+    val isProduction = flavorName == "production"
+    val isRelease = buildType.name == "release"
+
+    if (isProduction || isRelease) {
+        // Production flavor or release build: never allow overrides.
+        buildConfigField("String", "BACKEND_MODE", "\"\"")
+        buildConfigField("String", "MOCK_API_OVERRIDE", "\"\"")
+    } else {
+        // Staging debug: allow the Gradle properties.
+        buildConfigField("String", "BACKEND_MODE", "\"$backendModeProp\"")
+        buildConfigField("String", "MOCK_API_OVERRIDE", "\"$mockApiProp\"")
     }
 }
 
@@ -75,70 +120,151 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// VERIFICATION GUARDS (flavor-aware)
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Guard: cleartext HTTP may only be configured in the debug source set (see docs/data-layer.md).
 val verifyNoCleartextOutsideDebug by tasks.registering {
     val srcDir = layout.projectDirectory.dir("src")
-    // The merged release manifest must be clean too, whatever a library or flavour might contribute.
-    dependsOn("processReleaseManifest")
-    val releaseManifest =
-        layout.buildDirectory.file("intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml")
+    // Depend on all release manifest processing tasks (both flavors).
+    dependsOn("processStagingReleaseManifest", "processProductionReleaseManifest")
+    val stagingReleaseManifest =
+        layout.buildDirectory.file(
+            "intermediates/merged_manifests/stagingRelease/processStagingReleaseManifest/AndroidManifest.xml",
+        )
+    val productionReleaseManifest =
+        layout.buildDirectory.file(
+            "intermediates/merged_manifests/productionRelease/processProductionReleaseManifest/AndroidManifest.xml",
+        )
     doLast {
-        val merged = releaseManifest.get().asFile.readText()
-        check(!merged.contains("usesCleartextTraffic") && !merged.contains("networkSecurityConfig")) {
-            "The merged release manifest must not allow cleartext or set a network security config"
-        }
-        val root = srcDir.asFile
-        val manifest = root.resolve("main/AndroidManifest.xml").readText()
-        check(!manifest.contains("usesCleartextTraffic") && !manifest.contains("networkSecurityConfig")) {
+        // Check main manifest.
+        val mainManifest = srcDir.file("main/AndroidManifest.xml").asFile.readText()
+        check(!mainManifest.contains("usesCleartextTraffic") && !mainManifest.contains("networkSecurityConfig")) {
             "src/main/AndroidManifest.xml must not allow cleartext or set a network security config"
         }
-        val configs = root.walkTopDown().filter { it.name == "network_security_config.xml" }.toList()
-        check(configs.all { it.relativeTo(root).path.startsWith("debug/") }) {
+        // Check release merged manifests for all flavors.
+        listOf(stagingReleaseManifest, productionReleaseManifest).forEach { provider ->
+            val file = provider.get().asFile
+            if (file.exists()) {
+                val merged = file.readText()
+                check(!merged.contains("usesCleartextTraffic") && !merged.contains("networkSecurityConfig")) {
+                    "The merged release manifest ${file.name} must not allow cleartext"
+                }
+            }
+        }
+        // Check network_security_config.xml location.
+        val configs = srcDir.asFile.walkTopDown().filter { it.name == "network_security_config.xml" }.toList()
+        check(configs.all { it.relativeTo(srcDir.asFile).path.startsWith("debug/") }) {
             "network_security_config.xml is only allowed under src/debug: $configs"
         }
     }
 }
 tasks.named("check") { dependsOn(verifyNoCleartextOutsideDebug) }
 
-// Guard: a release build can never select the mock API or stub data (see NetworkConfig and docs/data-layer.md).
-// NetworkConfig.startup already ignores the flag unless BuildConfig.DEBUG; this also checks the generated release
-// constants, so a changed build type cannot turn them on unnoticed. It runs before assembleRelease and in check.
+// Guard: a release build can never select the mock API or stub data.
+// Now flavor-aware: checks both stagingRelease and productionRelease.
 val verifyReleaseNeverUsesMockApi by tasks.registering {
-    dependsOn("generateReleaseBuildConfig")
-    val releaseBuildConfig =
-        layout.buildDirectory.file("generated/source/buildConfig/release/com/rusuh/app/android/BuildConfig.java")
+    dependsOn("generateStagingReleaseBuildConfig", "generateProductionReleaseBuildConfig")
+    val stagingReleaseBuildConfig =
+        layout.buildDirectory.file(
+            "generated/source/buildConfig/staging/release/com/rusuh/app/android/BuildConfig.java",
+        )
+    val productionReleaseBuildConfig =
+        layout.buildDirectory.file(
+            "generated/source/buildConfig/production/release/com/rusuh/app/android/BuildConfig.java",
+        )
     doLast {
-        val generated = releaseBuildConfig.get().asFile.readText()
-        check(Regex("""boolean\s+DEBUG\s*=\s*false\s*;""").containsMatchIn(generated)) {
-            "The release build must have BuildConfig.DEBUG = false"
-        }
-        check(Regex("""String\s+BACKEND_MODE\s*=\s*"";""").containsMatchIn(generated)) {
-            "The release build must not override the backend mode: BuildConfig.BACKEND_MODE must be \"\""
-        }
-        check(Regex("""String\s+MOCK_API_OVERRIDE\s*=\s*"";""").containsMatchIn(generated)) {
-            "The release build must not override the mock API: BuildConfig.MOCK_API_OVERRIDE must be \"\""
+        listOf("staging" to stagingReleaseBuildConfig, "production" to productionReleaseBuildConfig).forEach { pair ->
+            val (flavor, provider) = pair
+            val file = provider.get().asFile
+            if (file.exists()) {
+                val generated = file.readText()
+                check(Regex("""boolean\s+DEBUG\s*=\s*false\s*;""").containsMatchIn(generated)) {
+                    "The ${flavor}Release build must have BuildConfig.DEBUG = false"
+                }
+                check(Regex("""String\s+BACKEND_MODE\s*=\s*"";""").containsMatchIn(generated)) {
+                    "The ${flavor}Release build must not override the backend mode"
+                }
+                check(Regex("""String\s+MOCK_API_OVERRIDE\s*=\s*"";""").containsMatchIn(generated)) {
+                    "The ${flavor}Release build must not override the mock API"
+                }
+            }
         }
     }
 }
 tasks.named("check") { dependsOn(verifyReleaseNeverUsesMockApi) }
-tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+
+// Hook the guard into all release assemble/bundle tasks (both flavors + aggregate).
+tasks.matching {
+    it.name == "assembleRelease" ||
+        it.name == "bundleRelease" ||
+        it.name.matches(Regex("assemble(Staging|Production)Release")) ||
+        it.name.matches(Regex("bundle(Staging|Production)Release"))
+}.configureEach {
     dependsOn(verifyReleaseNeverUsesMockApi)
 }
 
-// Guard: the MERGED debug and release manifests must declare INTERNET, or every HTTP call fails with EPERM.
+// Guard: production flavor must NEVER allow debug options, even in debug builds.
+val verifyProductionFlavorHasNoDebugOptions by tasks.registering {
+    dependsOn("generateProductionDebugBuildConfig", "generateProductionReleaseBuildConfig")
+    val productionDebugBuildConfig =
+        layout.buildDirectory.file(
+            "generated/source/buildConfig/production/debug/com/rusuh/app/android/BuildConfig.java",
+        )
+    val productionReleaseBuildConfig =
+        layout.buildDirectory.file(
+            "generated/source/buildConfig/production/release/com/rusuh/app/android/BuildConfig.java",
+        )
+    doLast {
+        listOf("productionDebug" to productionDebugBuildConfig, "productionRelease" to productionReleaseBuildConfig)
+            .forEach { pair ->
+                val (variant, provider) = pair
+                val file = provider.get().asFile
+                if (file.exists()) {
+                    val generated = file.readText()
+                    check(Regex("""Boolean\s+ALLOW_DEBUG_OPTIONS\s*=\s*false\s*;""").containsMatchIn(generated)) {
+                        "Production flavor must have ALLOW_DEBUG_OPTIONS = false in $variant"
+                    }
+                    check(Regex("""String\s+BACKEND_MODE\s*=\s*"";""").containsMatchIn(generated)) {
+                        "Production flavor must have empty BACKEND_MODE in $variant"
+                    }
+                    check(Regex("""String\s+MOCK_API_OVERRIDE\s*=\s*"";""").containsMatchIn(generated)) {
+                        "Production flavor must have empty MOCK_API_OVERRIDE in $variant"
+                    }
+                }
+            }
+    }
+}
+tasks.named("check") { dependsOn(verifyProductionFlavorHasNoDebugOptions) }
+
+// Guard: merged manifests must declare INTERNET (both flavors × both build types).
 val verifyMergedManifestsHaveInternet by tasks.registering {
-    dependsOn("processDebugManifest", "processReleaseManifest")
+    dependsOn(
+        "processStagingDebugManifest",
+        "processStagingReleaseManifest",
+        "processProductionDebugManifest",
+        "processProductionReleaseManifest",
+    )
     val manifests =
-        listOf("debug", "release").map { variant ->
-            val task = "process${variant.replaceFirstChar { it.uppercase() }}Manifest"
+        listOf(
+            "stagingDebug" to "processStagingDebugManifest",
+            "stagingRelease" to "processStagingReleaseManifest",
+            "productionDebug" to "processProductionDebugManifest",
+            "productionRelease" to "processProductionReleaseManifest",
+        ).map { (variant, task) ->
             variant to layout.buildDirectory.file("intermediates/merged_manifests/$variant/$task/AndroidManifest.xml")
         }
     doLast {
-        manifests.forEach { (variant, file) ->
-            val merged = file.get().asFile.readText()
-            val internet = Regex("""<uses-permission[^>]*android:name="android\.permission\.INTERNET"""")
-            check(internet.containsMatchIn(merged)) {
-                "The merged $variant manifest must declare android.permission.INTERNET"
+        manifests.forEach { pair ->
+            val (variant, provider) = pair
+            val file = provider.get().asFile
+            if (file.exists()) {
+                val merged = file.readText()
+                val internet = Regex("""<uses-permission[^>]*android:name="android\.permission\.INTERNET"""")
+                check(internet.containsMatchIn(merged)) {
+                    "The merged $variant manifest must declare android.permission.INTERNET"
+                }
             }
         }
     }

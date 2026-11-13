@@ -12,6 +12,9 @@ data class TicketsResponseDto(
 /**
  * `Ticket` schema. Every member has a default so a partial body still decodes.
  * [qrPayload] is security sensitive: never logged, and [toString] redacts it.
+ *
+ * Both `seating` and `entryGate` are optional per OpenAPI (`seating` has enum `standing|seated`,
+ * `entryGate` is a venue-specific string like "Gerbang 5").
  */
 @Serializable
 data class TicketDto(
@@ -22,7 +25,7 @@ data class TicketDto(
     @SerialName("categoryId") val categoryId: String = "",
     @SerialName("categoryName") val categoryName: String = "",
     @SerialName("seating") val seating: String? = null,
-    @SerialName("entryGate") val entryGate: String = "",
+    @SerialName("entryGate") val entryGate: String? = null,
     @SerialName("holderName") val holderName: String = "",
     @SerialName("nikMasked") val nikMasked: String = "",
     @SerialName("qrPayload") val qrPayload: String = "",
