@@ -1,7 +1,7 @@
 package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.cache.DeviceCache
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.network.newIdempotencyKey
 import com.rusuh.app.data.platform.AttestationProvider
 import com.rusuh.app.data.platform.DevAttestationProvider
@@ -85,7 +85,7 @@ class RealDeviceRepository(
             is DomainResult.Success -> {
                 registrations++
                 tokens.setDeviceToken(result.data.deviceToken)
-                val expiresAt = result.data.expiresAt?.let(::parseRfc3339Millis)
+                val expiresAt = result.data.expiresAt?.let(::parseStringDateMillis)
                 if (expiresAt != null) cache.setTokenExpiresAt(expiresAt) else cache.clearTokenExpiresAt()
                 DomainResult.Success(Unit)
             }

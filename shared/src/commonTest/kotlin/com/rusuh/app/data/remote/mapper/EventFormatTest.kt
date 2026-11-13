@@ -1,6 +1,6 @@
 package com.rusuh.app.data.remote.mapper
 
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.network.AppLanguage
 import com.rusuh.app.ui.components.TimeZoneLabel
 import kotlin.test.Test
@@ -10,7 +10,7 @@ class EventFormatTest {
     private fun moment(
         rfc3339: String,
         zone: TimeZoneLabel = TimeZoneLabel.WIB,
-    ) = localMoment(parseRfc3339Millis(rfc3339)!!, zone)
+    ) = localMoment(parseStringDateMillis(rfc3339)!!, zone)
 
     private val id = AppLanguage.Indonesian.words()
     private val en = AppLanguage.English.words()
@@ -46,7 +46,7 @@ class EventFormatTest {
 
     @Test
     fun zoneOffsetsAreSevenEightAndNineHours() {
-        val utc = parseRfc3339Millis("2026-12-12T12:00:00Z")!!
+        val utc = parseStringDateMillis("2026-12-12T12:00:00Z")!!
         assertEquals(19, localMoment(utc, TimeZoneLabel.WIB).hour)
         assertEquals(20, localMoment(utc, TimeZoneLabel.WITA).hour)
         assertEquals(21, localMoment(utc, TimeZoneLabel.WIT).hour)

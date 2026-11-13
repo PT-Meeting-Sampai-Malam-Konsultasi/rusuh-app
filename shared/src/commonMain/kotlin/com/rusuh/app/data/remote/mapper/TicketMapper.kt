@@ -1,7 +1,7 @@
 package com.rusuh.app.data.remote.mapper
 
 import com.rusuh.app.data.cache.CachedEventFacts
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.network.AppLanguage
 import com.rusuh.app.data.remote.dto.EventDto
 import com.rusuh.app.data.remote.dto.TicketDto
@@ -160,8 +160,8 @@ internal fun EventDto.toCachedEventFacts(): CachedEventFacts =
         eventName = name.ifBlank { eventId },
         venueShort = venueShort.orEmpty(),
         timezone = timezone,
-        doorsOpenAtMillis = doorsOpenAt?.let(::parseRfc3339Millis),
-        startsAtMillis = parseRfc3339Millis(startsAt),
+        doorsOpenAtMillis = doorsOpenAt?.let(::parseStringDateMillis),
+        startsAtMillis = parseStringDateMillis(startsAt),
     )
 
 /** Converts IANA timezone to zone label string. */
