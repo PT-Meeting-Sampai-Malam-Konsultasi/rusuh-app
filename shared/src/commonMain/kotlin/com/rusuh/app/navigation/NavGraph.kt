@@ -108,8 +108,12 @@ fun RusuhNavGraph(navController: NavHostController) {
                         popUpTo(Screen.Detail.route) { inclusive = true }
                     }
                 },
-                // TODO(FR-16-M1 #81): no payment route yet; do not navigate.
-                onPayment = {},
+                // Navigate to payment, popping Detail so back from payment returns to the event list.
+                onPayment = { bookingId ->
+                    navController.navigate(Screen.Payment.routeFor(bookingId)) {
+                        popUpTo(Screen.Detail.route) { inclusive = true }
+                    }
+                },
             )
         }
 
@@ -195,6 +199,21 @@ fun RusuhNavGraph(navController: NavHostController) {
                     }
                 },
             )
+        }
+
+        // Payment stub route: TODO(FR-17-M1 #82): implement the real payment screen.
+        composable(
+            route = Screen.Payment.route,
+            arguments = listOf(navArgument(Screen.Payment.ARG_BOOKING_ID) { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val bookingId = backStackEntry.arguments?.getString(Screen.Payment.ARG_BOOKING_ID).orEmpty()
+            // TODO(FR-17-M1 #82): another PR builds the payment handoff; this is a placeholder.
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Payment: $bookingId\n(TODO: implement payment screen)")
+            }
         }
     }
 }

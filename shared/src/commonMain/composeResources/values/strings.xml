@@ -154,6 +154,13 @@
     <string name="detail_error_load">Could not load the detail. Please try again.</string>
     <string name="detail_error_booking">Could not continue to payment. Please try again.</string>
     <string name="detail_error_nik_rejected">One of the NIKs could not be verified. Check the NIK and try again.</string>
+    <string name="detail_error_nik_seat_taken">This NIK already has the maximum tickets for this event.</string>
+    <string name="detail_error_duplicate_nik">Each ticket needs a different NIK.</string>
+    <string name="detail_error_dukcapil_unavailable">NIK verification is temporarily unavailable. Try again.</string>
+    <string name="detail_error_admission_expired">Your turn has expired. Queue again to try once more.</string>
+    <string name="detail_error_category_sold_out">One of your selected categories is now sold out.</string>
+    <string name="detail_error_active_booking">You already have an active booking for this event.</string>
+    <string name="detail_error_service_unavailable">Service temporarily unavailable. Please try again.</string>
     <string name="detail_expired_description">Time is up. 5 minutes have passed. Your selection was not saved.</string>
     <string name="detail_expired_badge">Time is up</string>
     <string name="detail_expired_headline">5 minutes have passed.</string>

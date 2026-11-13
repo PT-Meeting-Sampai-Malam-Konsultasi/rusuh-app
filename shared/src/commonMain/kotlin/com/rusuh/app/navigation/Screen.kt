@@ -71,6 +71,17 @@ sealed class Screen(val route: String) {
         fun routeFor(eventId: String? = null): String =
             if (eventId == null) "sign-in" else "sign-in?eventId=${eventId.encodeURLParameter()}"
     }
+
+    /**
+     * Payment page for a booking. TODO(FR-17-M1 #82): the payment screen is built by another PR.
+     * This stub route is for navigation only.
+     */
+    data object Payment : Screen("payment/{bookingId}") {
+        const val ARG_BOOKING_ID = "bookingId"
+
+        /** Build the concrete route for [bookingId]. */
+        fun routeFor(bookingId: String): String = "payment/${encodePathSegment(bookingId)}"
+    }
 }
 
 /**
