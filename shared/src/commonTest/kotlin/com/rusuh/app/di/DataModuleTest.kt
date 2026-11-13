@@ -82,7 +82,7 @@ class DataModuleTest {
                 },
                 storageModule,
                 coreModule(),
-                dataModule(mode, allowFallback) { warnings += it },
+                *dataModules(mode, allowFallback) { warnings += it }.toTypedArray(),
             )
         }
 
@@ -223,7 +223,7 @@ class DataModuleTest {
                         },
                         storageModule,
                         coreModule(),
-                        dataModule(BackendMode.Stub, true) { },
+                        *dataModules(BackendMode.Stub, true) { }.toTypedArray(),
                         appModule,
                     )
                 }.koin
@@ -250,7 +250,7 @@ class DataModuleTest {
                         },
                         storageModule,
                         coreModule(),
-                        dataModule(BackendMode.Stub, true) { },
+                        *dataModules(BackendMode.Stub, true) { }.toTypedArray(),
                     )
                 }.koin
             val auth = koin.get<AuthRepository>()
@@ -338,7 +338,7 @@ class DataModuleTest {
                             single<TokenStore> { SecureTokenStore(FakeSecureStore()) }
                         },
                         coreModule(),
-                        dataModule(BackendMode.Real, true) { },
+                        *dataModules(BackendMode.Real, true) { }.toTypedArray(),
                         module {
                             single<HttpClient> { buildHttpClient(engine, localeProvider = get(), serverTime = get()) }
                         },

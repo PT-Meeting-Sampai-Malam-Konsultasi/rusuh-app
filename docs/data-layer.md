@@ -178,7 +178,7 @@ and each test needs a fresh one.
    line to `coreModule()`.
 3. Extend `ApiConfigTest` and `CoreModuleTest`. For a non-local mock host, also extend the debug cleartext config.
 
-Wiring of ApiServices and Caches (`single`) and UseCases (`factory`) arrives with the feature tickets; repositories are bound per backend mode in `dataModule` (see below).
+Wiring of ApiServices and Caches (`single`) and UseCases (`factory`) arrives with the feature tickets; repositories are bound per backend mode by `dataModules(mode)` (see below).
 
 In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `CoreModuleTest`.
 
@@ -210,7 +210,8 @@ Release builds always use `Production` + `Real` over HTTPS.
 - Defaults: `BackendMode.defaultFor(env)` is `Real` for every environment. `Stub` is an explicit debug opt-in; asking
   for it for `Production` is rejected (`IllegalArgumentException`).
 - Switch: `initKoin(environment, backendMode)` for tests and tools; apps use `initKoinForBuild` (see Environments).
-- `dataModule(mode)` (`di/DataModule.kt`) binds every repository interface and the `ServerClock` per mode. In `Stub` it
+- `dataModules(mode)` (`di/DataModule.kt`) returns `commonDataModule()` (ApiServices, device identity, auth state) plus
+  `stubDataModule()` or `liveDataModule()`, which bind every repository interface and the `ServerClock`. In `Stub` it
   replaces the shared `HttpClient` with one on the in-process `StubEngine` (closed with Koin), so the three named
   `ApiClient`s and any ApiService built on them run with zero network, and the `ServerClock` is the demo's ticking
   `StubClock`, so countdowns run.
@@ -233,7 +234,7 @@ Release builds always use `Production` + `Real` over HTTPS.
   404), so it uses stub data. The constant `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`) lists `PaymentRepository`;
   flipping to the real repository is a one-line change once the routes go live (replace the `stubOrFail` binding with
   `RealPaymentRepository(get())` and remove from the list). The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES`
-  (default `true`) controls the fallback; set it to `false`, or pass `dataModule(mode, allowStubFallback = false)`,
+  (default `true`) controls the fallback; set it to `false`, or pass `liveDataModule(allowStubFallback = false)`,
   for the strict behaviour: resolving a repository without a real implementation throws
   `RealRepositoryNotAvailableException`.
 - Queue polling resilience: a transient failure inside the wait (network, 408, 429, 5xx) is retried with capped
