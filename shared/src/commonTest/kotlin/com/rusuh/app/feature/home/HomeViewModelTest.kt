@@ -142,17 +142,16 @@ class HomeViewModelTest {
     @Test
     fun loadEventsErrorSetsErrorStateAndEmitsShowError() =
         runTest(dispatcher) {
-            val message = "network down"
-            val viewModel = HomeViewModel(FakeHomeRepository(error = RuntimeException(message)))
+            val viewModel = HomeViewModel(FakeHomeRepository(error = RuntimeException("network down")))
 
             viewModel.dispatch(HomeIntent.LoadEvents)
             testScheduler.advanceUntilIdle()
 
             val state = viewModel.state.value
             assertTrue(!state.isLoading, "loading should be false after error")
-            assertEquals(message, state.error, "error message should be stored in state")
+            assertEquals(HomeError.LoadFailed, state.error, "error should be HomeError.LoadFailed")
 
             val effect = viewModel.effect.first()
-            assertEquals(HomeEffect.ShowError(message), effect)
+            assertEquals(HomeEffect.ShowError(HomeError.LoadFailed), effect)
         }
 }

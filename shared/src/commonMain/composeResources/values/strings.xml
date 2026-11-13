@@ -18,6 +18,8 @@
     <string name="home_empty_title">No events yet</string>
     <string name="home_pull_to_refresh">Pull down to reload.</string>
     <string name="home_loading_description">Loading event list</string>
+    <string name="home_error_title">Could not load events</string>
+    <string name="home_error_body">Check your connection and try again.</string>
 
     <!-- Event status badge labels (home cards) -->
     <string name="status_available">Queue open</string>

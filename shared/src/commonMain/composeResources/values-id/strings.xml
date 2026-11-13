@@ -18,6 +18,8 @@
     <string name="home_empty_title">Belum ada event</string>
     <string name="home_pull_to_refresh">Tarik ke bawah untuk memuat ulang.</string>
     <string name="home_loading_description">Memuat daftar event</string>
+    <string name="home_error_title">Gagal memuat event</string>
+    <string name="home_error_body">Periksa koneksi Anda lalu coba lagi.</string>
 
     <!-- Event status badge labels (home cards) -->
     <string name="status_available">Antrian dibuka</string>
