@@ -46,8 +46,46 @@ The `build` job builds both flavors (`assembleDebug`); the `distribute` job buil
      secret: a repository **variable** is enough (a secret with the same name also works; the variable wins).
 Until both exist the job only prints a notice and passes.
 
+## google-services.json and Firebase Analytics
+
+The `google-services.json` file is required to enable Firebase Analytics. It must NOT be committed to the repository.
+
+### How to get the file
+1. Go to Firebase Console (https://console.firebase.google.com).
+2. Open the project (e.g. `rusuh-app`).
+3. In Project settings (gear icon) > Your apps, find the Android app.
+4. Download `google-services.json`.
+5. Place it in `androidApp/google-services.json`.
+
+### CI setup
+Add the repo secret `GOOGLE_SERVICES_JSON` with the entire content of the file. The build and distribute jobs write
+it to `androidApp/google-services.json` before the build when the secret exists.
+
+### Builds without google-services.json
+The `com.google.gms.google-services` plugin is only applied when `androidApp/google-services.json` exists. Without it:
+- The build succeeds.
+- Firebase Analytics is not initialized (the implementation guards with a try/catch around `FirebaseApp.getApps()`).
+- The `ConsentAwareAnalytics` wrapper forwards to a no-op implementation.
+
+## Viewing events in DebugView
+
+1. Connect a device or emulator.
+2. Enable debug mode:
+   ```
+   adb shell setprop log.tag.FA VERBOSE
+   adb shell setprop debug.firebase.analytics.app com.rusuh.app.android
+   ```
+3. Open the app. Grant analytics consent when prompted.
+4. Watch `adb logcat` for `Logging event`.
+5. In Firebase Console > Analytics > DebugView, select the device.
+6. Events appear in real time.
+
+To disable debug mode:
+```
+adb shell setprop debug.firebase.analytics.app .none.
+```
+
 ## Notes
-- `google-services.json` is **not** needed (no Firebase SDK in the app) and must not be committed (public repo).
 - The key file is written to the runner's temp dir with owner-only permissions and removed when the step ends.
 - Rotate the key: create a new JSON key for the service account, update the secret, delete the old key in Google Cloud.
 - Release notes carry the short commit id and the first line of the commit message.

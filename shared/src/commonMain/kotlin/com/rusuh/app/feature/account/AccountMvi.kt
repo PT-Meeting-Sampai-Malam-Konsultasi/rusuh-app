@@ -1,6 +1,7 @@
 package com.rusuh.app.feature.account
 
 import androidx.compose.runtime.Immutable
+import com.rusuh.app.analytics.AnalyticsConsent
 import com.rusuh.app.domain.model.AccountSummary
 import com.rusuh.app.domain.session.SessionPhase
 import com.rusuh.app.mvi.MviEffect
@@ -29,6 +30,7 @@ data class AccountState(
     val profile: ProfileLoad = ProfileLoad.Idle,
     val sessionExpiredNotice: Boolean = false,
     val isSigningOut: Boolean = false,
+    val analyticsConsent: AnalyticsConsent = AnalyticsConsent.Unknown,
 ) : MviState
 
 sealed interface AccountIntent : MviIntent {
@@ -41,6 +43,8 @@ sealed interface AccountIntent : MviIntent {
     data object SignOut : AccountIntent
 
     data class NameStepVisibilityChanged(val held: Boolean) : AccountIntent
+
+    data class SetAnalyticsConsent(val enabled: Boolean) : AccountIntent
 }
 
 /** No one-time effects yet: sign-out is shown by the session phase changing. */
@@ -53,40 +57,54 @@ sealed interface AccountBody {
     data object Restoring : AccountBody
 
     /** The compact login; [sessionExpired] adds the "session ended" line. */
-    data class SignedOut(val sessionExpired: Boolean) : AccountBody
+    data class SignedOut(
+        val sessionExpired: Boolean,
+        val analyticsEnabled: Boolean,
+    ) : AccountBody
 
-    data object ProfileLoading : AccountBody
+    data class ProfileLoading(val analyticsEnabled: Boolean) : AccountBody
 
     data class Profile(val profile: AccountProfileUi) : AccountBody
 
-    data object ProfileError : AccountBody
+    data class ProfileError(val analyticsEnabled: Boolean) : AccountBody
 }
 
 /**
  * Maps the state to the body. [signInHoldsAccountPage] is true while the new-account step is open (signed in, but
  * the name step comes first), so the login stays on screen instead of flashing the profile.
  */
-fun AccountState.toBody(signInHoldsAccountPage: Boolean = false): AccountBody =
-    when (phase) {
+fun AccountState.toBody(signInHoldsAccountPage: Boolean = false): AccountBody {
+    val analyticsEnabled = analyticsConsent == AnalyticsConsent.Granted
+    return when (phase) {
         SessionPhase.Restoring -> AccountBody.Restoring
-        SessionPhase.SignedOut -> AccountBody.SignedOut(sessionExpired = sessionExpiredNotice)
+        SessionPhase.SignedOut ->
+            AccountBody.SignedOut(
+                sessionExpired = sessionExpiredNotice,
+                analyticsEnabled = analyticsEnabled,
+            )
         SessionPhase.SignedIn ->
             when {
-                signInHoldsAccountPage -> AccountBody.SignedOut(sessionExpired = false)
+                signInHoldsAccountPage ->
+                    AccountBody.SignedOut(
+                        sessionExpired = false,
+                        analyticsEnabled = analyticsEnabled,
+                    )
                 else ->
                     when (profile) {
-                        ProfileLoad.Idle, ProfileLoad.Loading -> AccountBody.ProfileLoading
-                        is ProfileLoad.Loaded -> AccountBody.Profile(profile.profile.toUi())
-                        ProfileLoad.Failed -> AccountBody.ProfileError
+                        ProfileLoad.Idle, ProfileLoad.Loading -> AccountBody.ProfileLoading(analyticsEnabled)
+                        is ProfileLoad.Loaded ->
+                            AccountBody.Profile(profile.profile.toUi(analyticsEnabled))
+                        ProfileLoad.Failed -> AccountBody.ProfileError(analyticsEnabled)
                     }
             }
     }
+}
 
 /** The page model: the server name, else the device-only one, else the part of the email before the "@". */
-fun AccountSummary.toUi(): AccountProfileUi =
+fun AccountSummary.toUi(analyticsEnabled: Boolean = false): AccountProfileUi =
     AccountProfileUi(
         name = name?.takeIf { it.isNotBlank() } ?: email.substringBefore('@'),
         email = email,
-        // Every account signs in with a code sent to its email, so a signed-in email is verified.
         emailVerified = true,
+        analyticsEnabled = analyticsEnabled,
     )

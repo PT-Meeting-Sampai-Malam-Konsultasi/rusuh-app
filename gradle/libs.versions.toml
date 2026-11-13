@@ -18,6 +18,8 @@ composeUiTest = "1.7.0"
 junit4 = "4.13.2"
 androidxTestRunner = "1.6.2"
 kotlinx-datetime = "0.6.1"
+firebase-bom = "33.5.1"
+google-services = "4.4.2"
 
 android-minSdk = "24"
 android-targetSdk = "34"
@@ -53,6 +55,8 @@ androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "a
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "androidx-browser" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -65,3 +69,4 @@ androidLibrary = { id = "com.android.library", version.ref = "agp" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint-plugin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+googleServices = { id = "com.google.gms.google-services", version.ref = "google-services" }

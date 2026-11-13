@@ -18,3 +18,6 @@ xcuserdata/
 fastlane/report.xml
 fastlane/README.md
 *.xcarchive
+
+# Firebase config (not committed; download from Firebase console or CI injects from a secret)
+androidApp/google-services.json

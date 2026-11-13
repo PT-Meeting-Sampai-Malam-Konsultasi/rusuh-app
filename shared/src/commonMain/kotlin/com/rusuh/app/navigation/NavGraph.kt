@@ -27,6 +27,11 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.rusuh.app.analytics.Analytics
+import com.rusuh.app.analytics.AnalyticsConsent
+import com.rusuh.app.analytics.AnalyticsConsentStore
+import com.rusuh.app.analytics.AnalyticsEvents
+import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.network.session.SessionStateProvider
 import com.rusuh.app.feature.account.AccountRoute
 import com.rusuh.app.feature.account.AccountViewModel
@@ -38,6 +43,10 @@ import com.rusuh.app.feature.auth.SignInUiState
 import com.rusuh.app.feature.auth.SignInViewModel
 import com.rusuh.app.feature.auth.SignInViewModelHolder
 import com.rusuh.app.feature.auth.signInActions
+import com.rusuh.app.feature.consent.ConsentEffect
+import com.rusuh.app.feature.consent.ConsentIntent
+import com.rusuh.app.feature.consent.ConsentScreen
+import com.rusuh.app.feature.consent.ConsentViewModel
 import com.rusuh.app.feature.detail.DetailRoute
 import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.detail.DetailViewModelHolder
@@ -94,11 +103,53 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun RusuhNavGraph(navController: NavHostController) {
     val sessionState = koinInject<SessionStateProvider>()
+    val consentStore = koinInject<AnalyticsConsentStore>()
+    val analytics = koinInject<Analytics>()
+    val localeProvider = koinInject<LocaleProvider>()
+    val consent by consentStore.consent.collectAsState()
+    val consentLoaded by consentStore.loaded.collectAsState()
+
+    LaunchedEffect(consentStore) { consentStore.load() }
+    LaunchedEffect(consentLoaded, consent) {
+        if (consentLoaded) {
+            val granted = consent == AnalyticsConsent.Granted
+            analytics.setCollectionEnabled(granted)
+            if (granted) analytics.setUserProperty(AnalyticsEvents.APP_LANGUAGE, localeProvider.language().tag)
+        }
+    }
+
+    if (!consentLoaded) {
+        SplashPlaceholder()
+        return
+    }
+
+    val startDestination = if (consent == AnalyticsConsent.Unknown) Screen.Consent.route else Screen.Home.route
+
     NavHost(
         navController = navController,
-        startDestination = Screen.Home.route,
+        startDestination = startDestination,
     ) {
         composable(Screen.Splash.route) { SplashPlaceholder() }
+
+        composable(Screen.Consent.route) {
+            val koin = getKoin()
+            val viewModel = remember { koin.get<ConsentViewModel>() }
+            LaunchedEffect(viewModel) {
+                viewModel.effect.collect { effect ->
+                    when (effect) {
+                        ConsentEffect.Done -> {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Consent.route) { inclusive = true }
+                            }
+                        }
+                    }
+                }
+            }
+            ConsentScreen(
+                onAccept = { viewModel.dispatch(ConsentIntent.Accept) },
+                onDecline = { viewModel.dispatch(ConsentIntent.Decline) },
+            )
+        }
 
         topLevelTabs(navController, sessionState)
 

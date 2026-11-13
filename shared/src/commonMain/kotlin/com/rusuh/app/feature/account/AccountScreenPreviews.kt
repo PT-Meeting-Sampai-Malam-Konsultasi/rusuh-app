@@ -25,7 +25,12 @@ private fun CompactPreview(
         val density = LocalDensity.current
         CompositionLocalProvider(
             LocalDensity provides Density(density.density, fontScale ?: density.fontScale),
-        ) { AccountScreen(body = AccountBody.SignedOut(sessionExpired = false), signInState = state) }
+        ) {
+            AccountScreen(
+                body = AccountBody.SignedOut(sessionExpired = false, analyticsEnabled = false),
+                signInState = state,
+            )
+        }
     }
 }
 
@@ -56,7 +61,12 @@ internal fun AccountSignedInPreview() {
         AccountScreen(
             body =
                 AccountBody.Profile(
-                    AccountProfileUi(name = "Sari Wulandari", email = SAMPLE_EMAIL, emailVerified = true),
+                    AccountProfileUi(
+                        name = "Sari Wulandari",
+                        email = SAMPLE_EMAIL,
+                        emailVerified = true,
+                        analyticsEnabled = false,
+                    ),
                 ),
             signInState = SignInUiState.Email(),
         )
@@ -67,7 +77,7 @@ internal fun AccountSignedInPreview() {
 internal fun AccountSessionExpiredPreview() {
     RusuhTheme {
         AccountScreen(
-            body = AccountBody.SignedOut(sessionExpired = true),
+            body = AccountBody.SignedOut(sessionExpired = true, analyticsEnabled = false),
             signInState = SignInUiState.Email(),
         )
     }
@@ -75,12 +85,22 @@ internal fun AccountSessionExpiredPreview() {
 
 @Composable
 internal fun AccountProfileLoadingPreview() {
-    RusuhTheme { AccountScreen(body = AccountBody.ProfileLoading, signInState = SignInUiState.Email()) }
+    RusuhTheme {
+        AccountScreen(
+            body = AccountBody.ProfileLoading(analyticsEnabled = false),
+            signInState = SignInUiState.Email(),
+        )
+    }
 }
 
 @Composable
 internal fun AccountProfileErrorPreview() {
-    RusuhTheme { AccountScreen(body = AccountBody.ProfileError, signInState = SignInUiState.Email()) }
+    RusuhTheme {
+        AccountScreen(
+            body = AccountBody.ProfileError(analyticsEnabled = false),
+            signInState = SignInUiState.Email(),
+        )
+    }
 }
 
 // 2x font scale (accessibility): the longest steps, to check nothing clips or overlaps.
