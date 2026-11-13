@@ -45,6 +45,10 @@ import rusuh_app.shared.generated.resources.action_back
 import rusuh_app.shared.generated.resources.action_retry
 import rusuh_app.shared.generated.resources.payment_admin_fee
 import rusuh_app.shared.generated.resources.payment_busy_error
+import rusuh_app.shared.generated.resources.payment_cancel_failed
+import rusuh_app.shared.generated.resources.payment_cancel_not_cancellable
+import rusuh_app.shared.generated.resources.payment_cancel_order
+import rusuh_app.shared.generated.resources.payment_cancelling
 import rusuh_app.shared.generated.resources.payment_continue_button
 import rusuh_app.shared.generated.resources.payment_error_load
 import rusuh_app.shared.generated.resources.payment_expired_badge
@@ -84,6 +88,7 @@ fun PaymentScreen(
     onGoToTickets: () -> Unit,
     onQueueAgain: () -> Unit,
     onGoHome: () -> Unit,
+    onCancelBooking: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -105,8 +110,11 @@ fun PaymentScreen(
                 PaymentReadyContent(
                     ui = ui,
                     isLaunching = state.isSnapLaunching,
+                    isCancelling = state.isCancelling,
+                    cancelError = state.cancelError,
                     onOpenSnap = onOpenSnap,
                     onRetrySnap = onRetrySnap,
+                    onCancelBooking = onCancelBooking,
                 )
             is PaymentUiState.Verifying -> PaymentVerifyingContent()
             is PaymentUiState.Success -> PaymentSuccessContent(onGoToTickets = onGoToTickets)
@@ -204,11 +212,15 @@ private fun PaymentLoadingContent() {
 }
 
 @Composable
+@Suppress("LongParameterList")
 private fun PaymentReadyContent(
     ui: PaymentUiState.Ready,
     isLaunching: Boolean,
+    isCancelling: Boolean,
+    cancelError: CancelError?,
     onOpenSnap: () -> Unit,
     onRetrySnap: () -> Unit,
+    onCancelBooking: () -> Unit,
 ) {
     Column(
         modifier =
@@ -266,6 +278,21 @@ private fun PaymentReadyContent(
         // Order summary
         OrderSummaryCard(summary = ui.summary)
 
+        if (cancelError != null) {
+            Text(
+                text =
+                    stringResource(
+                        if (cancelError == CancelError.NOT_CANCELLABLE) {
+                            Res.string.payment_cancel_not_cancellable
+                        } else {
+                            Res.string.payment_cancel_failed
+                        },
+                    ),
+                color = RusuhColors.BrandDanger,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         // CTA button
@@ -282,6 +309,16 @@ private fun PaymentReadyContent(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        Text(
+            text = stringResource(if (isCancelling) Res.string.payment_cancelling else Res.string.payment_cancel_order),
+            color = RusuhColors.BrandDanger,
+            modifier =
+                Modifier.align(Alignment.CenterHorizontally).clickable(
+                    enabled = !isCancelling && !isLaunching,
+                    role = Role.Button,
+                    onClick = onCancelBooking,
+                ).padding(16.dp),
+        )
     }
 }
 

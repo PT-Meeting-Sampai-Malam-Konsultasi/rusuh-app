@@ -434,6 +434,10 @@
     <string name="payment_total">Total</string>
     <string name="payment_midtrans_hint">Pembayaran diproses oleh Midtrans. Rusuh tidak menyimpan data kartu Anda. Dengan membayar, Anda menyetujui Syarat &amp; Ketentuan dan Kebijakan Refund.</string>
     <string name="payment_continue_button">Lanjutkan pembayaran →</string>
+    <string name="payment_cancel_order">Batalkan pesanan</string>
+    <string name="payment_cancel_not_cancellable">Pesanan ini tidak bisa dibatalkan lagi.</string>
+    <string name="payment_cancel_failed">Pesanan tidak dapat dibatalkan. Coba lagi.</string>
+    <string name="payment_cancelling">Membatalkan...</string>
     <string name="payment_not_paid_badge">BELUM DIBAYAR</string>
     <string name="payment_snap_closed_headline">Jendela pembayaran ditutup.</string>
     <string name="payment_snap_closed_body">Tiket Anda masih ditahan sampai waktu habis. Buka lagi untuk memilih metode — pembayaran yang sudah dimulai (mis. nomor VA) tetap berlaku.</string>

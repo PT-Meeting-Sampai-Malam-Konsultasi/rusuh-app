@@ -438,6 +438,10 @@
     <string name="payment_total">Total</string>
     <string name="payment_midtrans_hint">Payment is processed by Midtrans. Rusuh does not store your card data. By paying, you agree to the Terms &amp; Conditions and Refund Policy.</string>
     <string name="payment_continue_button">Continue to payment →</string>
+    <string name="payment_cancel_order">Cancel order</string>
+    <string name="payment_cancel_not_cancellable">This booking can no longer be cancelled.</string>
+    <string name="payment_cancel_failed">Could not cancel this booking. Try again.</string>
+    <string name="payment_cancelling">Cancelling...</string>
     <string name="payment_not_paid_badge">NOT PAID</string>
     <string name="payment_snap_closed_headline">Payment window closed.</string>
     <string name="payment_snap_closed_body">Your tickets are still held until the timer runs out. Open again to choose a method — a payment already started (e.g., a VA number) is still valid.</string>

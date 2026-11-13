@@ -239,10 +239,14 @@ class BookingApiServiceTest {
     fun cancelBookingDoesNotRequireAdmissionToken() =
         runTest {
             var sentAdmissionToken: String? = null
+            var path = ""
+            var method = ""
             val tokens = InMemoryTokenStore()
             val api =
                 apiClient { request ->
                     sentAdmissionToken = request.headers[ADMISSION_TOKEN_HEADER]
+                    path = request.url.encodedPath
+                    method = request.method.value
                     respond(bookingJson(), HttpStatusCode.OK, jsonHeaders)
                 }
             val service = BookingApiService(api, tokens)
@@ -251,6 +255,29 @@ class BookingApiServiceTest {
 
             assertIs<ApiResult.Success<*>>(result)
             assertNull(sentAdmissionToken)
+            assertEquals("/v1/core/bookings/bk_1/cancel", path)
+            assertEquals("POST", method)
+        }
+
+    @Test
+    fun cancelBookingPreservesNotCancellableProblem() =
+        runTest {
+            val api =
+                apiClient {
+                    respond(
+                        """{"type":"https://api.rusuh.id/problems/not-cancellable",""" +
+                            """"title":"Not cancellable","status":409,"code":"NOT_CANCELLABLE"}""",
+                        HttpStatusCode.Conflict,
+                        headersOf(HttpHeaders.ContentType, "application/problem+json"),
+                    )
+                }
+            val service = BookingApiService(api, InMemoryTokenStore())
+
+            val result = service.cancelBooking("bk_1")
+
+            val error = assertIs<ApiResult.Error>(result)
+            assertEquals(409, error.code)
+            assertEquals(ErrorCode.NOT_CANCELLABLE, error.problem?.code)
         }
 
     @Test
