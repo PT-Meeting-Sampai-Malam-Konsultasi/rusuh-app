@@ -1,24 +1,28 @@
 package com.rusuh.app.di
 
 /**
- * Called from Swift (iOSApp.init) as `KoinIosKt.doInitKoin(isDebug:backendModeName:useMockServer:)`.
- * [isDebug] is the Swift `DEBUG` build flag; [backendModeName] an optional debug-only override (`"Stub"` or
- * `"Real"`, null or blank = default). [useMockServer] points a debug build at the local Mockoon server instead of
- * the live host; it defaults to false, so iOS talks to the real API. A release build always uses the real host
- * and ignores both, see `NetworkConfig.startup`.
+ * Called from Swift (iOSApp.init) as `KoinIosKt.doInitKoin(...)`.
  *
- * iOS flavor/scheme work is a follow-up; for now iOS behaves like the staging flavor (allowDebugOptions = true).
+ * [isDebug] is the Swift `DEBUG` build flag.
+ * [environmentName] comes from the `RusuhEnvironment` Info.plist key ("Staging" or "Production").
+ * [allowDebugOptions] comes from the `RusuhAllowDebugOptions` Info.plist key (YES for Staging, NO for Production).
+ * [backendModeName] is an optional debug-only override (`"Stub"` or `"Real"`, null or blank = default).
+ * [useMockServer] points a debug build at the local Mockoon server instead of the live host.
+ *
+ * Production builds (allowDebugOptions = false) ignore [backendModeName] and [useMockServer].
+ * Release builds always use the production API.
  */
 fun doInitKoin(
     isDebug: Boolean,
+    environmentName: String,
+    allowDebugOptions: Boolean,
     backendModeName: String?,
     useMockServer: Boolean,
 ) {
-    // iOS has no flavors yet, so allowDebugOptions = true (like staging) and environmentName = "" (ignored).
     initKoinForBuild(
         isDebug = isDebug,
-        allowDebugOptions = true,
-        environmentName = "",
+        allowDebugOptions = allowDebugOptions,
+        environmentName = environmentName,
         backendModeName = backendModeName,
         mockApiOverride = useMockServer,
     )
