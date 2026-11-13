@@ -119,7 +119,7 @@ The **staging** flavor in a **debug** build can switch between mock/stub/live:
 | Option | Command | Environment + mode |
 |--------|---------|-------------------|
 | Mock (Mockoon) | `./gradlew :androidApp:assembleStagingDebug -PmockApi=true` | `Mock` + `Real` |
-| Live staging | `./gradlew :androidApp:assembleStagingDebug -PmockApi=false` | `Staging` + `Real` |
+| Live staging (default) | `./gradlew :androidApp:assembleStagingDebug` (or `-PmockApi=false`) | `Staging` + `Real` |
 | Stub (offline) | `./gradlew :androidApp:assembleStagingDebug -PbackendMode=Stub` | uses `Stub` mode |
 
 The **production** flavor is **always** `Production` + `Real`, even in debug builds. The `-PmockApi` and `-PbackendMode`
@@ -202,8 +202,8 @@ whether repositories talk to them. Three debug ways to run the app:
 | Mode | Environment + mode | Network | Repositories | Needs |
 |---|---|---|---|---|
 | Stub (offline demo) | `Stub` (`-PbackendMode=Stub`; iOS scheme `BACKEND_MODE=Stub`) | None; in-process `StubEngine` | Stub repositories | Nothing |
-| Mock (debug) | `Mock` + `Real` (`-PmockApi=true`; empty uses `MOCK_API`) | HTTP to Mockoon at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth, Detail, Tickets | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
-| Live staging (debug) | `Staging` + `Real` (`-PmockApi=false`) | HTTP to `https://api.rusuh-tiket.web.id/v1` | Same repositories as Mock | The staging backend |
+| Mock (debug) | `Mock` + `Real` (`-PmockApi=true`; `MOCK_API` is `false` by default) | HTTP to Mockoon at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth, Detail, Tickets | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
+| Live staging (debug) | `Staging` + `Real` (the default; `-PmockApi=false` is the same) | HTTP to `https://api.rusuh-tiket.web.id/v1` | Same repositories as Mock | The staging backend |
 
 Release builds always use `Production` + `Real` over HTTPS.
 
