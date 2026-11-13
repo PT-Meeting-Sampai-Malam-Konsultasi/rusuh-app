@@ -32,6 +32,16 @@ dependencies {
 
 kover {
     reports {
+        // Coverage is measured only for the code unit tests belong to: ViewModels, use cases, repositories and API
+        // services. Views, navigation, DI, DTOs/mappers/models, stubs, platform code and generated code are out.
+        filters {
+            includes {
+                classes("*ViewModel*", "*UseCase*", "*Repository*", "*ApiService*")
+            }
+            excludes {
+                classes("*Stub*", "*Fake*", "*\$\$serializer", "*ComposableSingletons*")
+            }
+        }
         total {
             xml {
                 onCheck = false
