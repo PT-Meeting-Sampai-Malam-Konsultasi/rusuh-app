@@ -529,6 +529,48 @@ class WaitingRoomViewModelTest {
             assertTrue(phase.showsGuestBanner(), "Banner should show when held for sign-in")
         }
 
+    @Test
+    fun guestBannerIsProminentWhenHeldAtTurn() {
+        // Held at turn state (YourTurn with heldForSignIn = true) should show prominent banner.
+        val heldPhase = WaitingRoomPhase.YourTurn(myNumber = 19_700, secondsLeft = 52, heldForSignIn = true)
+        assertTrue(heldPhase.isNearTurn(), "Held at turn should be prominent (pink banner)")
+        assertTrue(heldPhase.showsGuestBanner(), "Banner should show when held for sign-in")
+
+        // Signed-in user at turn (not held) should not show prominent banner.
+        val signedInPhase = WaitingRoomPhase.YourTurn(myNumber = 19_700, secondsLeft = 52, heldForSignIn = false)
+        assertTrue(!signedInPhase.isNearTurn(), "Signed-in at turn should not be 'near turn'")
+        assertTrue(!signedInPhase.showsGuestBanner(), "Banner should not show for signed-in user")
+    }
+
+    /**
+     * Sign-in completing at the exact expiry tick: the rule is "sign-in just in time wins".
+     * If the session emits signed-in before/during the same tick where expiry would fire,
+     * the user should navigate to Detail rather than seeing MissedTurn.
+     */
+    @Test
+    fun signInAtExactExpiryNavigatesToDetail() =
+        runTest(dispatcher) {
+            val session = FakeSessionStateProvider(signedIn = false)
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), session)
+            vm.dispatch(WaitingRoomIntent.Start)
+            runCurrent()
+
+            // Guest is held at turn with 60 seconds.
+            val phase = assertIs<WaitingRoomPhase.YourTurn>(vm.phase())
+            assertTrue(phase.heldForSignIn)
+            assertEquals(60, phase.secondsLeft)
+
+            // Advance clock to exactly expiry (61_000ms elapsed relative to serverNow=1_000L).
+            now = 60_000L
+
+            // Sign in BEFORE the tick processes (sign-in just in time wins).
+            session.setSignedIn(true)
+            runCurrent()
+
+            // User signed in just in time -> should navigate to Detail, not miss.
+            assertEquals(WaitingRoomEffect.NavigateToDetail("evt"), vm.effect.first())
+        }
+
     private companion object {
         const val STEP = 1_000L
         const val SCRIPT_STEPS = 10

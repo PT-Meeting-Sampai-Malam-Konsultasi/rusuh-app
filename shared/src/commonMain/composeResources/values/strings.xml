@@ -104,7 +104,7 @@
     <string name="waiting_note_nowait_body">If tickets sell out, the queue closes at once and we tell you.</string>
     <string name="waiting_note_app">In the app, we notify you when your turn is close.</string>
     <string name="waiting_leave">Leave the queue</string>
-    <string name="waiting_guest_banner">Sign in to keep your place in line.</string>
+    <string name="waiting_guest_banner">Sign in to keep your place in line</string>
     <string name="waiting_guest_sign_in">Sign in</string>
     <string name="queue_position_eta_minutes">about %1$d min left</string>
     <string name="queue_position_updated">Updated %1$d s ago</string>

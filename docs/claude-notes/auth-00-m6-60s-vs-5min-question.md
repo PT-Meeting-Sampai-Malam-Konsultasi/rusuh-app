@@ -29,7 +29,36 @@ When a guest's turn arrives:
    (which has its own 5-minute window from `AdmissionInfo.expiresAt`).
 4. If the 60 seconds expire while held, the turn is marked as Missed.
 
-## Open Question
+## Race Condition: Sign-in vs Expiry
+
+**Intended rule: Sign-in just in time wins.**
+
+If the user's sign-in completes at the exact same tick where the countdown would expire:
+- The session state update (signed-in) is processed first.
+- The user navigates to Detail, NOT to MissedTurn.
+
+This is implemented in the ViewModel's session observer: when `isSignedIn` transitions to `true`
+while the user is held at `YourTurn`, the navigation to Detail fires immediately (before any
+subsequent tick could transition to MissedTurn).
+
+Test coverage: `signInAtExactExpiryNavigatesToDetail` in `WaitingRoomViewModelTest`.
+
+## Verified Behaviour
+
+The countdown shown to a held guest uses the **60-second turn window** (`turnExpiresAtEpochMillis`)
+from the queue place snapshot, NOT the 5-minute admission window (`AdmissionInfo.expiresAt`).
+This is correct because:
+
+1. The 60-second window is what the screen text promises ("60 seconds to enter").
+2. The admission's 5-minute window is the Detail screen's concern.
+3. A guest who signs in quickly preserves most of the 5-minute order window.
+4. Consistency: signed-in users also see the same 60-second countdown before auto-advancing.
+
+The `WaitingRoomViewModel.tick()` method checks `phase.secondsLeft <= 0` against elapsed time from
+the monotonic clock anchored at `receivedAtMillis`. The expiry decision uses server time, never
+device time.
+
+## Open Question (UX, deferred)
 
 **Is the 60-second "turn window" the right UX for a guest who needs to sign in first?**
 

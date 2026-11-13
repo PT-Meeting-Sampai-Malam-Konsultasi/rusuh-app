@@ -138,4 +138,13 @@ fun WaitingRoomPhase.showsGuestBanner(): Boolean =
 
 private const val NEAR_TURN_POSITION = 10
 
-fun WaitingRoomPhase.isNearTurn(): Boolean = this is WaitingRoomPhase.Waiting && queue.position <= NEAR_TURN_POSITION
+/**
+ * Whether the guest banner should be prominent (pink background).
+ * True when the customer is near their turn (position ≤ 10) or held at their turn for sign-in.
+ */
+fun WaitingRoomPhase.isNearTurn(): Boolean =
+    when (this) {
+        is WaitingRoomPhase.Waiting -> queue.position <= NEAR_TURN_POSITION
+        is WaitingRoomPhase.YourTurn -> heldForSignIn
+        else -> false
+    }
