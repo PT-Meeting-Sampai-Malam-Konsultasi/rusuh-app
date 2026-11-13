@@ -6,10 +6,12 @@ import com.rusuh.app.data.platform.AttestationProvider
 import com.rusuh.app.data.platform.DevAttestationProvider
 import com.rusuh.app.data.platform.platformName
 import com.rusuh.app.data.remote.AuthApiService
+import com.rusuh.app.data.remote.BookingApiService
 import com.rusuh.app.data.remote.DeviceApiService
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
 import com.rusuh.app.data.repository.RealAuthRepository
+import com.rusuh.app.data.repository.RealDetailRepository
 import com.rusuh.app.data.repository.RealDeviceRepository
 import com.rusuh.app.data.repository.RealHomeRepository
 import com.rusuh.app.data.repository.RealMyQueuesRepository
@@ -43,9 +45,9 @@ import org.koin.dsl.onClose
 /**
  * shortcut: TEMPORARY. While a repository has no real (network) implementation, [BackendMode.Real] resolves its
  * stub and logs a WARNING instead of crashing, so Staging and Release builds start. Home, the Waiting Room, My
- * Queues, the device identity and auth are real now; what is left is Tickets (TICKET-00-M4) and Detail (FR-15/16/17-M1
- * #80 #81 #82). Remove this constant, the fallback and its tests when those land. Set it to false (or pass
- * `allowStubFallback = false`) for the strict behaviour: [RealRepositoryNotAvailableException].
+ * Queues, the device identity, auth, and Detail are real now; what is left is Tickets (TICKET-00-M4). Remove this
+ * constant, the fallback and its tests when those land. Set it to false (or pass `allowStubFallback = false`) for
+ * the strict behaviour: [RealRepositoryNotAvailableException].
  */
 const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
 
@@ -55,7 +57,7 @@ const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
  * list is the signal, kept in sync with the `notYetReal(...)` bindings by `DataModuleTest` and quoted in
  * docs/data-layer.md. Shrink it as the real repositories land; remove the fallback when it is empty.
  */
-val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("TicketsRepository", "DetailRepository")
+val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("TicketsRepository")
 
 /**
  * Binds every repository interface to its stub or its real implementation, per [mode]; every environment defaults to
@@ -65,8 +67,8 @@ val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("TicketsRepository", "Det
  *   in-process [StubEngine], so ApiServices built on the injected `ApiClient`s run with zero network. The
  *   [ServerClock] is the demo's ticking [StubClock], so countdowns run. The client is closed with Koin.
  * - [BackendMode.Real]: the [ServerClock] is the one from `coreModule`, synced from `serverNow` in responses.
- *   Home, Waiting Room, My Queues, Queue, Device and Auth are the network implementations. A repository without one yet
- *   (Detail, Tickets) resolves to its stub with [allowStubFallback] and logs a WARNING through [warn] once
+ *   Home, Waiting Room, My Queues, Queue, Device, Auth, and Detail are the network implementations. A repository
+ *   without one yet (Tickets) resolves to its stub with [allowStubFallback] and logs a WARNING through [warn] once
  *   (singletons); without it, resolving throws [RealRepositoryNotAvailableException]. When a feature ticket builds
  *   a real repository, bind it in place of the `notYetReal(...)` line of that repository below.
  *
@@ -96,6 +98,8 @@ fun dataModule(
         single { QueueApiService(get(ApiClientQualifier.Queue)) }
         // Auth is served by the core (api) host, like the refresh call of the session layer.
         single { AuthApiService(get(ApiClientQualifier.Api)) }
+        // Booking API (categories, attendee validation, booking create/get/cancel).
+        single { BookingApiService(get(ApiClientQualifier.Api)) }
         // Auth state layer (both modes): the sign-out counter and the read-only session view the screens use.
         single { AuthGeneration() }
         single<SessionObserver> { SessionManagerObserver(get(), get()) }
@@ -145,7 +149,7 @@ fun dataModule(
                     )
                 }
                 single<TicketsRepository> { notYetReal("TicketsRepository") { StubTicketsRepository() } }
-                single<DetailRepository> { notYetReal("DetailRepository") { StubDetailRepository(get()) } }
+                single<DetailRepository> { RealDetailRepository(get()) }
             }
         }
     }

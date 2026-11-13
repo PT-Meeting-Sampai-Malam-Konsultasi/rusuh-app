@@ -2,9 +2,12 @@ package com.rusuh.app.data.repository
 
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.AccountProfile
+import com.rusuh.app.domain.model.AttendeeValidation
 import com.rusuh.app.domain.model.Booking
 import com.rusuh.app.domain.model.BookingRequest
+import com.rusuh.app.domain.model.BookingResult
 import com.rusuh.app.domain.model.DetailOffering
+import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.EventDetail
 import com.rusuh.app.domain.model.SeatCategory
 import com.rusuh.app.domain.repository.DetailRepository
@@ -61,6 +64,7 @@ class StubDetailRepository(
     // The window is fixed on first load per event and never re-derived on reload, as the server
     // will own it. TODO(FR-17-M1 #82): server-provided expiresAt, kept across process death.
     private val windows = mutableMapOf<String, Long>()
+    private var validationCounter = 0
 
     override suspend fun getDetail(eventId: String): DetailOffering {
         // An expired window is dropped so re-entering after "Antre lagi" starts a fresh one.
@@ -70,7 +74,33 @@ class StubDetailRepository(
         return StubDetailData.offering(expiresAtMillis = expiresAt)
     }
 
+    override suspend fun validateAttendee(
+        eventId: String,
+        fieldIndex: Int,
+        fullName: String,
+        nik: String,
+    ): AttendeeValidation {
+        // Stub: always return valid with a fake token.
+        validationCounter++
+        return AttendeeValidation.Valid("stub_token_$validationCounter")
+    }
+
+    @Deprecated("Use validateAttendee instead", ReplaceWith("validateAttendee(...)"))
     override suspend fun isNikAccepted(nik: String): Boolean = true
 
+    override suspend fun createBooking(
+        request: BookingRequest,
+        idempotencyKey: String,
+    ): BookingResult = BookingResult.Success(Booking(bookingId = "stub-booking-$idempotencyKey"))
+
+    override suspend fun getBooking(bookingId: String): DomainResult<Booking> =
+        DomainResult.Success(Booking(bookingId = bookingId))
+
+    override suspend fun cancelBooking(bookingId: String): DomainResult<Booking> =
+        DomainResult.Success(Booking(bookingId = bookingId))
+
+    override suspend fun getActiveBookings(): DomainResult<List<Booking>> = DomainResult.Success(emptyList())
+
+    @Deprecated("Use createBooking with idempotencyKey instead")
     override suspend fun createBooking(request: BookingRequest): Booking = Booking(bookingId = "stub-booking")
 }
