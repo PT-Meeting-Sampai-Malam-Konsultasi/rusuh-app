@@ -1,7 +1,7 @@
 # Firebase App Distribution (Android demo builds)
 
-The `distribute` job in `.github/workflows/android-build.yml` sends a debug APK to testers on every push to `main` and on
-manual dispatch (Actions > Android Build > Run workflow, input `backend`):
+The `distribute` job in `.github/workflows/android-build.yml` sends a **staging debug** APK to testers on every push to
+`main` and on manual dispatch (Actions > Android Build > Run workflow, input `backend`):
 
 - **live** (default for pushes): `-PmockApi=false`, the app talks to the staging API `https://api.rusuh-tiket.web.id/v1`.
   Home events and login work today; Detail, Tickets and the queue still use stub data until the backend is complete
@@ -9,8 +9,20 @@ manual dispatch (Actions > Android Build > Run workflow, input `backend`):
 - **stub**: `-PbackendMode=Stub`, an offline demo with the in-process stub backend (no network needed). The Mockoon
   address `10.0.2.2` only works on the emulator, so a mock build is not distributed.
 
+Both options use the **staging** flavor (launcher name "Rusuh Staging"), which allows these debug options. The
+**production** flavor ignores `-PmockApi` and `-PbackendMode` entirely and always connects to the production API.
+
 Every build gets `versionCode` = the workflow run number (`-PversionCode`), so testers can tell builds apart.
 iOS is not distributed: a device install needs a signed build and the paid Apple Developer Program.
+
+## Flavors
+
+| Flavor | Task | Launcher name | API |
+|--------|------|---------------|-----|
+| staging | `assembleStagingDebug` | Rusuh Staging | Staging (or Mock/Stub in debug) |
+| production | `assembleProductionDebug` | Rusuh | Production always |
+
+The `build` job builds both flavors (`assembleDebug`); the `distribute` job builds only the staging flavor.
 
 ## One-time setup
 1. Firebase project `rusuh-app` with the Android app `com.rusuh.app.android`; App Distribution enabled.

@@ -154,6 +154,13 @@
     <string name="detail_error_load">Detail tidak bisa dimuat. Coba lagi.</string>
     <string name="detail_error_booking">Belum bisa lanjut ke pembayaran. Coba lagi.</string>
     <string name="detail_error_nik_rejected">Salah satu NIK tidak bisa diverifikasi. Periksa NIK lalu coba lagi.</string>
+    <string name="detail_error_nik_seat_taken">NIK ini sudah memiliki tiket maksimum untuk acara ini.</string>
+    <string name="detail_error_duplicate_nik">Setiap tiket butuh NIK yang berbeda.</string>
+    <string name="detail_error_dukcapil_unavailable">Verifikasi NIK sedang tidak tersedia. Coba lagi.</string>
+    <string name="detail_error_admission_expired">Giliran Anda sudah habis. Antre lagi untuk mencoba lagi.</string>
+    <string name="detail_error_category_sold_out">Salah satu kategori yang dipilih sudah habis.</string>
+    <string name="detail_error_active_booking">Anda sudah punya pesanan aktif untuk acara ini.</string>
+    <string name="detail_error_service_unavailable">Layanan sedang tidak tersedia. Coba lagi.</string>
     <string name="detail_expired_description">Waktu habis. 5 menit sudah lewat. Pilihan Anda belum disimpan.</string>
     <string name="detail_expired_badge">Waktu habis</string>
     <string name="detail_expired_headline">5 menit sudah lewat.</string>

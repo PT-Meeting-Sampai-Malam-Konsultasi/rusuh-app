@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Rusuh Booking Tiket</string>
+    <!-- app_name is defined via resValue in build.gradle.kts per flavor: "Rusuh Staging" or "Rusuh". -->
 </resources>

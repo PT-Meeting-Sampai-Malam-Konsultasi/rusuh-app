@@ -5,7 +5,9 @@ import com.rusuh.app.domain.model.AccountProfile
 import com.rusuh.app.domain.model.AttendeeValidation
 import com.rusuh.app.domain.model.Booking
 import com.rusuh.app.domain.model.BookingRequest
+import com.rusuh.app.domain.model.BookingResult
 import com.rusuh.app.domain.model.DetailOffering
+import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.EventDetail
 import com.rusuh.app.domain.model.SeatCategory
 import com.rusuh.app.domain.model.validateAttendeeLocally
@@ -52,6 +54,7 @@ class DetailViewModelTest {
         override fun nowMillis(): Long = now
     }
 
+    @Suppress("TooManyFunctions")
     private class FakeRepository(
         private val offering: DetailOffering,
         private val loadError: Throwable? = null,
@@ -65,8 +68,37 @@ class DetailViewModelTest {
             return offering
         }
 
+        override suspend fun validateAttendee(
+            eventId: String,
+            fieldIndex: Int,
+            fullName: String,
+            nik: String,
+        ): AttendeeValidation =
+            if (nikAccepted) AttendeeValidation.Valid("tok-$fieldIndex") else AttendeeValidation.NikInvalid
+
+        @Suppress("DEPRECATION")
+        @Deprecated("Use validateAttendee instead", ReplaceWith("validateAttendee(...)"))
         override suspend fun isNikAccepted(nik: String): Boolean = nikAccepted
 
+        override suspend fun createBooking(
+            request: BookingRequest,
+            idempotencyKey: String,
+        ): BookingResult {
+            bookingError?.let { return BookingResult.ServerError(500, com.rusuh.app.domain.model.ErrorCode.UNKNOWN) }
+            bookings += request
+            return BookingResult.Success(Booking("b-1"))
+        }
+
+        override suspend fun getBooking(bookingId: String): DomainResult<Booking> =
+            DomainResult.Success(Booking(bookingId))
+
+        override suspend fun cancelBooking(bookingId: String): DomainResult<Booking> =
+            DomainResult.Success(Booking(bookingId))
+
+        override suspend fun getActiveBookings(): DomainResult<List<Booking>> = DomainResult.Success(emptyList())
+
+        @Suppress("DEPRECATION")
+        @Deprecated("Use createBooking with idempotencyKey instead")
         override suspend fun createBooking(request: BookingRequest): Booking {
             bookingError?.let { throw it }
             bookings += request
@@ -399,7 +431,8 @@ class DetailViewModelTest {
         assertEquals(AttendeeValidation.InvalidNik, validateAttendeeLocally("N", "123", emptyList()))
         assertEquals(AttendeeValidation.InvalidNik, validateAttendeeLocally("N", nikA.dropLast(1) + "x", emptyList()))
         assertEquals(AttendeeValidation.DuplicateNik(2), validateAttendeeLocally("N", nikA, listOf(nikB, nikA)))
-        assertEquals(AttendeeValidation.Valid, validateAttendeeLocally("N", nikA, listOf(nikB)))
+        // Valid returns a placeholder token ("") for local pass.
+        assertTrue(validateAttendeeLocally("N", nikA, listOf(nikB)) is AttendeeValidation.Valid)
     }
 
     // --- review round 1 ---
@@ -505,8 +538,33 @@ class DetailViewModelTest {
                         return offering()
                     }
 
+                    override suspend fun validateAttendee(
+                        eventId: String,
+                        fieldIndex: Int,
+                        fullName: String,
+                        nik: String,
+                    ): AttendeeValidation = AttendeeValidation.Valid("tok")
+
+                    @Suppress("DEPRECATION")
+                    @Deprecated("Use validateAttendee instead", ReplaceWith("validateAttendee(...)"))
                     override suspend fun isNikAccepted(nik: String) = true
 
+                    override suspend fun createBooking(
+                        request: BookingRequest,
+                        idempotencyKey: String,
+                    ): BookingResult = BookingResult.Success(Booking("b"))
+
+                    override suspend fun getBooking(bookingId: String): DomainResult<Booking> =
+                        DomainResult.Success(Booking(bookingId))
+
+                    override suspend fun cancelBooking(bookingId: String): DomainResult<Booking> =
+                        DomainResult.Success(Booking(bookingId))
+
+                    override suspend fun getActiveBookings(): DomainResult<List<Booking>> =
+                        DomainResult.Success(emptyList())
+
+                    @Suppress("DEPRECATION")
+                    @Deprecated("Use createBooking with idempotencyKey instead")
                     override suspend fun createBooking(request: BookingRequest) = Booking("b")
                 }
             val vm = newVm(repository, FakeClock())
@@ -551,9 +609,14 @@ class DetailViewModelTest {
             val base = FakeRepository(offering())
             val repository =
                 object : DetailRepository by base {
-                    override suspend fun isNikAccepted(nik: String): Boolean {
+                    override suspend fun validateAttendee(
+                        eventId: String,
+                        fieldIndex: Int,
+                        fullName: String,
+                        nik: String,
+                    ): AttendeeValidation {
                         delay(100) // a real network call keeps the first Proceed in flight
-                        return true
+                        return AttendeeValidation.Valid("tok")
                     }
                 }
             val vm = newVm(repository, FakeClock())
@@ -571,9 +634,14 @@ class DetailViewModelTest {
             val base = FakeRepository(offering())
             val repository =
                 object : DetailRepository by base {
-                    override suspend fun isNikAccepted(nik: String): Boolean {
+                    override suspend fun validateAttendee(
+                        eventId: String,
+                        fieldIndex: Int,
+                        fullName: String,
+                        nik: String,
+                    ): AttendeeValidation {
                         clock.now = 400_000L // the window closes while the NIK check is in flight
-                        return true
+                        return AttendeeValidation.Valid("tok")
                     }
                 }
             val vm = newVm(repository, clock)

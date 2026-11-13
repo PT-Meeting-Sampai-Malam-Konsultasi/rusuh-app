@@ -10,6 +10,7 @@ import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.remote.AuthApiService
 import com.rusuh.app.data.remote.dto.RequestOtpDto
 import com.rusuh.app.data.repository.RealAuthRepository
+import com.rusuh.app.data.repository.RealDetailRepository
 import com.rusuh.app.data.repository.RealDeviceRepository
 import com.rusuh.app.data.repository.RealHomeRepository
 import com.rusuh.app.data.repository.RealMyQueuesRepository
@@ -97,13 +98,13 @@ class DataModuleTest {
             "QueueRepository" to QueueRepository::class,
             "DeviceRepository" to DeviceRepository::class,
             "AuthRepository" to AuthRepository::class,
+            "DetailRepository" to DetailRepository::class,
         )
 
     /** Repositories that still fall back to their stub in [BackendMode.Real]. */
     private val stubOnlyRepositories: Map<String, KClass<*>> =
         mapOf(
             "TicketsRepository" to TicketsRepository::class,
-            "DetailRepository" to DetailRepository::class,
         )
 
     private val repositories: Map<String, KClass<*>> = realRepositories + stubOnlyRepositories
@@ -152,6 +153,7 @@ class DataModuleTest {
         assertIs<RealMyQueuesRepository>(koin.get<MyQueuesRepository>())
         assertIs<RealDeviceRepository>(koin.get<DeviceRepository>())
         assertIs<RealAuthRepository>(koin.get<AuthRepository>())
+        assertIs<RealDetailRepository>(koin.get<DetailRepository>())
         assertSame<Any>(koin.get<QueueRepository>(), koin.get<WaitingRoomRepository>(), "one queue behind both seams")
         assertTrue(warnings.isEmpty(), "no stub is used for these: $warnings")
     }
@@ -263,12 +265,12 @@ class DataModuleTest {
     fun strictRealModeKeepsFailingOnASecondResolution() {
         val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
 
-        assertFailsWith<Exception> { koin.get<DetailRepository>() }
-        assertFailsWith<Exception> { koin.get<DetailRepository>() }
+        assertFailsWith<Exception> { koin.get<TicketsRepository>() }
+        assertFailsWith<Exception> { koin.get<TicketsRepository>() }
     }
 
     @Test
-    fun realModeFallsBackToTheStubOnlyForDetailAndTicketsAndWarnsOncePerRepository() {
+    fun realModeFallsBackToTheStubOnlyForTicketsAndWarnsOncePerRepository() {
         val koin = koin(AppEnvironment.Staging, BackendMode.Real)
 
         repositories.values.forEach { type -> koin.get<Any>(type) }
