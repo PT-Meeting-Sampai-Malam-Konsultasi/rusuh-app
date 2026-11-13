@@ -18,6 +18,24 @@ class LanguageStringParityTest {
             }.toSet()
         }
 
-        assertEquals(keys("values/strings.xml"), keys("values-id/strings.xml"))
+        // Indonesian folder uses "in" (Java's ISO 639-1 code) not "id" (BCP 47) to match
+        // what Locale.getLanguage() returns at runtime on Android.
+        assertEquals(keys("values/strings.xml"), keys("values-in/strings.xml"))
+    }
+
+    @Test
+    fun homeEventTitleHasEnglishAndIndonesianValues() {
+        val root = File("src/commonMain/composeResources")
+
+        fun text(path: String): String {
+            val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(File(root, path))
+            val nodes = document.getElementsByTagName("string")
+            return (0 until nodes.length).map { nodes.item(it) }
+                .first { it.attributes.getNamedItem("name")?.nodeValue == "home_section_all_events" }
+                .textContent
+        }
+
+        assertEquals("Semua event", text("values-in/strings.xml"))
+        assertEquals("All events", text("values/strings.xml"))
     }
 }
