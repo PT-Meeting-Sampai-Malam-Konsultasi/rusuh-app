@@ -31,6 +31,7 @@ data class AccountState(
     val sessionExpiredNotice: Boolean = false,
     val isSigningOut: Boolean = false,
     val analyticsConsent: AnalyticsConsent = AnalyticsConsent.Unknown,
+    val allowDebugOptions: Boolean = false,
 ) : MviState
 
 sealed interface AccountIntent : MviIntent {
@@ -39,6 +40,10 @@ sealed interface AccountIntent : MviIntent {
 
     /** Load it again after a failure. */
     data object RetryProfile : AccountIntent
+
+    data object TestCrash : AccountIntent
+
+    data object TestNonFatal : AccountIntent
 
     data object SignOut : AccountIntent
 
@@ -60,6 +65,7 @@ sealed interface AccountBody {
     data class SignedOut(
         val sessionExpired: Boolean,
         val analyticsEnabled: Boolean,
+        val allowDebugOptions: Boolean = false,
     ) : AccountBody
 
     data class ProfileLoading(val analyticsEnabled: Boolean) : AccountBody
@@ -81,6 +87,7 @@ fun AccountState.toBody(signInHoldsAccountPage: Boolean = false): AccountBody {
             AccountBody.SignedOut(
                 sessionExpired = sessionExpiredNotice,
                 analyticsEnabled = analyticsEnabled,
+                allowDebugOptions = allowDebugOptions,
             )
         SessionPhase.SignedIn ->
             when {
@@ -88,6 +95,7 @@ fun AccountState.toBody(signInHoldsAccountPage: Boolean = false): AccountBody {
                     AccountBody.SignedOut(
                         sessionExpired = false,
                         analyticsEnabled = analyticsEnabled,
+                        allowDebugOptions = allowDebugOptions,
                     )
                 else ->
                     when (profile) {

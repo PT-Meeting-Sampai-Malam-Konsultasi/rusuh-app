@@ -1,3 +1,5 @@
+@file:Suppress("LongParameterList", "TooManyFunctions")
+
 package com.rusuh.app.feature.account
 
 import androidx.compose.foundation.background
@@ -48,6 +50,8 @@ import rusuh_app.shared.generated.resources.account_login_method_value
 import rusuh_app.shared.generated.resources.account_sign_in_section
 import rusuh_app.shared.generated.resources.account_sign_out
 import rusuh_app.shared.generated.resources.account_verified
+import rusuh_app.shared.generated.resources.debug_send_test_crash
+import rusuh_app.shared.generated.resources.debug_send_test_nonfatal
 
 /**
  * Signed-in Account profile body (design "Account · Profile", without NIK and without the
@@ -74,6 +78,10 @@ fun AccountProfileContent(
         SignInSection(profile, actions.onChangeEmail)
         Spacer(Modifier.height(RusuhSpacing.xxl))
         AnalyticsRow(profile.analyticsEnabled, actions.onToggleAnalytics)
+        if (actions.onTestCrash != null || actions.onTestNonFatal != null) {
+            Spacer(Modifier.height(RusuhSpacing.md))
+            DebugRows(actions.onTestCrash, actions.onTestNonFatal)
+        }
         Spacer(Modifier.height(RusuhSpacing.xxl))
         AccountButtons(actions)
     }
@@ -286,6 +294,41 @@ internal fun AnalyticsRow(
             color = RusuhColors.BrandInk,
         )
     }
+}
+
+@Composable
+internal fun DebugRows(
+    onTestCrash: (() -> Unit)?,
+    onTestNonFatal: (() -> Unit)?,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.sm),
+        modifier = Modifier.fillMaxWidth().padding(vertical = RusuhSpacing.sm),
+    ) {
+        if (onTestCrash != null) {
+            DebugActionRow(stringResource(Res.string.debug_send_test_crash), onTestCrash)
+        }
+        if (onTestNonFatal != null) {
+            DebugActionRow(stringResource(Res.string.debug_send_test_nonfatal), onTestNonFatal)
+        }
+    }
+}
+
+@Composable
+private fun DebugActionRow(
+    label: String,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = label,
+        style = RusuhBrandTextStyles.label.body(),
+        color = RusuhColors.BrandSubtle,
+        textDecoration = TextDecoration.Underline,
+        modifier =
+            Modifier
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(vertical = RusuhSpacing.sm),
+    )
 }
 
 // TODO(ACCOUNT-00 #104): SectionHeader/UnderlinedLink duplicate StepHeader/LinkText; share after the login PR.

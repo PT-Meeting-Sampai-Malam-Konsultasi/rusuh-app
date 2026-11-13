@@ -11,6 +11,7 @@ plugins {
 // Apply google-services plugin only when google-services.json exists, so CI builds without the file work.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 // Pin Kotlin's JVM target to 17 so it matches android.compileOptions (17)
@@ -121,6 +122,7 @@ dependencies {
     implementation(libs.koin.android)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)

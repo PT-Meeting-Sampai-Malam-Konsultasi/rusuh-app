@@ -463,4 +463,8 @@
     <string name="account_analytics_label">Analitik</string>
     <string name="account_analytics_enabled">Aktif</string>
     <string name="account_analytics_disabled">Nonaktif</string>
+
+    <!-- Debug options (staging only) -->
+    <string name="debug_send_test_crash">Send test crash</string>
+    <string name="debug_send_test_nonfatal">Send test non-fatal</string>
 </resources>

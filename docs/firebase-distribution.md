@@ -89,3 +89,9 @@ adb shell setprop debug.firebase.analytics.app .none.
 - The key file is written to the runner's temp dir with owner-only permissions and removed when the step ends.
 - Rotate the key: create a new JSON key for the service account, update the secret, delete the old key in Google Cloud.
 - Release notes carry the short commit id and the first line of the commit message.
+
+## Crashlytics
+
+Crash reports and non-fatal errors follow the same analytics consent: reports are collected only after consent is granted. Denial disables Crashlytics collection. The app records unexpected technical failures; ordinary validation and business errors are excluded. Crash messages are scrubbed for email addresses, 16-digit values, and JWT-like strings. User IDs, when available, are account IDs only.
+
+To verify in staging, grant analytics consent and tap the Account debug action **Send test crash**, then reopen the app. The report should appear in the Firebase Crashlytics dashboard within minutes. **Send test non-fatal** sends a non-fatal sample. Production does not expose these actions. The Crashlytics Gradle plugin uploads mapping files with the production minified release build; ensure CI has `androidApp/google-services.json` and runs the production release task.

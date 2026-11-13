@@ -22,6 +22,7 @@ data class AccountProfileUi(
  * (the `/me/email-change` flow is out of scope for this POC).
  * [onDeleteAccount] is optional: there is no backend endpoint yet, so with null (default) the
  * "Hapus akun" text looks the same but is not clickable and TalkBack reads it as disabled.
+ * [onTestCrash] and [onTestNonFatal] are visible only in staging when allowDebugOptions is true.
  */
 @Stable
 class AccountProfileActions(
@@ -29,4 +30,6 @@ class AccountProfileActions(
     val onChangeEmail: (() -> Unit)? = null,
     val onDeleteAccount: (() -> Unit)? = null,
     val onToggleAnalytics: ((Boolean) -> Unit)? = null,
+    val onTestCrash: (() -> Unit)? = null,
+    val onTestNonFatal: (() -> Unit)? = null,
 )
