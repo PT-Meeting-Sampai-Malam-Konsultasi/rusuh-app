@@ -69,7 +69,7 @@ private val BLOB_WIDTH = 190.dp
 @Composable
 fun SignInScreen(
     state: SignInUiState,
-    event: SignInEventContext,
+    event: SignInEventContext?,
     modifier: Modifier = Modifier,
     actions: SignInActions = SignInActions(),
     status: SignInStatus = SignInStatus(),
@@ -86,14 +86,16 @@ fun SignInScreen(
                     .navigationBarsPadding()
                     .padding(horizontal = RusuhSpacing.xl, vertical = RusuhSpacing.xl),
         ) {
-            Text(
-                text = stringResource(Res.string.sign_in_event_label).uppercase(),
-                style = RusuhBrandTextStyles.eyebrow.body(),
-                color = RusuhColors.BrandMuted,
-            )
-            Spacer(Modifier.height(RusuhSpacing.md))
-            SignInEventBanner(event)
-            Spacer(Modifier.height(RusuhSpacing.xxl))
+            if (event != null) {
+                Text(
+                    text = stringResource(Res.string.sign_in_event_label).uppercase(),
+                    style = RusuhBrandTextStyles.eyebrow.body(),
+                    color = RusuhColors.BrandMuted,
+                )
+                Spacer(Modifier.height(RusuhSpacing.md))
+                SignInEventBanner(event)
+                Spacer(Modifier.height(RusuhSpacing.xxl))
+            }
             SignInContent(
                 state = state,
                 actions = actions,
@@ -145,8 +147,13 @@ internal fun SignInEventBanner(
     event: SignInEventContext,
     modifier: Modifier = Modifier,
 ) {
-    val opens = stringResource(Res.string.sign_in_event_opens, event.openingTime)
-    val description = stringResource(Res.string.sign_in_event_description, opens, event.name, event.tag)
+    val opens = event.openingTime.takeIf { it.isNotBlank() }?.let { stringResource(Res.string.sign_in_event_opens, it) }
+    val description =
+        if (opens != null) {
+            stringResource(Res.string.sign_in_event_description, opens, event.name, event.tag)
+        } else {
+            listOf(event.name, event.tag).filter { it.isNotBlank() }.joinToString(", ")
+        }
     Box(
         modifier =
             modifier
@@ -179,30 +186,34 @@ internal fun SignInEventBanner(
         Column(
             modifier = Modifier.padding(horizontal = RusuhSpacing.xl, vertical = RusuhSpacing.lg),
         ) {
-            Text(
-                text = opens.uppercase(),
-                style = RusuhBrandTextStyles.eyebrow.body(),
-                color = RusuhColors.BrandPaper,
-            )
-            Spacer(Modifier.height(RusuhSpacing.xs))
+            if (opens != null) {
+                Text(
+                    text = opens.uppercase(),
+                    style = RusuhBrandTextStyles.eyebrow.body(),
+                    color = RusuhColors.BrandPaper,
+                )
+                Spacer(Modifier.height(RusuhSpacing.xs))
+            }
             Text(
                 text = event.name.uppercase(),
                 style = RusuhBrandTextStyles.hero.display(),
                 color = RusuhColors.BrandPaper,
             )
         }
-        Text(
-            text = event.tag,
-            style = RusuhBrandTextStyles.label.display(),
-            color = RusuhColors.PinkInk,
-            modifier =
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = RusuhSpacing.lg)
-                    .rotate(TAG_TILT_DEGREES)
-                    .background(RusuhColors.PaperCard)
-                    .padding(horizontal = RusuhSpacing.md, vertical = RusuhSpacing.xs),
-        )
+        if (event.tag.isNotBlank()) {
+            Text(
+                text = event.tag,
+                style = RusuhBrandTextStyles.label.display(),
+                color = RusuhColors.PinkInk,
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = RusuhSpacing.lg)
+                        .rotate(TAG_TILT_DEGREES)
+                        .background(RusuhColors.PaperCard)
+                        .padding(horizontal = RusuhSpacing.md, vertical = RusuhSpacing.xs),
+            )
+        }
     }
 }
 

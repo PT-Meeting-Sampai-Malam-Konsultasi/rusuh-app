@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.detail.DetailViewModelHolder
 import com.rusuh.app.feature.eticket.ETicketRoute
 import com.rusuh.app.feature.eticket.ETicketViewModel
+import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.payment.PaymentPageLauncher
@@ -58,9 +60,11 @@ import com.rusuh.app.feature.tickets.TicketsScreen
 import com.rusuh.app.feature.tickets.TicketsViewModel
 import com.rusuh.app.feature.waitingroom.WaitingRoomRoute
 import com.rusuh.app.feature.waitingroom.WaitingRoomViewModel
+import com.rusuh.app.ui.components.EventStatus
 import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
+import kotlinx.coroutines.CancellationException
 import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
@@ -164,6 +168,10 @@ fun RusuhNavGraph(navController: NavHostController) {
                     key = "sign-in",
                     factory = viewModelFactory { initializer { SignInViewModelHolder(koin.get<SignInViewModel>()) } },
                 ).viewModel
+            val homeRepository = remember { koin.get<HomeRepository>() }
+            val signInEvent by produceState<SignInEventContext?>(null, eventId) {
+                value = eventId?.let { id -> homeRepository.signInEventFor(id) }
+            }
             val state by viewModel.state.collectAsState()
             val lastState = remember { LastState() }
             lastState.value = state.step
@@ -173,7 +181,9 @@ fun RusuhNavGraph(navController: NavHostController) {
                 viewModel.effect.collect { effect ->
                     when (effect) {
                         is SignInEffect.SignedIn -> {
-                            if (eventId != null) {
+                            val cameFromWaitingRoom =
+                                navController.previousBackStackEntry?.destination?.route == Screen.WaitingRoom.route
+                            if (eventId != null && !cameFromWaitingRoom) {
                                 navController.navigate(Screen.WaitingRoom.routeFor(eventId)) {
                                     popUpTo(Screen.SignIn.route) { inclusive = true }
                                 }
@@ -186,7 +196,7 @@ fun RusuhNavGraph(navController: NavHostController) {
             }
             SignInScreen(
                 state = lastState.value,
-                event = PLACEHOLDER_SIGN_IN_EVENT,
+                event = signInEvent,
                 status = state.status,
                 actions =
                     signInActions(
@@ -435,6 +445,20 @@ private fun SplashPlaceholder() {
     }
 }
 
-/** Demo event for the banner of the full login until #103 resolves the real one (synthetic data). */
-private val PLACEHOLDER_SIGN_IN_EVENT =
-    SignInEventContext(name = "Samudra", tag = "Tur Gelombang 2026", openingTime = "10.00 WIB")
+/** The event the sign-in banner shows, from the (cache-first) event list; null when it cannot be resolved. */
+private suspend fun HomeRepository.signInEventFor(eventId: String): SignInEventContext? =
+    try {
+        getEvents().firstOrNull { it.id == eventId }?.let { event ->
+            SignInEventContext(
+                name = event.title,
+                tag = event.subtitle,
+                openingTime = (event.status as? EventStatus.ComingSoon)?.opensAt.orEmpty(),
+            )
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (
+        @Suppress("TooGenericExceptionCaught", "SwallowedException") failure: Exception,
+    ) {
+        null
+    }
