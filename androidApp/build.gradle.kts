@@ -131,7 +131,7 @@ dependencies {
 // VERIFICATION GUARDS (flavor-aware)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Guard: cleartext HTTP may only be configured in the debug source set (see docs/data-layer.md).
+// Guard: cleartext HTTP is off in the main and release manifests; only the debug source set may allow it for the mock.
 val verifyNoCleartextOutsideDebug by tasks.registering {
     val srcDir = layout.projectDirectory.dir("src")
     // Depend on all release manifest processing tasks (both flavors).
@@ -145,18 +145,22 @@ val verifyNoCleartextOutsideDebug by tasks.registering {
             "intermediates/merged_manifests/productionRelease/processProductionReleaseManifest/AndroidManifest.xml",
         )
     doLast {
-        // Check main manifest.
+        // Check main manifest: cleartext is declared off (Android 7 to 8 would allow it by default).
         val mainManifest = srcDir.file("main/AndroidManifest.xml").asFile.readText()
-        check(!mainManifest.contains("usesCleartextTraffic") && !mainManifest.contains("networkSecurityConfig")) {
-            "src/main/AndroidManifest.xml must not allow cleartext or set a network security config"
+        check(mainManifest.contains("android:usesCleartextTraffic=\"false\"")) {
+            "src/main/AndroidManifest.xml must declare android:usesCleartextTraffic=\"false\""
+        }
+        check(!mainManifest.contains("networkSecurityConfig")) {
+            "src/main/AndroidManifest.xml must not set a network security config"
         }
         // Check release merged manifests for all flavors.
         listOf(stagingReleaseManifest, productionReleaseManifest).forEach { provider ->
             val file = provider.get().asFile
             if (file.exists()) {
                 val merged = file.readText()
-                check(!merged.contains("usesCleartextTraffic") && !merged.contains("networkSecurityConfig")) {
-                    "The merged release manifest ${file.name} must not allow cleartext"
+                val cleartextOff = merged.contains("android:usesCleartextTraffic=\"false\"")
+                check(cleartextOff && !merged.contains("networkSecurityConfig")) {
+                    "The merged release manifest ${file.name} must disable cleartext, no network security config"
                 }
             }
         }

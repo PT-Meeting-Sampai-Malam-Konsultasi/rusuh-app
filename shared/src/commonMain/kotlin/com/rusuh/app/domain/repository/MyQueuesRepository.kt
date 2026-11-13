@@ -1,6 +1,7 @@
 package com.rusuh.app.domain.repository
 
 import com.rusuh.app.domain.model.MyQueue
+import com.rusuh.app.domain.model.OrderInProgress
 
 /**
  * Data seam for the My Queues tab.
@@ -11,4 +12,6 @@ import com.rusuh.app.domain.model.MyQueue
 interface MyQueuesRepository {
     /** The queues the signed-in user is currently in. Throws on load failure. */
     suspend fun getMyQueues(): List<MyQueue>
+
+    suspend fun getOrdersInProgress(): List<OrderInProgress> = emptyList()
 }

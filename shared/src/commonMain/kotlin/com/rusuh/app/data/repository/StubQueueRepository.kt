@@ -9,5 +9,7 @@ class StubQueueRepository(
     waitingRoom: WaitingRoomRepository,
 ) : QueueRepository,
     WaitingRoomRepository by waitingRoom {
+    override suspend fun resumeAdmission(eventId: String): Boolean = true
+
     override suspend fun leave(eventId: String): DomainResult<Unit> = DomainResult.Success(Unit)
 }
