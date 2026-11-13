@@ -1,6 +1,6 @@
 package com.rusuh.app.data.remote.mapper
 
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.remote.dto.OtpChallengeDto
 import com.rusuh.app.data.remote.dto.SessionDto
 import com.rusuh.app.data.remote.dto.UserDto
@@ -14,7 +14,7 @@ internal fun OtpChallengeDto.toDomain(): OtpChallenge? =
     challengeId.takeIf { it.isNotBlank() }?.let {
         OtpChallenge(
             challengeId = it,
-            expiresAtMillis = expiresAt?.let(::parseRfc3339Millis),
+            expiresAtMillis = expiresAt?.let(::parseStringDateMillis),
             resendAfterSeconds = resendAfterSeconds,
         )
     }

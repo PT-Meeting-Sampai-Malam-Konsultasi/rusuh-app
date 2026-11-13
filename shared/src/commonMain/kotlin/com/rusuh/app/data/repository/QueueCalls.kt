@@ -2,7 +2,7 @@ package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.cache.AdmissionInfo
 import com.rusuh.app.data.cache.QueueCache
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
@@ -128,7 +128,7 @@ internal class QueueCalls(
                         eventId = eventId,
                         slotId = result.data.slotId,
                         maxTickets = result.data.maxTickets,
-                        expiresAtEpochMillis = result.data.expiresAt?.let(::parseRfc3339Millis),
+                        expiresAtEpochMillis = result.data.expiresAt?.let(::parseStringDateMillis),
                     ),
                 )
                 ClaimStep.Admitted(result.data)

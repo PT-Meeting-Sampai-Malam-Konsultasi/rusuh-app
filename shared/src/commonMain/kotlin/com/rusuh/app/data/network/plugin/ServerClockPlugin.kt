@@ -3,7 +3,7 @@
 package com.rusuh.app.data.network.plugin
 
 import com.rusuh.app.data.clock.ServerTimeSink
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
@@ -72,7 +72,7 @@ internal fun findServerNow(body: String): Long? {
                     else -> null
                 }
             }
-    return text?.let(::parseRfc3339Millis)
+    return text?.let(::parseStringDateMillis)
 }
 
 private fun serverNowOf(obj: JsonObject): String? = (obj[SERVER_NOW] as? JsonPrimitive)?.takeIf { it.isString }?.content

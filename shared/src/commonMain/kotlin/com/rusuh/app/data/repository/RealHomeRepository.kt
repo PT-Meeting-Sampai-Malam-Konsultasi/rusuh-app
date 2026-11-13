@@ -1,6 +1,6 @@
 package com.rusuh.app.data.repository
 
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.mapper.toHomeEventItem
@@ -29,7 +29,7 @@ class RealHomeRepository(
         val body = result.data
         val language = localeProvider.language()
         // An unsynced clock counts from an arbitrary start: without a server time the cards show no countdown.
-        val now = body.serverNow?.let(::parseRfc3339Millis) ?: serverClock.takeIf { it.isSynced }?.nowMillis()
+        val now = body.serverNow?.let(::parseStringDateMillis) ?: serverClock.takeIf { it.isSynced }?.nowMillis()
         return body.items.mapNotNull { it.toHomeEventItem(language, now) }
     }
 }

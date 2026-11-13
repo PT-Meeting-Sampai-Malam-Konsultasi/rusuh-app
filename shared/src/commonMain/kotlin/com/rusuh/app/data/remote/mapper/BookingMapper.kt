@@ -1,6 +1,6 @@
 package com.rusuh.app.data.remote.mapper
 
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.remote.dto.BookingDto
 import com.rusuh.app.data.remote.dto.CategoriesResponseDto
 import com.rusuh.app.data.remote.dto.CategoryDto
@@ -25,10 +25,10 @@ fun CategoryDto.toDomain(): SeatCategory =
 fun CategoriesResponseDto.toDomainCategories(): List<SeatCategory> = categories.map { it.toDomain() }
 
 /** Parses expiresAt and serverNow from a [CategoriesResponseDto] and returns the expiry in epoch millis. */
-fun CategoriesResponseDto.expiresAtMillis(): Long = parseRfc3339Millis(expiresAt) ?: 0L
+fun CategoriesResponseDto.expiresAtMillis(): Long = parseStringDateMillis(expiresAt) ?: 0L
 
 /** Parses serverNow from a [CategoriesResponseDto] and returns epoch millis. */
-fun CategoriesResponseDto.serverNowMillis(): Long = parseRfc3339Millis(serverNow) ?: 0L
+fun CategoriesResponseDto.serverNowMillis(): Long = parseStringDateMillis(serverNow) ?: 0L
 
 /** Maps a [BookingDto] to a domain [Booking]. */
 fun BookingDto.toDomain(): Booking =
@@ -37,6 +37,6 @@ fun BookingDto.toDomain(): Booking =
         eventId = eventId,
         status = BookingStatus.fromWire(status),
         orderCode = orderCode,
-        expiresAtMillis = expiresAt?.let(::parseRfc3339Millis),
+        expiresAtMillis = expiresAt?.let(::parseStringDateMillis),
         totalRupiah = price.total.amount,
     )

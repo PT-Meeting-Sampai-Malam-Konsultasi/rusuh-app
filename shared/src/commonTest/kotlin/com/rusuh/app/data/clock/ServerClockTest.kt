@@ -29,15 +29,15 @@ class ServerClockTest {
     private val clock = MonotonicServerClock(timeSource = time)
 
     @Test
-    fun parsesRfc3339ToEpochMillis() {
-        assertEquals(0L, parseRfc3339Millis("1970-01-01T00:00:00Z"))
-        assertEquals(serverNow, parseRfc3339Millis("2026-11-14T10:40:00Z"))
-        assertEquals(serverNow + 250, parseRfc3339Millis("2026-11-14T10:40:00.25Z"))
-        assertEquals(serverNow, parseRfc3339Millis("2026-11-14T17:40:00+07:00"))
-        assertEquals(951_782_400_000L, parseRfc3339Millis("2000-02-29T00:00:00Z"))
-        assertNull(parseRfc3339Millis("2026-13-14T10:40:00Z"))
-        assertNull(parseRfc3339Millis("yesterday"))
-        assertNull(parseRfc3339Millis("2026-11-14"))
+    fun parsesStringDateToEpochMillis() {
+        assertEquals(0L, parseStringDateMillis("1970-01-01T00:00:00Z"))
+        assertEquals(serverNow, parseStringDateMillis("2026-11-14T10:40:00Z"))
+        assertEquals(serverNow + 250, parseStringDateMillis("2026-11-14T10:40:00.25Z"))
+        assertEquals(serverNow, parseStringDateMillis("2026-11-14T17:40:00+07:00"))
+        assertEquals(951_782_400_000L, parseStringDateMillis("2000-02-29T00:00:00Z"))
+        assertNull(parseStringDateMillis("2026-13-14T10:40:00Z"))
+        assertNull(parseStringDateMillis("yesterday"))
+        assertNull(parseStringDateMillis("2026-11-14"))
     }
 
     @Test

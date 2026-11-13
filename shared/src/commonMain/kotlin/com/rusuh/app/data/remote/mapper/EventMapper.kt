@@ -1,6 +1,6 @@
 package com.rusuh.app.data.remote.mapper
 
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.network.AppLanguage
 import com.rusuh.app.data.remote.dto.EventDto
 import com.rusuh.app.feature.home.HomeEventItem
@@ -78,7 +78,7 @@ internal fun EventDto.toDateVenueLine(language: AppLanguage): String {
 }
 
 private fun EventDto.startMoment(): LocalMoment? =
-    parseRfc3339Millis(startsAt)?.let { localMoment(it, zoneLabelFor(timezone)) }
+    parseStringDateMillis(startsAt)?.let { localMoment(it, zoneLabelFor(timezone)) }
 
 private fun EventDto.toStatus(
     language: AppLanguage,
@@ -103,7 +103,7 @@ private fun EventDto.comingSoon(
     zone: TimeZoneLabel,
     nowMillis: Long?,
 ): EventStatus {
-    val opensAt = saleOpensAt?.let(::parseRfc3339Millis)
+    val opensAt = saleOpensAt?.let(::parseStringDateMillis)
     return if (opensAt == null || nowMillis == null) {
         EventStatus.ComingSoon(countdown = startMoment()?.dayMonthYear(words) ?: eventId)
     } else {
@@ -115,8 +115,8 @@ private fun EventDto.comingSoon(
 }
 
 private fun EventDto.soldOut(): EventStatus {
-    val soldAt = soldOutAt?.let(::parseRfc3339Millis)
-    val openedAt = saleOpensAt?.let(::parseRfc3339Millis)
+    val soldAt = soldOutAt?.let(::parseStringDateMillis)
+    val openedAt = saleOpensAt?.let(::parseStringDateMillis)
     val minutes = if (soldAt != null && openedAt != null) ((soldAt - openedAt) / MILLIS_PER_MINUTE) else 0L
     return EventStatus.SoldOut(
         soldOutInMinutes = minutes.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
@@ -128,7 +128,10 @@ private fun EventDto.ended(
     words: FormatWords,
     zone: TimeZoneLabel,
 ): EventStatus {
-    val closed = (saleEndsAt?.let(::parseRfc3339Millis) ?: parseRfc3339Millis(startsAt))?.let { localMoment(it, zone) }
+    val closed =
+        (saleEndsAt?.let(::parseStringDateMillis) ?: parseStringDateMillis(startsAt))?.let {
+            localMoment(it, zone)
+        }
     return EventStatus.Ended(closedOn = closed?.dayMonth(words) ?: eventId)
 }
 

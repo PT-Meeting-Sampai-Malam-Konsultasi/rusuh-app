@@ -1,7 +1,7 @@
 package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.cache.QueueCache
-import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
@@ -107,7 +107,7 @@ class RealQueueRepository(
         suspend fun run() {
             val joined = calls.join(eventId)
             seq = joined.seq
-            opensAtFromPlace = joined.opensAt?.let(::parseRfc3339Millis)
+            opensAtFromPlace = joined.opensAt?.let(::parseStringDateMillis)
             event = calls.event(eventId)
             event?.let { info = it.toQueueEventInfo(localeProvider.language()) }
             var finished = false
@@ -200,7 +200,7 @@ class RealQueueRepository(
                 MeResult.Closed -> end(QueueState.Closed, frontier)
                 is MeResult.Found, MeResult.NotFound, MeResult.Unavailable -> {
                     // The 60 s window is only a display hint; the claim answers for itself.
-                    val shown = (me as? MeResult.Found)?.place?.turnExpiresAt?.let(::parseRfc3339Millis)
+                    val shown = (me as? MeResult.Found)?.place?.turnExpiresAt?.let(::parseStringDateMillis)
                     val turn =
                         place(QueueState.Turn, frontier)
                             .copy(turnExpiresAtEpochMillis = shown ?: (serverNow(frontier) + TURN_WINDOW_MILLIS))
