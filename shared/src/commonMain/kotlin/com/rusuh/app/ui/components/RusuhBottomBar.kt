@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -19,15 +21,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.theme.RusuhBrandColors
 import com.rusuh.app.ui.theme.RusuhBrandMetrics
 import com.rusuh.app.ui.theme.RusuhSpacing
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+
+private val TabIconSize = 24.dp
 
 /**
  * Shared bottom navigation bar used by every top-level tab screen (Event /
@@ -103,12 +107,11 @@ private fun BottomBarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = tab.glyph,
-            style = MaterialTheme.typography.titleMedium,
-            color = iconColor,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.clearAndSetSemantics {},
+        Icon(
+            painter = painterResource(tab.icon),
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(TabIconSize),
         )
         Spacer(Modifier.height(RusuhSpacing.xxs))
         TabLabel(tab = tab, selected = selected)
