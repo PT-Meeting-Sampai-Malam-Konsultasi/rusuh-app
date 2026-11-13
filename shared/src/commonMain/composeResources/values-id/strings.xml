@@ -421,6 +421,7 @@
 
     <!-- Payment screen -->
     <string name="payment_title">Pembayaran</string>
+    <string name="payment_open_in_browser">Buka di browser</string>
     <string name="payment_loading">Memverifikasi pesanan Anda…</string>
     <string name="payment_timer_description">Sisa waktu %1$s</string>
     <string name="payment_pay_via_midtrans">Bayar lewat Midtrans</string>

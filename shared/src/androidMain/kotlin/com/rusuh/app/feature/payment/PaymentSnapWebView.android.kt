@@ -10,7 +10,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 
 @Composable
@@ -28,6 +30,7 @@ actual fun PaymentSnapWebView(
         modifier = modifier,
         factory = { context ->
             WebView(context).apply {
+                settings.cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
                 settings.javaScriptEnabled = true
                 settings.javaScriptCanOpenWindowsAutomatically = true
                 settings.domStorageEnabled = true
@@ -112,4 +115,16 @@ actual fun PaymentSnapWebView(
         },
         onRelease = { it.destroy() },
     )
+}
+
+@Composable
+actual fun rememberPaymentBrowserLauncher(onFailure: () -> Unit): (String) -> Unit {
+    val context = LocalContext.current
+    return remember(context, onFailure) {
+        { url ->
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            }.onFailure { onFailure() }
+        }
+    }
 }

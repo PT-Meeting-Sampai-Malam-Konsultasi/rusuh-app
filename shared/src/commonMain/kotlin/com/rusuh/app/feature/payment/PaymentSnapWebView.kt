@@ -14,3 +14,6 @@ expect fun PaymentSnapWebView(
     onLoadError: () -> Unit,
     onNotice: () -> Unit,
 )
+
+@Composable
+expect fun rememberPaymentBrowserLauncher(onFailure: () -> Unit): (String) -> Unit

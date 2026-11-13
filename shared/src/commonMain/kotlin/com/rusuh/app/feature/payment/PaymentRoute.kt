@@ -38,6 +38,7 @@ import rusuh_app.shared.generated.resources.payment_close
 import rusuh_app.shared.generated.resources.payment_external_missing
 import rusuh_app.shared.generated.resources.payment_leave_body
 import rusuh_app.shared.generated.resources.payment_leave_title
+import rusuh_app.shared.generated.resources.payment_open_in_browser
 import rusuh_app.shared.generated.resources.payment_retry
 import rusuh_app.shared.generated.resources.payment_title
 import rusuh_app.shared.generated.resources.payment_web_error
@@ -61,6 +62,7 @@ fun PaymentRoute(
     var loadError by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf(false) }
     var webLoading by remember { mutableStateOf(true) }
+    val openInBrowser = rememberPaymentBrowserLauncher { notice = true }
 
     PlatformBackHandler(enabled = snapUrl != null) {
         showLeaveDialog = true
@@ -130,6 +132,9 @@ fun PaymentRoute(
                     color = RusuhColors.BrandInk,
                 )
                 if (webLoading && !loadError) CircularProgressIndicator(color = RusuhColors.BrandMagenta)
+                TextButton(onClick = {
+                    openInBrowser(snapUrl!!)
+                }) { Text(stringResource(Res.string.payment_open_in_browser)) }
                 TextButton(onClick = {
                     snapUrl = null
                     viewModel.dispatch(PaymentIntent.SnapClosed)
