@@ -190,7 +190,7 @@ whether repositories talk to them. Three debug ways to run the app:
 | Mode | Environment + mode | Network | Repositories | Needs |
 |---|---|---|---|---|
 | Stub (offline demo) | `Stub` (`-PbackendMode=Stub`; iOS scheme `BACKEND_MODE=Stub`) | None; in-process `StubEngine` | Stub repositories | Nothing |
-| Mock (debug) | `Mock` + `Real` (`-PmockApi=true`; empty uses `MOCK_API`) | HTTP to Mockoon at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth; stub Detail and Tickets | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
+| Mock (debug) | `Mock` + `Real` (`-PmockApi=true`; empty uses `MOCK_API`) | HTTP to Mockoon at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth, Tickets; stub Detail | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
 | Live staging (debug) | `Staging` + `Real` (`-PmockApi=false`) | HTTP to `https://api.rusuh-tiket.web.id/v1` | Same repositories as Mock | The staging backend |
 
 Release builds always use `Production` + `Real` over HTTPS.
@@ -204,17 +204,22 @@ Release builds always use `Production` + `Real` over HTTPS.
   `StubClock`, so countdowns run.
 - Real repositories (`data/repository`): `RealHomeRepository` (`GET /core/events`), `RealQueueRepository` (behind both
   `WaitingRoomRepository` and `QueueRepository`: join, frontier polling at the ADR-0003 cadence, claim, leave),
-  `RealMyQueuesRepository`, `RealDeviceRepository` (`POST /queue/devices`, the install id lives in the `SecureStore`). They
-  are built on `EventApiService`, `QueueApiService` and `DeviceApiService` (`data/remote`), which use the `Api` and
+  `RealMyQueuesRepository`, `RealDeviceRepository` (`POST /queue/devices`, the install id lives in the `SecureStore`),
+  `RealTicketsRepository` (`GET /core/tickets`, `GET /core/tickets/{ticketId}`). They
+  are built on `EventApiService`, `QueueApiService`, `DeviceApiService` and `TicketApiService` (`data/remote`), which use the `Api` and
   `Queue` clients (`/devices` and `/queue/*` belong to the queue service). Failed calls surface as `DomainException`
   (carrying the `DomainResult`), `SignInRequiredException` for a guest claim. `QueuePacing` makes the waits and the
   jitter injectable, so tests run in virtual time.
+- `RealTicketsRepository`: fetches the signed-in user's tickets from `GET /core/tickets`, groups flat tickets by
+  `bookingId` into orders, and enriches them with event facts from `GET /core/events/{eventId}` (cached per event in
+  `TicketsCache` so the e-ticket page does not refetch). A 401 is handled by the session layer (refresh or session
+  expired). shortcut: The Ticket schema does not include order number (`orderCode`), total, payment method, paid-at
+  time, or contact email; these fields are left blank/placeholder in the domain model. The UI degrades gracefully.
 - Temporary fallback (`shortcut:`): a repository without a real implementation resolves to its stub in `Real` mode and
-  logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)` once. Detail and Tickets are the
-  ones left. The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES` (`DataModule.kt`, default `true`) controls it;
+  logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)` once. Detail is the only one left. The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES` (`DataModule.kt`, default `true`) controls it;
   set it to `false`, or pass `dataModule(mode, allowStubFallback = false)`, for the strict behaviour: resolving such a
-  repository throws `RealRepositoryNotAvailableException`. Remove the constant and fallback when Tickets
-  (TICKET-00-M4) and Detail (#80 #81 #82) land: a feature ticket then binds its real repository in place of that
+  repository throws `RealRepositoryNotAvailableException`. Remove the constant and fallback when
+  Detail (#80 #81 #82) lands: a feature ticket then binds its real repository in place of that
   repository's `notYetReal(...)` line.
 - Queue polling resilience: a transient failure inside the wait (network, 408, 429, 5xx) is retried with capped
   exponential backoff (2, 4, 8, 16, 30 s, `QueuePacing.backoffMillis`) that honours `Retry-After` (capped at 2 min); the
@@ -233,9 +238,9 @@ Release builds always use `Production` + `Real` over HTTPS.
   expiry is judged against the device wall clock with a one day margin (`wallClockMillis`, used for nothing else).
 - My Queues reads entries in parallel (at most 4). An entry is dropped on 401/410/closed (and forgotten), left out but
   kept on 404 or a transient failure; the load fails only when every entry failed.
-- Release builds still show FAKE Detail and Tickets data through the fallback above (one WARNING each). The list is
+- Release builds still show FAKE Detail data through the fallback above (one WARNING each). The list is
   `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`, checked against the bindings by `DataModuleTest`): currently
-  `TicketsRepository` and `DetailRepository`. `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
+  `DetailRepository`. `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
 - Mockoon (`workspace-local/mockoon`) simulates a moving queue: the frontier is SEQUENTIAL (served 100, 130, ..., two
   paused polls, then `served >= seq`), claim answers 409 `NOT_YET` once and then 200. Restart it to replay the sequence.
 - TODO(FR-04-M4 #30): the last 2,000 places also get SSE (ADR-0015); only polling is implemented.

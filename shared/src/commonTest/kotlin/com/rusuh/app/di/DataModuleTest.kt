@@ -14,6 +14,7 @@ import com.rusuh.app.data.repository.RealDeviceRepository
 import com.rusuh.app.data.repository.RealHomeRepository
 import com.rusuh.app.data.repository.RealMyQueuesRepository
 import com.rusuh.app.data.repository.RealQueueRepository
+import com.rusuh.app.data.repository.RealTicketsRepository
 import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.storage.AppPreferences
 import com.rusuh.app.data.storage.FakeAppPreferences
@@ -97,12 +98,12 @@ class DataModuleTest {
             "QueueRepository" to QueueRepository::class,
             "DeviceRepository" to DeviceRepository::class,
             "AuthRepository" to AuthRepository::class,
+            "TicketsRepository" to TicketsRepository::class,
         )
 
     /** Repositories that still fall back to their stub in [BackendMode.Real]. */
     private val stubOnlyRepositories: Map<String, KClass<*>> =
         mapOf(
-            "TicketsRepository" to TicketsRepository::class,
             "DetailRepository" to DetailRepository::class,
         )
 
@@ -152,6 +153,7 @@ class DataModuleTest {
         assertIs<RealMyQueuesRepository>(koin.get<MyQueuesRepository>())
         assertIs<RealDeviceRepository>(koin.get<DeviceRepository>())
         assertIs<RealAuthRepository>(koin.get<AuthRepository>())
+        assertIs<RealTicketsRepository>(koin.get<TicketsRepository>())
         assertSame<Any>(koin.get<QueueRepository>(), koin.get<WaitingRoomRepository>(), "one queue behind both seams")
         assertTrue(warnings.isEmpty(), "no stub is used for these: $warnings")
     }

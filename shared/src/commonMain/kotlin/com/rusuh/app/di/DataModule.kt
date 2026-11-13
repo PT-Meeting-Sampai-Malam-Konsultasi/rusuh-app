@@ -10,11 +10,13 @@ import com.rusuh.app.data.remote.AuthApiService
 import com.rusuh.app.data.remote.DeviceApiService
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
+import com.rusuh.app.data.remote.TicketApiService
 import com.rusuh.app.data.repository.RealAuthRepository
 import com.rusuh.app.data.repository.RealDeviceRepository
 import com.rusuh.app.data.repository.RealHomeRepository
 import com.rusuh.app.data.repository.RealMyQueuesRepository
 import com.rusuh.app.data.repository.RealQueueRepository
+import com.rusuh.app.data.repository.RealTicketsRepository
 import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
@@ -44,7 +46,7 @@ import org.koin.dsl.onClose
 /**
  * shortcut: TEMPORARY. While a repository has no real (network) implementation, [BackendMode.Real] resolves its
  * stub and logs a WARNING instead of crashing, so Staging and Release builds start. Home, the Waiting Room, My
- * Queues, the device identity and auth are real now; what is left is Tickets (TICKET-00-M4) and Detail (FR-15/16/17-M1
+ * Queues, the device identity, auth and Tickets are real now; what is left is Detail (FR-15/16/17-M1
  * #80 #81 #82). Remove this constant, the fallback and its tests when those land. Set it to false (or pass
  * `allowStubFallback = false`) for the strict behaviour: [RealRepositoryNotAvailableException].
  */
@@ -56,7 +58,7 @@ const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
  * list is the signal, kept in sync with the `notYetReal(...)` bindings by `DataModuleTest` and quoted in
  * docs/data-layer.md. Shrink it as the real repositories land; remove the fallback when it is empty.
  */
-val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("TicketsRepository", "DetailRepository")
+val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("DetailRepository")
 
 /**
  * Binds every repository interface to its stub or its real implementation, per [mode]; every environment defaults to
@@ -97,6 +99,8 @@ fun dataModule(
         single { QueueApiService(get(ApiClientQualifier.Queue)) }
         // Auth is served by the core (api) host, like the refresh call of the session layer.
         single { AuthApiService(get(ApiClientQualifier.Api)) }
+        // Tickets API is served by the core (api) host.
+        single { TicketApiService(get(ApiClientQualifier.Api)) }
         // Auth state layer (both modes): the sign-out counter and the read-only session view the screens use.
         single { AuthGeneration() }
         single<SessionObserver> { SessionManagerObserver(get(), get()) }
@@ -147,7 +151,7 @@ fun dataModule(
                         refresher = get(),
                     )
                 }
-                single<TicketsRepository> { notYetReal("TicketsRepository") { StubTicketsRepository() } }
+                single<TicketsRepository> { RealTicketsRepository(get(), get(), get(), get()) }
                 single<DetailRepository> { notYetReal("DetailRepository") { StubDetailRepository(get()) } }
             }
         }
