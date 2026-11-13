@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Indonesian translation (values-in folder for Android resource resolution).
-  Android's Locale.getLanguage() returns "in" (legacy ISO 639-1 code) for
-  Indonesian, so CMP Resources looks for values-in/. Keep this file IDENTICAL
-  to values-id/strings.xml; a unit test (LanguageStringParityTest) fails if
-  they drift.
+  Android's Locale.getLanguage() returns "in" (legacy ISO 639-1 code) for Indonesian, so CMP Resources
+  looks for values-in/. Keep this file IDENTICAL to values-id/strings.xml;
+  a unit test (LanguageStringParityTest) fails if they drift.
   EN base is in values/strings.xml. Keep keys in sync with the EN base.
 -->
 <resources>
@@ -413,4 +412,33 @@
     <!-- HTTP status class fallbacks (when no specific ErrorCode is available). -->
     <string name="error_http_client">Permintaan tidak bisa diproses. Periksa datanya lalu coba lagi.</string>
     <string name="error_http_server">Terjadi kesalahan di sistem kami. Coba lagi sebentar.</string>
+
+    <!-- Payment screen -->
+    <string name="payment_title">Pembayaran</string>
+    <string name="payment_loading">Memverifikasi pesanan Anda…</string>
+    <string name="payment_timer_description">Sisa waktu %1$s</string>
+    <string name="payment_pay_via_midtrans">Bayar lewat Midtrans</string>
+    <string name="payment_time_hint">Waktu 10 menit sudah termasuk memilih metode dan mencoba ulang.</string>
+    <string name="payment_order_section">Pesanan</string>
+    <string name="payment_admin_fee">Biaya layanan</string>
+    <string name="payment_total">Total</string>
+    <string name="payment_midtrans_hint">Pembayaran diproses oleh Midtrans. Rusuh tidak menyimpan data kartu Anda. Dengan membayar, Anda menyetujui Syarat &amp; Ketentuan dan Kebijakan Refund.</string>
+    <string name="payment_continue_button">Lanjutkan pembayaran →</string>
+    <string name="payment_not_paid_badge">BELUM DIBAYAR</string>
+    <string name="payment_snap_closed_headline">Jendela pembayaran ditutup.</string>
+    <string name="payment_snap_closed_body">Tiket Anda masih ditahan sampai waktu habis. Buka lagi untuk memilih metode — pembayaran yang sudah dimulai (mis. nomor VA) tetap berlaku.</string>
+    <string name="payment_busy_error">Layanan pembayaran sedang sibuk. Silakan coba lagi.</string>
+    <string name="payment_verifying_headline">Memastikan pembayaran Anda…</string>
+    <string name="payment_verifying_body">Dana sudah dikirim. Kami menunggu konfirmasi Midtrans — biasanya beberapa detik. Jangan bayar ulang.</string>
+    <string name="payment_verifying_note">Waktu tiket Anda ditahan selama pengecekan ini.</string>
+    <string name="payment_success_headline">Pembayaran dikonfirmasi!</string>
+    <string name="payment_success_body">Tiket Anda diterbitkan dan diemail. Tunjukkan QR di pintu masuk.</string>
+    <string name="payment_success_cta">Lihat e-tiket →</string>
+    <string name="payment_expired_badge">WAKTU HABIS</string>
+    <string name="payment_expired_headline">Pesanan dibatalkan.</string>
+    <string name="payment_expired_body">Waktu 10 menit untuk membayar sudah lewat. Tiket yang ditahan kami lepaskan untuk pembeli lain.</string>
+    <string name="payment_expired_refund_notice">Saldo terpotong? Jika pembayaran Anda masuk setelah waktu habis, dana dikembalikan otomatis ke metode yang sama. Rinciannya kami kirim ke %1$s.</string>
+    <string name="payment_expired_queue_again">Antre lagi →</string>
+    <string name="payment_expired_home">Ke beranda</string>
+    <string name="payment_error_load">Tidak bisa memuat detail pembayaran. Silakan coba lagi.</string>
 </resources>

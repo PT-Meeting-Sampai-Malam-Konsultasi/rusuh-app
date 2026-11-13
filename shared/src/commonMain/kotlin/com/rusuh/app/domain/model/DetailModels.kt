@@ -103,6 +103,7 @@ data class Booking(
 enum class BookingStatus {
     SELECTION,
     PAYMENT_PENDING,
+    HELD,
     PAID,
     EXPIRED,
     CANCELLED,
@@ -111,8 +112,15 @@ enum class BookingStatus {
     ;
 
     companion object {
-        fun fromWire(value: String?): BookingStatus = entries.firstOrNull { it.name == value } ?: SELECTION
+        fun fromWire(value: String?): BookingStatus =
+            value?.let { v -> entries.firstOrNull { it.name.equals(v, ignoreCase = true) } } ?: SELECTION
     }
+
+    /** True when the booking is in a final state (no more changes possible). */
+    val isFinal: Boolean get() = this in setOf(PAID, EXPIRED, CANCELLED, REFUNDED)
+
+    /** True when the payment arrived in time and tickets are issued. */
+    val isPaid: Boolean get() = this == PAID
 }
 
 /** Outcome of creating a booking. */

@@ -17,6 +17,7 @@ import com.rusuh.app.data.repository.RealMyQueuesRepository
 import com.rusuh.app.data.repository.RealQueueRepository
 import com.rusuh.app.data.repository.RealTicketsRepository
 import com.rusuh.app.data.repository.StubAuthRepository
+import com.rusuh.app.data.repository.StubPaymentRepository
 import com.rusuh.app.data.storage.AppPreferences
 import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.data.storage.FakeSecureStore
@@ -32,6 +33,7 @@ import com.rusuh.app.domain.repository.AuthRepository
 import com.rusuh.app.domain.repository.DetailRepository
 import com.rusuh.app.domain.repository.DeviceRepository
 import com.rusuh.app.domain.repository.MyQueuesRepository
+import com.rusuh.app.domain.repository.PaymentRepository
 import com.rusuh.app.domain.repository.QueueRepository
 import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.StubHomeRepository
@@ -103,8 +105,11 @@ class DataModuleTest {
             "DetailRepository" to DetailRepository::class,
         )
 
-    /** Repositories that still fall back to their stub in [BackendMode.Real]. */
-    private val stubOnlyRepositories: Map<String, KClass<*>> = emptyMap()
+    /** Repositories that still fall back to their stub in [BackendMode.Real] (routes not deployed on live backend). */
+    private val stubOnlyRepositories: Map<String, KClass<*>> =
+        mapOf(
+            "PaymentRepository" to PaymentRepository::class,
+        )
 
     private val repositories: Map<String, KClass<*>> = realRepositories + stubOnlyRepositories
 
@@ -144,8 +149,8 @@ class DataModuleTest {
     }
 
     @Test
-    fun realModeBindsTheNetworkImplementationsForAllRepositories() {
-        val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
+    fun realModeBindsTheNetworkImplementationsForAllRealRepositories() {
+        val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = true)
 
         assertIs<RealHomeRepository>(koin.get<HomeRepository>())
         assertIs<RealQueueRepository>(koin.get<QueueRepository>())
@@ -155,7 +160,24 @@ class DataModuleTest {
         assertIs<RealTicketsRepository>(koin.get<TicketsRepository>())
         assertIs<RealDetailRepository>(koin.get<DetailRepository>())
         assertSame<Any>(koin.get<QueueRepository>(), koin.get<WaitingRoomRepository>(), "one queue behind both seams")
-        assertTrue(warnings.isEmpty(), "no stub is used for these: $warnings")
+    }
+
+    @Test
+    fun paymentRepositoryUsesStubInRealModeBecauseRoutesAreNotDeployed() {
+        val koin = koin(AppEnvironment.Staging, BackendMode.Real, allowFallback = true)
+
+        assertIs<StubPaymentRepository>(koin.get<PaymentRepository>())
+        assertTrue(warnings.any { "PaymentRepository" in it }, "should warn about stub fallback: $warnings")
+    }
+
+    @Test
+    fun strictRealModeThrowsForPaymentRepositoryWithoutFallback() {
+        val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
+        val exception =
+            assertFailsWith<org.koin.core.error.InstanceCreationException> {
+                koin.get<PaymentRepository>()
+            }
+        assertIs<RealRepositoryNotAvailableException>(exception.cause)
     }
 
     @Test
@@ -241,12 +263,13 @@ class DataModuleTest {
         }
 
     @Test
-    fun strictRealModeResolvesAllRepositoriesWithoutFallback() {
+    fun strictRealModeResolvesAllRealRepositoriesWithoutFallback() {
+        // When allowFallback = false, only repositories with real implementations should resolve
         val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = false)
 
-        // All repositories should resolve to their real implementations without any warnings
+        // All real repositories should resolve to their real implementations without any warnings
         realRepositories.values.forEach { type -> koin.get<Any>(type) }
-        assertTrue(warnings.isEmpty(), "no stub fallback should be used: $warnings")
+        assertTrue(warnings.isEmpty(), "no stub fallback should be used for real repos: $warnings")
     }
 
     @Test
@@ -255,14 +278,15 @@ class DataModuleTest {
     }
 
     @Test
-    fun realModeResolvesAllRepositoriesWithoutWarnings() {
+    fun realModeResolvesAllRepositoriesWithWarningsOnlyForStubFallbacks() {
         val koin = koin(AppEnvironment.Staging, BackendMode.Real)
 
         repositories.values.forEach { type -> koin.get<Any>(type) }
         repositories.values.forEach { type -> koin.get<Any>(type) } // singletons: no second warning
 
-        // No warnings because all repositories have real implementations now
-        assertTrue(warnings.isEmpty(), "no stub fallback should be used: $warnings")
+        // Only PaymentRepository should have a warning (it's on stub because routes return 404)
+        assertEquals(1, warnings.size, "only PaymentRepository should warn: $warnings")
+        assertTrue(warnings.single().contains("PaymentRepository"))
     }
 
     @Test

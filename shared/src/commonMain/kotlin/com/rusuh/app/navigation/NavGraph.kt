@@ -43,6 +43,11 @@ import com.rusuh.app.feature.eticket.ETicketRoute
 import com.rusuh.app.feature.eticket.ETicketViewModel
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
+import com.rusuh.app.feature.payment.PaymentPageLauncher
+import com.rusuh.app.feature.payment.PaymentResultRoute
+import com.rusuh.app.feature.payment.PaymentResultViewModel
+import com.rusuh.app.feature.payment.PaymentRoute
+import com.rusuh.app.feature.payment.PaymentViewModel
 import com.rusuh.app.feature.queues.MyQueuesRoute
 import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.TicketsActions
@@ -203,19 +208,44 @@ fun RusuhNavGraph(navController: NavHostController) {
             )
         }
 
-        // Payment stub route: TODO(FR-17-M1 #82): implement the real payment screen.
+        // Payment screen: shows order summary and Midtrans Snap handoff.
         composable(
             route = Screen.Payment.route,
             arguments = listOf(navArgument(Screen.Payment.ARG_BOOKING_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val bookingId = backStackEntry.arguments?.getString(Screen.Payment.ARG_BOOKING_ID).orEmpty()
-            // TODO(FR-17-M1 #82): another PR builds the payment handoff; this is a placeholder.
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("Payment: $bookingId\n(TODO: implement payment screen)")
-            }
+            val koin = getKoin()
+            val viewModel = remember(bookingId) { koin.get<PaymentViewModel> { parametersOf(bookingId) } }
+            val launcher = remember { koin.get<PaymentPageLauncher>() }
+            PaymentRoute(
+                viewModel = viewModel,
+                launcher = launcher,
+                onBack = { navController.popBackStack() },
+                onNavigateToTickets = { navController.switchTab(RusuhTab.Tiket) },
+                onNavigateToHome = { navController.switchTab(RusuhTab.Event) },
+            )
+        }
+
+        // Payment result: reached via App Link after returning from Midtrans Snap.
+        composable(
+            route = Screen.PaymentResult.route,
+            arguments =
+                listOf(
+                    navArgument(Screen.PaymentResult.ARG_BOOKING_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+        ) { backStackEntry ->
+            val bookingId = backStackEntry.arguments?.getString(Screen.PaymentResult.ARG_BOOKING_ID).orEmpty()
+            val koin = getKoin()
+            val viewModel = remember(bookingId) { koin.get<PaymentResultViewModel> { parametersOf(bookingId) } }
+            PaymentResultRoute(
+                viewModel = viewModel,
+                onNavigateToTickets = { navController.switchTab(RusuhTab.Tiket) },
+                onNavigateToHome = { navController.switchTab(RusuhTab.Event) },
+            )
         }
     }
 }

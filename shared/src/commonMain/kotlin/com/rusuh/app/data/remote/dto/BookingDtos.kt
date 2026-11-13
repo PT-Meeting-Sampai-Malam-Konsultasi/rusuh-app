@@ -93,6 +93,7 @@ data class PriceBreakdownDto(
     @SerialName("lines") val lines: List<PriceLineDto> = emptyList(),
     @SerialName("ticketSubtotal") val ticketSubtotal: MoneyDto = MoneyDto(),
     @SerialName("adminFee") val adminFee: MoneyDto = MoneyDto(),
+    @SerialName("tax") val tax: MoneyDto? = null,
     @SerialName("total") val total: MoneyDto = MoneyDto(),
 )
 
