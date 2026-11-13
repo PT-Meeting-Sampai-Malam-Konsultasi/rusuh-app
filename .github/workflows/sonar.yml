@@ -1,4 +1,4 @@
-name: SonarQube Analysis
+name: SonarCloud Analysis
 on:
   push:
     branches: [main]
@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for accurate blame
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -27,19 +27,8 @@ jobs:
         with:
           name: kover-report
           path: build/reports/kover/
-      - name: Check SonarQube configuration
-        id: sonar-check
-        run: |
-          if [ -n "${{ secrets.SONAR_TOKEN }}" ] && [ -n "${{ secrets.SONAR_HOST_URL }}" ]; then
-            echo "configured=true" >> $GITHUB_OUTPUT
-          else
-            echo "configured=false" >> $GITHUB_OUTPUT
-            echo "⚠️ SonarQube secrets not configured. Skipping scan."
-            echo "To enable SonarQube analysis, add SONAR_TOKEN and SONAR_HOST_URL secrets."
-          fi
-      - name: SonarQube Scan
-        if: steps.sonar-check.outputs.configured == 'true'
-        uses: sonarsource/sonarqube-scan-action@v3
+      - name: SonarCloud Scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarcloud-github-action@v3
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
