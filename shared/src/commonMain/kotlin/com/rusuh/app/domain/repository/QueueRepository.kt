@@ -5,9 +5,17 @@ import com.rusuh.app.feature.waitingroom.domain.repository.WaitingRoomRepository
 
 /** Queue actions beyond observing the place ([WaitingRoomRepository.observePlace], which also joins). */
 interface QueueRepository : WaitingRoomRepository {
+    suspend fun claim(
+        eventId: String,
+        turnExpiresAtEpochMillis: Long,
+        serverNowEpochMillis: Long,
+    ): QueueClaimOutcome
+
     /**
      * Leaves the queue of [eventId] (`DELETE /queue/{eventId}/me`, idempotent) and forgets the stored place. A
      * device that never joined succeeds without a call.
      */
     suspend fun leave(eventId: String): DomainResult<Unit>
 }
+
+enum class QueueClaimOutcome { Admitted, BackToWaiting, Missed, Closed }

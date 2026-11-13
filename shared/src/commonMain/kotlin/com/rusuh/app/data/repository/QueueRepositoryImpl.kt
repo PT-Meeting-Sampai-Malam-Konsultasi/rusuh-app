@@ -21,8 +21,8 @@ import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.ErrorCode
-import com.rusuh.app.domain.model.SignInRequiredException
 import com.rusuh.app.domain.repository.DeviceRepository
+import com.rusuh.app.domain.repository.QueueClaimOutcome
 import com.rusuh.app.domain.repository.QueueRepository
 import com.rusuh.app.feature.waitingroom.domain.model.QueueEventInfo
 import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
@@ -34,17 +34,12 @@ import kotlinx.coroutines.flow.flow
 
 /**
  * The real queue: [observePlace] joins (idempotent) and then polls the public frontier at the ADR-0003 cadence until
- * the flow collector is cancelled, the queue closes, or the turn is claimed.
+ * the flow collector is cancelled or the queue closes.
  *
  * - Position is `seq - served`; the queue states map onto [QueueState] (`preopen`, `open`, `paused` with its reason,
  *   `closed` = sold out). A closed queue drops the stored queue token and the cached event id.
- * - At `served >= seq` the turn starts: a [QueueState.Turn] place is emitted at once (its 60 s window from `/me`
- *   `turnExpiresAt`, or from the server clock), then `claim` is retried (`NOT_YET`/`FULL`, about 1 s apart) inside
- *   that window. A 200 stores the admission token and its non-secret details (`AdmissionInfo`, for Detail) and ends
- *   the flow; the YourTurn countdown stays the 60 s window (the admission's longer order window belongs to
- *   Detail); a 410
- *   `MISSED`/`EXPIRED` or running out of the window emits [QueueState.Missed]; a 401 with code `UNAUTHORIZED` fails the
- *   flow with [SignInRequiredException] (a guest cannot claim), any other 401 registers the device again once.
+ * - At `served >= seq` the turn screen is emitted with the server's 60 s deadline. Claim is explicit through
+ *   [claim]; the observation continues polling while the user decides.
  * - Transient failures (network, 408, 429, 5xx) inside the loop are retried with capped exponential backoff that
  *   honours `Retry-After`; the flow fails with [DomainException] after 5 failures in a row, or at once on a failure
  *   that waiting cannot fix (401/403/404 where they are not meaningful). The Waiting Room keeps the last place and
@@ -66,6 +61,7 @@ class QueueRepositoryImpl(
     private val pacing: QueuePacing = QueuePacing(),
 ) : QueueRepository {
     private val calls = QueueCalls(queueApi, eventApi, devices, tokens, cache)
+    private val noStockEvents = mutableSetOf<String>()
 
     override fun observePlace(eventId: String): Flow<QueuePlace> =
         if (eventId.isBlank()) {
@@ -82,6 +78,78 @@ class QueueRepositoryImpl(
             calls.forgetAdmissionOf(eventId)
         }
         return result
+    }
+
+    @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount")
+    override suspend fun claim(
+        eventId: String,
+        turnExpiresAtEpochMillis: Long,
+        serverNowEpochMillis: Long,
+    ): QueueClaimOutcome {
+        val deadline = pacing.nowMillis() + (turnExpiresAtEpochMillis - serverNowEpochMillis).coerceAtLeast(0L)
+        var reRegistered = false
+        var failures = 0
+        while (true) {
+            try {
+                when (val result = calls.claim(eventId)) {
+                    is ClaimStep.Admitted -> return QueueClaimOutcome.Admitted
+                    is ClaimStep.Retry -> {
+                        if (pacing.nowMillis() >= deadline) return missed(eventId)
+                        if (pacing.waitForClaimRetry(result.code == ErrorCode.FULL, result.afterSeconds, deadline)) {
+                            return when (val final = calls.claim(eventId)) {
+                                is ClaimStep.Admitted -> QueueClaimOutcome.Admitted
+                                ClaimStep.BackToWaiting -> {
+                                    noStockEvents += eventId
+                                    QueueClaimOutcome.BackToWaiting
+                                }
+                                ClaimStep.Closed -> closed(eventId)
+                                ClaimStep.Missed, is ClaimStep.Retry -> missed(eventId)
+                                is ClaimStep.DeviceRejected -> {
+                                    if (reRegistered) throw final.error
+                                    calls.reRegisterDevice()
+                                    when (calls.claim(eventId)) {
+                                        is ClaimStep.Admitted -> QueueClaimOutcome.Admitted
+                                        ClaimStep.BackToWaiting -> {
+                                            noStockEvents += eventId
+                                            QueueClaimOutcome.BackToWaiting
+                                        }
+                                        else -> missed(eventId)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ClaimStep.BackToWaiting -> {
+                        noStockEvents += eventId
+                        return QueueClaimOutcome.BackToWaiting
+                    }
+                    ClaimStep.Missed -> return missed(eventId)
+                    ClaimStep.Closed -> return closed(eventId)
+                    is ClaimStep.DeviceRejected -> {
+                        if (reRegistered) throw result.error
+                        calls.reRegisterDevice()
+                        reRegistered = true
+                    }
+                }
+            } catch (failure: DomainException) {
+                if (!failure.isTransient()) throw failure
+                val now = pacing.nowMillis()
+                if (now >= deadline) return missed(eventId)
+                failures++
+                val backoff = pacing.backoffMillis(failures.coerceAtMost(5), failure.retryAfterSeconds())
+                pacing.delay(minOf(backoff, deadline - now))
+            }
+        }
+    }
+
+    private suspend fun missed(eventId: String): QueueClaimOutcome {
+        calls.forget(eventId)
+        return QueueClaimOutcome.Missed
+    }
+
+    private suspend fun closed(eventId: String): QueueClaimOutcome {
+        calls.forget(eventId)
+        return QueueClaimOutcome.Closed
     }
 
     /**
@@ -103,9 +171,11 @@ class QueueRepositoryImpl(
         private var opensAtFromPlace: Long? = null
         private var drawJitterDone = false
         private var failures = 0
+        private var servedAtJoin: Int? = null
 
         suspend fun run() {
             val joined = calls.join(eventId)
+            servedAtJoin = cache.servedAtJoin(eventId) ?: joined.served
             seq = joined.seq
             opensAtFromPlace = joined.opensAt?.let(::parseStringDateMillis)
             event = calls.event(eventId)
@@ -130,6 +200,10 @@ class QueueRepositoryImpl(
             }
 
         private suspend fun openOrPaused(frontier: FrontierDto): Boolean {
+            if (servedAtJoin == null) {
+                servedAtJoin = frontier.served.coerceAtMost(seq ?: frontier.served)
+                cache.setServedAtJoin(eventId, servedAtJoin!!)
+            }
             val over = if (seq == null) drawNumber(frontier) else null
             val mine = seq
             return when {
@@ -140,12 +214,19 @@ class QueueRepositoryImpl(
                     out.emit(place(QueueState.Paused, frontier).copy(pauseReason = frontier.pauseReason()))
                     false
                 }
-                frontier.served >= mine -> onTurn(frontier)
-                else -> {
+                frontier.served < mine -> {
+                    noStockEvents.remove(eventId)
                     position = mine - frontier.served
                     out.emit(place(QueueState.Open, frontier))
                     false
                 }
+                eventId in noStockEvents -> {
+                    position = (mine - frontier.served).coerceAtLeast(1)
+                    out.emit(place(QueueState.Open, frontier))
+                    false
+                }
+                frontier.served >= mine -> onTurn(frontier)
+                else -> false
             }
         }
 
@@ -199,49 +280,14 @@ class QueueRepositoryImpl(
                 MeResult.Missed -> end(QueueState.Missed, frontier)
                 MeResult.Closed -> end(QueueState.Closed, frontier)
                 is MeResult.Found, MeResult.NotFound, MeResult.Unavailable -> {
-                    // The 60 s window is only a display hint; the claim answers for itself.
                     val shown = (me as? MeResult.Found)?.place?.turnExpiresAt?.let(::parseStringDateMillis)
                     val turn =
                         place(QueueState.Turn, frontier)
                             .copy(turnExpiresAtEpochMillis = shown ?: (serverNow(frontier) + TURN_WINDOW_MILLIS))
                     out.emit(turn)
-                    claim(frontier)
+                    false
                 }
             }
-
-        /**
-         * Claims inside the 60 s turn window, measured on the monotonic clock from the first attempt (so request time
-         * counts). `NOT_YET`/`FULL` wait and retry, a transient failure backs off, a device-token 401 registers the
-         * device again once. When a wait would pass the end of the window it is cut to the window and ONE last attempt
-         * is made; only a failed last attempt is Missed. Returns true when the run is over, false for NO_STOCK.
-         */
-        private suspend fun claim(frontier: FrontierDto): Boolean {
-            val deadline = pacing.nowMillis() + TURN_WINDOW_MILLIS
-            var lastAttempt = false
-            var reRegistered = false
-            var over: Boolean? = null
-            while (over == null) {
-                when (val step = resilient(deadline) { calls.claim(eventId) }) {
-                    is ClaimStep.Admitted -> over = true
-                    is ClaimStep.Retry ->
-                        if (lastAttempt) {
-                            over = end(QueueState.Missed, frontier)
-                        } else {
-                            val full = step.code == ErrorCode.FULL
-                            lastAttempt = pacing.waitForClaimRetry(full, step.afterSeconds, deadline)
-                        }
-                    is ClaimStep.DeviceRejected -> {
-                        if (reRegistered) throw step.error
-                        calls.reRegisterDevice()
-                        reRegistered = true
-                    }
-                    ClaimStep.BackToWaiting -> over = false
-                    ClaimStep.Missed -> over = end(QueueState.Missed, frontier)
-                    ClaimStep.Closed -> over = end(QueueState.Closed, frontier)
-                }
-            }
-            return checkNotNull(over)
-        }
 
         /** Emits the final [state] (missed or closed), forgets the place and ends the run. */
         private suspend fun end(
@@ -262,6 +308,7 @@ class QueueRepositoryImpl(
             state = state,
             seq = seq ?: 0,
             served = frontier.served,
+            servedAtJoin = servedAtJoin?.coerceAtMost(seq ?: frontier.served)?.coerceAtMost(frontier.served),
             serverNowEpochMillis = serverNow(frontier),
             ratePerMinute = frontier.ratePerMin?.takeIf { it > 0 },
         )

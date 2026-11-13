@@ -32,6 +32,17 @@ class QueueCacheTest {
         }
 
     @Test
+    fun servedAtJoinSurvivesCacheRecreationAndIsClearedOnLeave() =
+        runTest {
+            val prefs = FakeAppPreferences()
+            QueueCache(prefs).setServedAtJoin("evt_a", 42)
+
+            assertEquals(42, QueueCache(prefs).servedAtJoin("evt_a"))
+            QueueCache(prefs).removeJoinedEvent("evt_a")
+            assertEquals(null, QueueCache(prefs).servedAtJoin("evt_a"))
+        }
+
+    @Test
     fun storesAJsonListUnderTheQueuePrefix() =
         runTest {
             val prefs = FakeAppPreferences()

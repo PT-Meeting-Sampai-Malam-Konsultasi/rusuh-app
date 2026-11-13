@@ -47,6 +47,7 @@ kotlin {
             implementation(libs.ktor.client.mock) // StubEngine: the in-process stub backend (demo mode and tests)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.navigation.compose)
+            implementation(libs.androidx.lifecycle.runtime.compose)
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)

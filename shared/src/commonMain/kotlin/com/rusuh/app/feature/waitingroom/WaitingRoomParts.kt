@@ -94,6 +94,7 @@ internal fun Headline(
 internal fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     Box(modifier = Modifier.fillMaxWidth().padding(end = RusuhSpacing.hardShadow, bottom = RusuhSpacing.hardShadow)) {
         Box(
@@ -108,14 +109,14 @@ internal fun PrimaryButton(
                     .fillMaxWidth()
                     .heightIn(min = RusuhSpacing.primaryButtonHeight)
                     .background(RusuhColors.Ink)
-                    .clickable(role = Role.Button, onClick = onClick),
+                    .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = "$text $FORWARD_ARROW",
                 style = MaterialTheme.typography.bodyLarge.copy(fontFamily = rusuhDisplayFontFamily()),
                 fontWeight = FontWeight.Bold,
-                color = RusuhColors.Paper,
+                color = if (enabled) RusuhColors.Paper else RusuhColors.PaperDeep,
                 textAlign = TextAlign.Center,
             )
         }
@@ -139,7 +140,7 @@ internal fun TurnTimer(seconds: Int) {
         Text(
             text = time,
             style = RusuhTextStyles.etaHeadline.copy(fontFamily = rusuhDisplayFontFamily()),
-            color = RusuhColors.PinkInk,
+            color = if (seconds <= 10) RusuhColors.PinkInk else RusuhColors.Ink,
         )
         Text(text = label, style = MaterialTheme.typography.bodyMedium, color = RusuhColors.InkMuted)
     }

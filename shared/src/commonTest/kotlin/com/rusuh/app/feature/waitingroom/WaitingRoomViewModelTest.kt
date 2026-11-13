@@ -2,7 +2,9 @@ package com.rusuh.app.feature.waitingroom
 
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.SignInRequiredException
+import com.rusuh.app.domain.repository.QueueClaimOutcome
 import com.rusuh.app.domain.repository.QueueRepository
+import com.rusuh.app.domain.usecase.ClaimQueueUseCase
 import com.rusuh.app.domain.usecase.LeaveQueueUseCase
 import com.rusuh.app.feature.waitingroom.data.repository.StubWaitingRoomRepository
 import com.rusuh.app.feature.waitingroom.domain.model.QueueEventInfo
@@ -14,7 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -52,9 +53,16 @@ class WaitingRoomViewModelTest {
 
     private var leaveResult: DomainResult<Unit> = DomainResult.Success(Unit)
     private val leaves = mutableListOf<String>()
+    private var claims = 0
 
     private val queueRepository =
         object : QueueRepository {
+            override suspend fun claim(
+                eventId: String,
+                turnExpiresAtEpochMillis: Long,
+                serverNowEpochMillis: Long,
+            ) = QueueClaimOutcome.Admitted.also { claims++ }
+
             override fun observePlace(eventId: String): Flow<QueuePlace> = emptyFlow()
 
             override suspend fun leave(eventId: String): DomainResult<Unit> {
@@ -63,16 +71,14 @@ class WaitingRoomViewModelTest {
             }
         }
 
-    private fun viewModel(
-        repository: WaitingRoomRepository = StubWaitingRoomRepository(STEP),
-        sessionState: FakeSessionStateProvider? = null,
-    ) = WaitingRoomViewModel(
-        "evt",
-        ObserveQueuePlaceUseCase(repository),
-        LeaveQueueUseCase(queueRepository),
-        monotonicMillis = { now },
-        sessionState = sessionState,
-    )
+    private fun viewModel(repository: WaitingRoomRepository = StubWaitingRoomRepository(STEP)) =
+        WaitingRoomViewModel(
+            "evt",
+            ObserveQueuePlaceUseCase(repository),
+            LeaveQueueUseCase(queueRepository),
+            monotonicMillis = { now },
+            claimQueue = ClaimQueueUseCase(queueRepository),
+        )
 
     private fun place(
         state: QueueState,
@@ -191,12 +197,12 @@ class WaitingRoomViewModelTest {
         }
 
     @Test
-    fun chooseTicketsEmitsNavigateToDetail() =
+    fun chooseTicketsWithoutATurnDoesNothing() =
         runTest(dispatcher) {
             val vm = viewModel()
             vm.dispatch(WaitingRoomIntent.ChooseTicketsNow)
             runCurrent()
-            assertEquals(WaitingRoomEffect.NavigateToDetail("evt"), vm.effect.first())
+            assertTrue(vm.state.value.ui is WaitingRoomUiState.Loading)
         }
 
     @Test
@@ -404,60 +410,24 @@ class WaitingRoomViewModelTest {
         assertEquals(WaitingRoomIntent.QueueAgain, WaitingRoomAction.QueueAgain.toIntent())
     }
 
-    // ===== AUTH-00-M8 (#154): Login Gate Tests =====
-
     @Test
-    fun signedInUserAtTurnAutoAdvancesToDetail() =
+    fun turnWaitsForClaimAndDuplicateTapClaimsOnce() =
         runTest(dispatcher) {
-            val session = FakeSessionStateProvider(signedIn = true)
-            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), session)
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }))
             vm.dispatch(WaitingRoomIntent.Start)
             runCurrent()
-
+            assertEquals(60, assertIs<WaitingRoomPhase.YourTurn>(vm.phase()).secondsLeft)
+            assertEquals(0, claims)
+            vm.dispatch(WaitingRoomIntent.ScreenActive)
+            vm.dispatch(WaitingRoomIntent.ChooseTicketsNow)
+            vm.dispatch(WaitingRoomIntent.ChooseTicketsNow)
+            runCurrent()
             assertEquals(WaitingRoomEffect.NavigateToDetail("evt"), vm.effect.first())
-        }
-
-    @Test
-    fun signedOutAtTurnStillAutoAdvances() =
-        runTest(dispatcher) {
-            // With login-before-queue (AUTH-00-M8), a signed-out user should not reach
-            // the waiting room. But if they do (defensive), we still auto-advance.
-            val session = FakeSessionStateProvider(signedIn = false)
-            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), session)
-            vm.dispatch(WaitingRoomIntent.Start)
-            runCurrent()
-
-            // Without session state, no auto-advance since isSignedIn = false and we're defensive.
-            // The user can still tap "Choose tickets now" manually.
-            val phase = assertIs<WaitingRoomPhase.YourTurn>(vm.phase())
-            assertEquals(60, phase.secondsLeft)
-        }
-
-    @Test
-    fun noSessionStateDefaultsToAutoAdvance() =
-        runTest(dispatcher) {
-            // When no SessionStateProvider is injected, default to signed-in behavior.
-            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), sessionState = null)
-            vm.dispatch(WaitingRoomIntent.Start)
-            runCurrent()
-
-            assertEquals(WaitingRoomEffect.NavigateToDetail("evt"), vm.effect.first())
+            assertEquals(1, claims)
         }
 
     private companion object {
         const val STEP = 1_000L
         const val SCRIPT_STEPS = 10
-    }
-}
-
-/** Minimal fake SessionStateProvider for testing. */
-private class FakeSessionStateProvider(signedIn: Boolean) :
-    com.rusuh.app.data.network.session.SessionStateProvider {
-    private val flow = MutableStateFlow(signedIn)
-
-    override val isSignedIn: kotlinx.coroutines.flow.StateFlow<Boolean> = flow
-
-    fun setSignedIn(value: Boolean) {
-        flow.value = value
     }
 }

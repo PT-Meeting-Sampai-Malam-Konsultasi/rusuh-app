@@ -6,6 +6,8 @@ import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
 import com.rusuh.app.feature.waitingroom.domain.model.QueueState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -209,88 +211,73 @@ class QueueResilienceTest {
     // region: the claim
 
     @Test
-    fun aTransientFailureDuringTheClaimIsRetriedInsideTheWindow() =
+    fun aTransientClaimFailureRetriesUntilAdmission() =
         runTest {
             val h = QueueHarness()
             h.script(frontiers = listOf(open(400)), claim = listOf(unavailable(), ok(ADMISSION_JSON)))
-
-            val places = h.places()
-
-            assertEquals(listOf(QueueState.Turn), places.map { it.state })
-            assertEquals("mock-admission-token", h.tokens.getAdmissionToken())
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            val result = h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis)
+            assertEquals(com.rusuh.app.domain.repository.QueueClaimOutcome.Admitted, result)
             assertEquals(2, h.backend.callsTo(claimLine))
             assertTrue(2_000L in h.delays)
         }
 
     @Test
-    fun claimFailuresInARowEndTheFlowButNotTheTurnWindowAlone() =
+    fun offlineRetriesContinueUntilTheTurnDeadline() =
         runTest {
             val h = QueueHarness()
-            h.script(frontiers = listOf(open(400)), claim = listOf(unavailable()))
-            val seen = mutableListOf<QueuePlace>()
-
-            val failure = assertFailsWith<DomainException> { h.queue.observePlace(EVT).collect { seen += it } }
-
-            assertEquals(503, assertIs<DomainResult.Error>(failure.result).code)
-            assertEquals(listOf(QueueState.Turn), seen.map { it.state })
-            assertEquals(5, h.backend.callsTo(claimLine))
-        }
-
-    @Test
-    fun aLongRetryAfterWaitsOutTheWindowThenMakesOneLastAttempt() =
-        runTest {
-            val h = QueueHarness()
-            h.script(
-                frontiers = listOf(open(400)),
-                claim = listOf(Reply.problem(409, "NOT_YET", retryAfter = 120)),
+            h.script(frontiers = listOf(open(400)), claim = listOf(Reply.offline()))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Missed,
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
             )
-
-            val places = h.places()
-
-            assertEquals(listOf(QueueState.Turn, QueueState.Missed), places.map { it.state })
-            assertEquals(listOf(60_000L), h.delays, "the wait is cut to the window, not skipped")
-            assertEquals(2, h.backend.callsTo(claimLine), "one attempt at the start and one at the end of the window")
+            assertEquals(60_000L, h.delays.sum())
+            assertTrue(h.backend.callsTo(claimLine) > 5)
         }
 
     @Test
-    fun theLastAttemptCanStillSucceed() =
+    fun aLongRetryAfterEndsWithOneFinalAttempt() =
+        runTest {
+            val h = QueueHarness()
+            h.script(frontiers = listOf(open(400)), claim = listOf(Reply.problem(409, "NOT_YET", retryAfter = 120)))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Missed,
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
+            )
+            assertEquals(listOf(60_000L), h.delays.takeLast(1))
+            assertEquals(2, h.backend.callsTo(claimLine))
+        }
+
+    @Test
+    fun theFinalClaimAttemptCanSucceed() =
         runTest {
             val h = QueueHarness()
             h.script(
                 frontiers = listOf(open(400)),
                 claim = listOf(Reply.problem(409, "NOT_YET", retryAfter = 120), ok(ADMISSION_JSON)),
             )
-
-            val places = h.places()
-
-            assertEquals(listOf(QueueState.Turn), places.map { it.state })
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Admitted,
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
+            )
             assertEquals("mock-admission-token", h.tokens.getAdmissionToken())
         }
 
     @Test
-    fun aSessionProblemOnClaimAsksForSignInButADeviceProblemRegistersAgain() =
+    fun aDeviceProblemRegistersAgainOnceDuringClaim() =
         runTest {
-            val device = QueueHarness()
-            device.script(
-                frontiers = listOf(open(400)),
-                claim = listOf(Reply.problem(401, "FORBIDDEN"), ok(ADMISSION_JSON)),
-            )
-
-            device.places()
-
+            val h = QueueHarness()
+            h.script(frontiers = listOf(open(400)), claim = listOf(Reply.problem(401, "FORBIDDEN"), ok(ADMISSION_JSON)))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
             assertEquals(
-                2,
-                device.backend.callsTo("POST /queue/devices"),
-                "registered again after the rejected device token",
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Admitted,
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
             )
-            assertEquals(2, device.backend.callsTo(claimLine))
-
-            val stubborn = QueueHarness()
-            stubborn.script(frontiers = listOf(open(400)), claim = listOf(Reply.problem(401, "FORBIDDEN")))
-            val failure = assertFailsWith<DomainException> { stubborn.places() }
-            assertEquals(401, assertIs<DomainResult.Error>(failure.result).code)
-            assertEquals(2, stubborn.backend.callsTo("POST /queue/devices"), "only once")
-            assertEquals(2, stubborn.backend.callsTo(claimLine))
+            assertEquals(2, h.backend.callsTo("POST /queue/devices"))
+            assertEquals(2, h.backend.callsTo(claimLine))
         }
 
     // endregion
@@ -304,7 +291,7 @@ class QueueResilienceTest {
             val h = QueueHarness(synced = false, clockStart = 5_000L)
             h.script(frontiers = listOf(open(100), open(400)))
 
-            val places = h.places()
+            val places = h.queue.observePlace(EVT).take(2).toList()
 
             val turn = places.last()
             assertEquals(QueueState.Turn, turn.state)
@@ -351,7 +338,8 @@ class QueueResilienceTest {
             val h = QueueHarness()
             h.script(frontiers = listOf(open(400)))
             h.backend.on("DELETE /queue/$EVT/me", Reply.noContent())
-            h.places()
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis)
             assertEquals("mock-admission-token", h.tokens.getAdmissionToken())
 
             assertEquals(DomainResult.Success(Unit), h.queue.leave(EVT))
@@ -366,7 +354,8 @@ class QueueResilienceTest {
         runTest {
             val h = QueueHarness()
             h.script(frontiers = listOf(open(400)))
-            h.places()
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis)
             h.tokens.setQueueToken("evt_other", "t")
             h.backend.on("DELETE /queue/evt_other/me", Reply.noContent())
 

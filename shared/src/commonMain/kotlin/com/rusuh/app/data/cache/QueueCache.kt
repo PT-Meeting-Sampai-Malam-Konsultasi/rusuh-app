@@ -28,6 +28,7 @@ data class AdmissionInfo(
  * places to read. The queue tokens themselves live in the `TokenStore`, never here. Changes are serialised, so two
  * joins at once never lose an id; an unreadable stored value counts as an empty list.
  */
+@Suppress("TooManyFunctions")
 class QueueCache(
     prefs: AppPreferences,
 ) : PrefsCache(prefs, PREFIX) {
@@ -45,7 +46,22 @@ class QueueCache(
         lock.withLock {
             val ids = readIds()
             if (eventId in ids) write(KEY_JOINED, encode(ids - eventId))
+            delete(KEY_SERVED_PREFIX + eventId)
         }
+
+    suspend fun servedAtJoin(eventId: String): Int? =
+        lock.withLock {
+            read(KEY_SERVED_PREFIX + eventId)?.toIntOrNull()
+        }
+
+    suspend fun setServedAtJoin(
+        eventId: String,
+        served: Int,
+    ) = lock.withLock {
+        if (servedAtJoinUnlocked(eventId) == null) write(KEY_SERVED_PREFIX + eventId, served.toString())
+    }
+
+    private suspend fun servedAtJoinUnlocked(eventId: String): Int? = read(KEY_SERVED_PREFIX + eventId)?.toIntOrNull()
 
     suspend fun setAdmission(info: AdmissionInfo) = lock.withLock { write(KEY_ADMISSION, json.encodeToString(info)) }
 
@@ -79,6 +95,7 @@ class QueueCache(
         const val PREFIX = "queue_"
         const val KEY_JOINED = PREFIX + "joined_events_json"
         const val KEY_ADMISSION = PREFIX + "admission_json"
+        const val KEY_SERVED_PREFIX = PREFIX + "served_at_join_"
         val json = Json
     }
 }

@@ -44,7 +44,7 @@ sealed interface WaitingRoomPhase {
     data class Paused(val position: Int, val reason: PauseReason) : WaitingRoomPhase
 
     /** The customer's turn: [secondsLeft] of the 60 s window to enter. */
-    data class YourTurn(val myNumber: Int, val secondsLeft: Int) : WaitingRoomPhase
+    data class YourTurn(val myNumber: Int, val secondsLeft: Int, val claiming: Boolean = false) : WaitingRoomPhase
 
     /** The 60 s window ran out. */
     data class MissedTurn(val estimateMinutes: Int?) : WaitingRoomPhase
