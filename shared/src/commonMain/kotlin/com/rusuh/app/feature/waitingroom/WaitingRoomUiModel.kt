@@ -44,7 +44,7 @@ sealed interface WaitingRoomPhase {
     data class Paused(val position: Int, val reason: PauseReason) : WaitingRoomPhase
 
     /** The customer's turn: [secondsLeft] of the 60 s window to enter. */
-    data class YourTurn(val myNumber: Int, val secondsLeft: Int, val heldForSignIn: Boolean = false) : WaitingRoomPhase
+    data class YourTurn(val myNumber: Int, val secondsLeft: Int) : WaitingRoomPhase
 
     /** The 60 s window ran out. */
     data class MissedTurn(val estimateMinutes: Int?) : WaitingRoomPhase
@@ -57,7 +57,7 @@ sealed interface WaitingRoomPhase {
 enum class WaitingRoomErrorKind {
     Generic,
 
-    /** The turn came but claiming needs a signed-in account. TODO(AUTH-00 #77): show the sign-in sheet for it. */
+    /** Session lost mid-queue (401/SignInRequiredException during polling). Opens sign-in to resume. */
     SignInRequired,
 }
 
@@ -76,19 +76,16 @@ sealed interface WaitingRoomUiState {
         val kind: WaitingRoomErrorKind = WaitingRoomErrorKind.Generic,
     ) : WaitingRoomUiState
 
-    /** A queue exists: [event] poster + [phase]; [isGuest] shows the "Masuk" banner. */
+    /** A queue exists: [event] poster + [phase]. */
     data class Active(
         val event: WaitingRoomEventUi,
         val phase: WaitingRoomPhase,
-        val isGuest: Boolean = false,
     ) : WaitingRoomUiState
 }
 
 /** User actions raised by the screen; the caller (future ViewModel) decides what they do. */
 sealed interface WaitingRoomAction {
     data object Back : WaitingRoomAction
-
-    data object SignIn : WaitingRoomAction
 
     data object EnterNow : WaitingRoomAction
 
@@ -126,25 +123,4 @@ fun WaitingRoomPhase.showsNotes(): Boolean =
     when (this) {
         is WaitingRoomPhase.PreQueue, is WaitingRoomPhase.Waiting, is WaitingRoomPhase.Paused -> true
         is WaitingRoomPhase.YourTurn, is WaitingRoomPhase.MissedTurn, WaitingRoomPhase.SoldOut -> false
-    }
-
-/** The guest login banner shows only while the customer is waiting (pre-queue, waiting, paused). */
-fun WaitingRoomPhase.showsGuestBanner(): Boolean =
-    when (this) {
-        is WaitingRoomPhase.PreQueue, is WaitingRoomPhase.Waiting, is WaitingRoomPhase.Paused -> true
-        is WaitingRoomPhase.YourTurn -> heldForSignIn
-        is WaitingRoomPhase.MissedTurn, WaitingRoomPhase.SoldOut -> false
-    }
-
-private const val NEAR_TURN_POSITION = 10
-
-/**
- * Whether the guest banner should be prominent (pink background).
- * True when the customer is near their turn (position ≤ 10) or held at their turn for sign-in.
- */
-fun WaitingRoomPhase.isNearTurn(): Boolean =
-    when (this) {
-        is WaitingRoomPhase.Waiting -> queue.position <= NEAR_TURN_POSITION
-        is WaitingRoomPhase.YourTurn -> heldForSignIn
-        else -> false
     }

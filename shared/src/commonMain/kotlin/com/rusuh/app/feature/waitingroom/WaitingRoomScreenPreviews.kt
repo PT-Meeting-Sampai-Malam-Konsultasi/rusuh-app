@@ -49,10 +49,6 @@ internal fun WaitingRoomWaitingPreview() =
     )
 
 @Composable
-internal fun WaitingRoomWaitingGuestPreview() =
-    Preview(WaitingRoomUiState.Active(sampleEvent, WaitingRoomPhase.Waiting(sampleQueue), isGuest = true))
-
-@Composable
 internal fun WaitingRoomPausedStockPreview() =
     Preview(
         WaitingRoomUiState.Active(sampleEvent, WaitingRoomPhase.Paused(position = 1248, reason = PauseReason.Stock)),
@@ -74,13 +70,3 @@ internal fun WaitingRoomMissedTurnPreview() =
 
 @Composable
 internal fun WaitingRoomSoldOutPreview() = Preview(WaitingRoomUiState.Active(sampleEvent, WaitingRoomPhase.SoldOut))
-
-@Composable
-internal fun WaitingRoomYourTurnHeldPreview() =
-    Preview(
-        WaitingRoomUiState.Active(
-            sampleEvent,
-            WaitingRoomPhase.YourTurn(myNumber = 19_700, secondsLeft = 52, heldForSignIn = true),
-            isGuest = true,
-        ),
-    )

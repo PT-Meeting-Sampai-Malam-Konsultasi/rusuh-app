@@ -31,6 +31,11 @@ private const val TICK_MILLIS = 1_000L
  * stateless [WaitingRoomScreen], ticks countdowns once a second and routes one-time effects.
  *
  * [WaitingRoomEffect.NavigateToDetail] (the turn's "choose tickets" action) goes to [onChooseTickets].
+ *
+ * The queue entry gate (AUTH-00-M8 #154) ensures users are signed in before reaching this screen.
+ * The only sign-in path from here is [onReSignIn], a defensive fallback when the session is lost
+ * mid-queue (401/SignInRequiredException during polling); after re-signing in the user resumes
+ * the same place (join is idempotent, the place belongs to the device).
  */
 @Suppress("LongParameterList") // Navigation callbacks for a route composable.
 @Composable
@@ -39,7 +44,7 @@ fun WaitingRoomRoute(
     onBack: () -> Unit,
     onBrowseEvents: () -> Unit,
     onChooseTickets: (String) -> Unit,
-    onSignIn: (String) -> Unit = {},
+    onReSignIn: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
@@ -65,9 +70,9 @@ fun WaitingRoomRoute(
             when (effect) {
                 WaitingRoomEffect.NavigateBack -> currentOnBack()
                 WaitingRoomEffect.NavigateToEvents -> currentOnBrowseEvents()
-                is WaitingRoomEffect.OpenSignIn -> onSignIn(effect.eventId)
-                // TODO(AUTH-00 #77): SignInRequired opens the sign-in sheet; until then it shows the same message.
-                WaitingRoomEffect.ShowRefreshError, WaitingRoomEffect.SignInRequired ->
+                // Defensive re-auth: session lost mid-queue opens sign-in to resume.
+                is WaitingRoomEffect.ReSignIn -> onReSignIn(effect.eventId)
+                WaitingRoomEffect.ShowRefreshError ->
                     scope.launch {
                         val result = snackbarHostState.showSnackbar(refreshMessage, actionLabel = retryLabel)
                         if (result == SnackbarResult.ActionPerformed) viewModel.dispatch(WaitingRoomIntent.Retry)

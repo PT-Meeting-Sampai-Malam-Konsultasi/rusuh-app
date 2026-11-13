@@ -26,6 +26,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.rusuh.app.data.network.session.SessionStateProvider
 import com.rusuh.app.feature.account.AccountRoute
 import com.rusuh.app.feature.account.AccountViewModel
 import com.rusuh.app.feature.account.AccountViewModelHolder
@@ -76,17 +77,26 @@ import org.koin.core.parameter.parametersOf
  * restoration across tabs is a nice-to-have left for a later pass (the tab
  * screens are stateless placeholders today).
  *
+ * ## Queue entry gate (AUTH-00-M8 #154)
+ *
+ * The queue requires a signed-in user. Every path to the waiting room goes through
+ * [navigateToQueueWithGate]: signed in goes straight, signed out goes to sign-in
+ * with the event id. After sign-in completes the sign-in route is replaced with
+ * the waiting room (no pop back to caller). Back/dismiss from sign-in returns to
+ * where the user came from and nothing is joined.
+ *
  * TODO(M3/M4): swap the placeholder tab screens for their real ViewModels.
  */
 @Composable
 fun RusuhNavGraph(navController: NavHostController) {
+    val sessionState = koinInject<SessionStateProvider>()
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
     ) {
         composable(Screen.Splash.route) { SplashPlaceholder() }
 
-        topLevelTabs(navController)
+        topLevelTabs(navController, sessionState)
 
         composable(
             route = Screen.Detail.route,
@@ -107,12 +117,8 @@ fun RusuhNavGraph(navController: NavHostController) {
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onHome = { navController.popBackStack(Screen.Home.route, inclusive = false) },
-                // TODO(FR-04-M5 #78): temporary queue entry until the join/route decision lands.
-                onQueue = { id ->
-                    navController.navigate(Screen.WaitingRoom.routeFor(id)) {
-                        popUpTo(Screen.Detail.route) { inclusive = true }
-                    }
-                },
+                // Entry gate: queue entry requires sign-in (AUTH-00-M8 #154).
+                onQueue = { id -> navController.navigateToQueueWithGate(id, sessionState) },
                 // Navigate to payment, popping Detail so back from payment returns to the event list.
                 onPayment = { bookingId ->
                     navController.navigate(Screen.Payment.routeFor(bookingId)) {
@@ -150,8 +156,7 @@ fun RusuhNavGraph(navController: NavHostController) {
                     },
                 ),
         ) { backStackEntry ->
-            // The event is resolved from ARG_EVENT_ID; the waiting-room entry point navigates
-            // via Screen.SignIn.routeFor(eventId). When opened standalone the banner shows a placeholder.
+            val eventId = backStackEntry.arguments?.getString(Screen.SignIn.ARG_EVENT_ID)
             val koin = getKoin()
             val viewModel =
                 viewModel<SignInViewModelHolder>(
@@ -162,12 +167,20 @@ fun RusuhNavGraph(navController: NavHostController) {
             val state by viewModel.state.collectAsState()
             val lastState = remember { LastState() }
             lastState.value = state.step
-            // On SignedIn effect the screen closes. The waiting room (onSignIn callback) resumes the
-            // held turn automatically once the session state updates.
+            // On SignedIn effect: if opened from the queue entry gate (eventId present), replace
+            // this route with the waiting room. Otherwise just pop back.
             LaunchedEffect(viewModel) {
                 viewModel.effect.collect { effect ->
                     when (effect) {
-                        is SignInEffect.SignedIn -> navController.popIfCurrent(Screen.SignIn.route)
+                        is SignInEffect.SignedIn -> {
+                            if (eventId != null) {
+                                navController.navigate(Screen.WaitingRoom.routeFor(eventId)) {
+                                    popUpTo(Screen.SignIn.route) { inclusive = true }
+                                }
+                            } else {
+                                navController.popIfCurrent(Screen.SignIn.route)
+                            }
+                        }
                     }
                 }
             }
@@ -192,19 +205,18 @@ fun RusuhNavGraph(navController: NavHostController) {
             // so resolve once per event id to keep a single ViewModel for this destination.
             val koin = getKoin()
             val viewModel = remember(eventId) { koin.get<WaitingRoomViewModel> { parametersOf(eventId) } }
-            // The onSignIn callback opens the sign-in route; once signed in the session updates and
-            // the VM's session observer auto-navigates to Detail with the remaining time.
             WaitingRoomRoute(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
-                onSignIn = { id -> navController.navigate(Screen.SignIn.routeFor(id)) },
                 // The turn: go to Detail and drop the Waiting Room so Back does not return into it.
                 onChooseTickets = { id ->
                     navController.navigate(Screen.Detail.routeFor(id)) {
                         popUpTo(Screen.WaitingRoom.route) { inclusive = true }
                     }
                 },
+                // Defensive re-auth: if the session is lost mid-queue, re-sign in for this event.
+                onReSignIn = { id -> navController.navigate(Screen.SignIn.routeFor(id)) },
             )
         }
 
@@ -255,7 +267,10 @@ fun RusuhNavGraph(navController: NavHostController) {
  * [RusuhBottomBar] with its own tab selected (the per-tab-screen Scaffold
  * pattern); tab taps route through [onTabSelected].
  */
-private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
+private fun NavGraphBuilder.topLevelTabs(
+    navController: NavHostController,
+    sessionState: SessionStateProvider,
+) {
     val onTabSelected: (RusuhTab) -> Unit = { tab -> navController.switchTab(tab) }
 
     composable(Screen.Home.route) {
@@ -272,7 +287,8 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
             // which joins the queue.
             HomeScreen(
                 viewModel = viewModel,
-                onOpenQueue = { eventId -> navController.navigate(Screen.WaitingRoom.routeFor(eventId)) },
+                // Entry gate: queue entry requires sign-in (AUTH-00-M8 #154).
+                onOpenQueue = { eventId -> navController.navigateToQueueWithGate(eventId, sessionState) },
                 modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
             )
         }
@@ -281,7 +297,8 @@ private fun NavGraphBuilder.topLevelTabs(navController: NavHostController) {
     composable(Screen.Queues.route) {
         MyQueuesRoute(
             viewModel = koinInject<MyQueuesViewModel>(),
-            onOpenWaitingRoom = { eventId -> navController.navigate(Screen.WaitingRoom.routeFor(eventId)) },
+            // Entry gate: queue entry requires sign-in (AUTH-00-M8 #154).
+            onOpenWaitingRoom = { eventId -> navController.navigateToQueueWithGate(eventId, sessionState) },
             onSwitchTab = onTabSelected,
             onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
         )
@@ -356,6 +373,21 @@ private class LastState(
  */
 private fun NavHostController.popIfCurrent(route: String) {
     if (currentDestination?.route == route) popBackStack()
+}
+
+/**
+ * Entry gate (AUTH-00-M8 #154): navigates to the waiting room if signed in, otherwise to sign-in
+ * with the event id. After sign-in completes, the sign-in route is replaced with the waiting room.
+ */
+private fun NavHostController.navigateToQueueWithGate(
+    eventId: String,
+    sessionState: SessionStateProvider,
+) {
+    val decision = decideQueueEntry(eventId, sessionState.isSignedIn.value)
+    when (decision) {
+        is QueueEntryDecision.ToWaitingRoom -> navigate(Screen.WaitingRoom.routeFor(eventId))
+        is QueueEntryDecision.ToSignIn -> navigate(Screen.SignIn.routeFor(eventId))
+    }
 }
 
 /**

@@ -104,7 +104,6 @@ class WaitingRoomMapperTest {
     fun toUiStateCarriesEventCopy() {
         val ui = assertIs<WaitingRoomUiState.Active>(place(QueueState.Closed).toUiState())
         assertEquals(WaitingRoomEventUi("Konser", "Sub", "Sab", "GBK"), ui.event)
-        assertEquals(false, ui.isGuest)
     }
 
     @Test

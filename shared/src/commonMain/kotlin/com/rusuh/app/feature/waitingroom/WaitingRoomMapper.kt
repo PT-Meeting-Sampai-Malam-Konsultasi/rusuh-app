@@ -69,8 +69,6 @@ internal fun QueuePlace.toPhase(elapsedMillis: Long = 0L): WaitingRoomPhase? =
 /**
  * Maps a domain [QueuePlace] to what the screen renders, [elapsedMillis] of monotonic time
  * after it was received. An invalid snapshot becomes a blank-message [WaitingRoomUiState.Error].
- *
- * shortcut: `isGuest` stays false until the auth state seam (AUTH-00) exists.
  */
 fun QueuePlace.toUiState(elapsedMillis: Long = 0L): WaitingRoomUiState {
     val phase = toPhase(elapsedMillis) ?: return WaitingRoomUiState.Error("")
