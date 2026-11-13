@@ -3,6 +3,7 @@ package com.rusuh.app.data.repository
 import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.isNetworkFailure
+import com.rusuh.app.data.network.newIdempotencyKey
 import com.rusuh.app.data.remote.BookingApiService
 import com.rusuh.app.data.remote.dto.BookingTicketDto
 import com.rusuh.app.data.remote.dto.CreateBookingRequestDto
@@ -266,6 +267,3 @@ class DetailRepositoryImpl(
         val HTTP_SERVER_ERROR_RANGE = 500..599
     }
 }
-
-/** Generates a new idempotency key (UUID v4). */
-internal expect fun newIdempotencyKey(): String
