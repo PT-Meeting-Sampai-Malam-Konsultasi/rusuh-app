@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.rusuh.app.feature.initializeComposeResourceContext
 import com.rusuh.app.feature.startScreenTestKoin
 import com.rusuh.app.ui.theme.RusuhTheme
@@ -15,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.stopKoin
 import org.robolectric.RobolectricTestRunner
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 class ETicketScreenTest {
@@ -41,5 +43,20 @@ class ETicketScreenTest {
     @Test fun errorStateShowsRetryCopy() {
         compose.setContent { RusuhTheme { ETicketScreen(ETicketUiState.Error) } }
         compose.onNodeWithText("E-ticket could not be loaded").assertIsDisplayed()
+    }
+
+    @Test fun calendarButtonClickCallsOnAddToCalendar() {
+        var calendarClicked = false
+        val ui = sampleETicketOrder(1).toUi()
+        compose.setContent {
+            RusuhTheme {
+                ETicketScreen(
+                    state = ETicketUiState.Content(ui),
+                    actions = ETicketActions(onAddToCalendar = { calendarClicked = true }),
+                )
+            }
+        }
+        compose.onNodeWithText("Add to calendar").performClick()
+        assertTrue(calendarClicked)
     }
 }

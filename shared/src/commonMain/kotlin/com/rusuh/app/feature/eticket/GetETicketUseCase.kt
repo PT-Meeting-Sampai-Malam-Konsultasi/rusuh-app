@@ -15,6 +15,20 @@ class GetETicketUseCase(
         val order = repository.getOrderTickets(orderId)
         return if (order == null || order.tickets.isEmpty()) ETicketResult.NotFound else ETicketResult.Found(order)
     }
+
+    /**
+     * Loads the order, wrapping failures as [ETicketResult.NotFound] so the caller can decide
+     * how to handle errors.
+     */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    suspend fun load(orderId: String): ETicketResult =
+        try {
+            invoke(orderId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            ETicketResult.NotFound
+        }
 }
 
 /**
