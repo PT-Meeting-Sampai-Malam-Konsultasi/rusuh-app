@@ -6,7 +6,6 @@ import com.rusuh.app.data.network.plugin.queueToken
 import com.rusuh.app.data.remote.dto.AdmissionDto
 import com.rusuh.app.data.remote.dto.FrontierDto
 import com.rusuh.app.data.remote.dto.QueuePlaceDto
-import io.ktor.http.encodeURLPathPart
 
 /**
  * The queue endpoints (queue service). The device token and the optional Bearer are added by the host client; the
@@ -41,7 +40,7 @@ class QueueApiService(
     private fun path(
         eventId: String,
         suffix: String,
-    ) = "/queue/${eventId.encodeURLPathPart()}/$suffix"
+    ) = "/queue/${pathSegment(eventId)}/$suffix"
 
     private companion object {
         const val JOIN = "join"

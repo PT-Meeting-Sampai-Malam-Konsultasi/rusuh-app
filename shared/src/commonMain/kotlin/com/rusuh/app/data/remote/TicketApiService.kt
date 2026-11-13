@@ -17,10 +17,10 @@ class TicketApiService(
     suspend fun getTickets(): ApiResult<TicketsResponseDto> = api.get(EP_TICKETS)
 
     /** One ticket by its id. */
-    suspend fun getTicket(ticketId: String): ApiResult<TicketDto> = api.get("$EP_TICKETS/$ticketId")
+    suspend fun getTicket(ticketId: String): ApiResult<TicketDto> = api.get("$EP_TICKETS/${pathSegment(ticketId)}")
 
     /** Public event details for enriching ticket display. */
-    suspend fun getEvent(eventId: String): ApiResult<EventDto> = api.get("$EP_EVENTS/$eventId")
+    suspend fun getEvent(eventId: String): ApiResult<EventDto> = api.get("$EP_EVENTS/${pathSegment(eventId)}")
 
     private companion object {
         const val EP_TICKETS = "/core/tickets"

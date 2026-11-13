@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
+import com.rusuh.app.util.groupThousands
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.event_card_price_from
@@ -260,12 +261,4 @@ internal fun buildCardIdentity(data: EventCardData): String =
 internal fun Int.formatThousands(): String = toLong().formatThousands()
 
 /** Long variant of [Int.formatThousands] (money amounts). */
-internal fun Long.formatThousands(): String {
-    val digits = toString()
-    val sb = StringBuilder()
-    for ((index, ch) in digits.withIndex()) {
-        if (index > 0 && (digits.length - index) % 3 == 0) sb.append('.')
-        sb.append(ch)
-    }
-    return sb.toString()
-}
+internal fun Long.formatThousands(): String = groupThousands()

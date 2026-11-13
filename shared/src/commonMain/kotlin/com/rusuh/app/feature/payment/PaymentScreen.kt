@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.components.BrutalButton
+import com.rusuh.app.ui.components.formatRupiah
 import com.rusuh.app.ui.theme.RusuhBrandTextStyles
 import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
@@ -743,7 +744,3 @@ private fun TextButton(
 }
 
 /** Formats a rupiah amount with thousand separators. */
-private fun formatRupiah(amount: Long): String {
-    val formatted = amount.toString().reversed().chunked(3).joinToString(".").reversed()
-    return "Rp $formatted"
-}

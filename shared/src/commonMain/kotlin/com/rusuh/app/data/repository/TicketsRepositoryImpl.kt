@@ -15,6 +15,7 @@ import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.feature.eticket.ETicketOrder
 import com.rusuh.app.feature.tickets.TicketOrder
 import com.rusuh.app.feature.tickets.TicketsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -46,7 +47,7 @@ class TicketsRepositoryImpl(
         val eventIds = tickets.mapNotNull { it.eventId.takeIf { id -> id.isNotBlank() } }.toSet()
         ensureEventFacts(eventIds)
         // Build a snapshot of event facts for the mapper (non-suspend lambda)
-        val eventFactsSnapshot = eventIds.associateWith { getEventFactsSync(it) }
+        val eventFactsSnapshot = eventIds.associateWith { getEventFacts(it) }
         val nowMillis = serverClock.takeIf { it.isSynced }?.nowMillis()
         return groupTicketsIntoOrders(
             tickets = tickets,
@@ -97,12 +98,20 @@ class TicketsRepositoryImpl(
                 is ApiResult.Success -> {
                     val facts = result.data.toCachedEventFacts()
                     mutex.withLock { eventFactsMemory[eventId] = facts }
-                    runCatching { cache.setEventFacts(eventId, facts) }
+                    try {
+                        cache.setEventFacts(eventId, facts)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Cache persistence is optional for ticket display.
+                    }
                 }
                 else -> {
                     // Event fetch failed; degrade gracefully (ticket shows without event facts)
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             // Silently fail; the ticket display degrades gracefully
         }
@@ -111,12 +120,15 @@ class TicketsRepositoryImpl(
     private suspend fun getEventFacts(eventId: String): CachedEventFacts? {
         if (eventId.isBlank()) return null
         val memoryFacts = mutex.withLock { eventFactsMemory[eventId] }
-        val result = memoryFacts ?: runCatching { cache.getEventFacts(eventId) }.getOrNull()
+        val result =
+            memoryFacts ?: try {
+                cache.getEventFacts(eventId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
         result?.let { mutex.withLock { eventFactsMemory[eventId] = it } }
         return result
     }
-
-    /** Synchronous read from the in-memory cache only (for the mapper lambda after ensureEventFacts). */
-    private fun getEventFactsSync(eventId: String): CachedEventFacts? =
-        if (eventId.isBlank()) null else eventFactsMemory[eventId]
 }

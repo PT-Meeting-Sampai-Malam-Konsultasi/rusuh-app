@@ -11,4 +11,8 @@ import androidx.lifecycle.ViewModel
  *
  * TODO(FR-16-M1 #81): cancel the ViewModel's scope (and any in-flight booking) in onCleared.
  */
-class DetailViewModelHolder(val viewModel: DetailViewModel) : ViewModel()
+class DetailViewModelHolder(val viewModel: DetailViewModel) : ViewModel() {
+    override fun onCleared() {
+        viewModel.clear()
+    }
+}

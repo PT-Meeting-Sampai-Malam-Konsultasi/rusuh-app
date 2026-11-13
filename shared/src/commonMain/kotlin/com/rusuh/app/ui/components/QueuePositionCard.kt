@@ -29,6 +29,7 @@ import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhTextStyles
 import com.rusuh.app.ui.theme.rusuhDisplayFontFamily
+import com.rusuh.app.util.groupThousands
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.queue_position_eta_minutes
@@ -245,9 +246,7 @@ private fun QueueProgressTrack(progress: QueueProgressUi) {
 
 /** Indonesian thousands grouping with a dot: 1248 -> "1.248". Pure function. */
 fun formatQueueNumber(value: Int): String {
-    val digits = value.toString().removePrefix("-")
-    val grouped = digits.reversed().chunked(GROUP_SIZE).joinToString(".").reversed()
-    return if (value < 0) "-$grouped" else grouped
+    return value.toLong().groupThousands()
 }
 
 /** Formats a countdown in whole seconds as m:ss ("8:42", "0:52"). Pure function. */
@@ -285,7 +284,6 @@ internal fun buildQueueDescription(data: QueuePositionUi): String =
     }
 
 private const val META_SEPARATOR = " · "
-private const val GROUP_SIZE = 3
 private const val SECONDS_PER_MINUTE = 60
 private const val MAX_FULL_SIZE_CHARS = 5
 internal const val PROGRESS_FILL_TAG = "queue-progress-blue-fill"
