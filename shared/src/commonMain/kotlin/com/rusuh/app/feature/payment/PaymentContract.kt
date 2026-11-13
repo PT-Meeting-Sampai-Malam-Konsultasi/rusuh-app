@@ -48,8 +48,8 @@ sealed interface PaymentIntent : MviIntent {
     /** The countdown ticked: recompute remaining time from the server clock. */
     data object Tick : PaymentIntent
 
-    /** User returned from the Snap page; start polling for status. */
-    data object ReturnedFromSnap : PaymentIntent
+    /** The app returned to the foreground after the Snap handoff. */
+    data object Resumed : PaymentIntent
 
     /** Go to the e-ticket / Tiket tab after successful payment. */
     data object GoToTickets : PaymentIntent

@@ -3,14 +3,14 @@ package com.rusuh.app.feature.payment
 import com.rusuh.app.domain.model.BookingStatus
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.ErrorCode
+import com.rusuh.app.domain.model.PaymentStatus
 import com.rusuh.app.domain.model.PaymentSummary
 import com.rusuh.app.domain.usecase.LoadPaymentUseCase
 import com.rusuh.app.domain.usecase.ObservePaymentStatusUseCase
 import com.rusuh.app.domain.usecase.StartSnapPaymentUseCase
 import com.rusuh.app.mvi.MviViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -44,7 +44,7 @@ class PaymentViewModel(
             PaymentIntent.OpenSnap -> openSnap()
             PaymentIntent.RetrySnap -> openSnap()
             PaymentIntent.Tick -> tick()
-            PaymentIntent.ReturnedFromSnap -> startPolling()
+            PaymentIntent.Resumed -> refreshAfterResume()
             PaymentIntent.GoToTickets -> sendEffect(PaymentEffect.NavigateToTickets)
             PaymentIntent.QueueAgain -> queueAgain()
             PaymentIntent.GoHome -> sendEffect(PaymentEffect.NavigateToHome)
@@ -54,7 +54,12 @@ class PaymentViewModel(
     private suspend fun load() {
         setState { copy(ui = PaymentUiState.Loading) }
         when (val result = loadPayment(bookingId)) {
-            is DomainResult.Success -> handleLoadSuccess(result.data)
+            is DomainResult.Success -> {
+                handleLoadSuccess(result.data)
+                if (result.data.currentSnap != null) {
+                    checkStatusOnce(result.data)
+                }
+            }
             is DomainResult.Error -> handleLoadError(result.errorCode)
             is DomainResult.NetworkError -> setNetworkError()
             is DomainResult.Empty, is DomainResult.TechnicalError -> setGenericError()
@@ -193,30 +198,66 @@ class PaymentViewModel(
         lastIdempotencyKey = null
     }
 
-    private fun startPolling() {
-        val currentSummary = summary ?: return
+    @Suppress("ReturnCount", "SwallowedException")
+    private suspend fun refreshAfterResume() {
+        val previous = summary ?: return
+        val ui = currentState.ui
+        if (ui !is PaymentUiState.Ready || !ui.hasOpenedSnap) return
         pollingJob?.cancel()
-
-        setState {
-            copy(
-                ui =
-                    PaymentUiState.Verifying(
-                        summary = currentSummary.toUi(),
-                        methodName = currentSummary.currentSnap?.method?.name?.lowercase()?.replace("_", " "),
-                    ),
-            )
-        }
-
-        pollingJob =
-            viewModelScope.launch {
-                observePaymentStatus(bookingId)
-                    .catch { /* Polling failed; stay in verifying state */ }
-                    .collect { status ->
-                        serverNowAtReceive = status.serverNow
-                        receivedAtMillis = monotonicMillis()
-                        handlePollingStatus(status.bookingStatus, status.paymentStatus.isSuccess, currentSummary)
-                    }
+        when (val refreshed = loadPayment(bookingId)) {
+            is DomainResult.Success -> {
+                summary = refreshed.data
+                serverNowAtReceive = refreshed.data.serverNow
+                receivedAtMillis = monotonicMillis()
+                val remaining = computeRemainingSeconds(refreshed.data.expiresAt)
+                setState { copy(remainingSeconds = remaining) }
+                checkStatusOnce(refreshed.data)
             }
+            is DomainResult.Error,
+            is DomainResult.NetworkError,
+            is DomainResult.Empty,
+            is DomainResult.TechnicalError,
+            -> {
+                val remaining = computeRemainingSeconds(previous.expiresAt)
+                setState { copy(remainingSeconds = remaining) }
+                if (remaining == 0) setExpiredState(previous.toUi(), previous.customerEmail, false)
+            }
+        }
+    }
+
+    @Suppress("SwallowedException")
+    private suspend fun checkStatusOnce(currentSummary: PaymentSummary) {
+        val status =
+            try {
+                observePaymentStatus(bookingId).first()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Exception,
+            ) {
+                setGenericError()
+                return
+            }
+        serverNowAtReceive = status.serverNow
+        receivedAtMillis = monotonicMillis()
+        when {
+            status.bookingStatus.isPaid -> handlePollingStatus(status.bookingStatus, true, currentSummary)
+            status.bookingStatus == BookingStatus.EXPIRED || status.bookingStatus == BookingStatus.CANCELLED ->
+                handlePollingStatus(
+                    status.bookingStatus,
+                    status.paymentStatus == PaymentStatus.PAID_AFTER_EXPIRY,
+                    currentSummary,
+                )
+            computeRemainingSeconds(currentSummary.expiresAt) <= 0 ->
+                setExpiredState(currentSummary.toUi(), currentSummary.customerEmail, false)
+            else ->
+                setState {
+                    copy(
+                        ui = PaymentUiState.Ready(currentSummary.toUi(), hasOpenedSnap = true),
+                        remainingSeconds = computeRemainingSeconds(currentSummary.expiresAt),
+                    )
+                }
+        }
     }
 
     private fun handlePollingStatus(

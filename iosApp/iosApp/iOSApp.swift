@@ -38,6 +38,9 @@ struct iOSApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onOpenURL { url in
+                    PaymentReturnLinkKt.handlePaymentReturnUrl(url: url.absoluteString)
+                }
         }
     }
 }

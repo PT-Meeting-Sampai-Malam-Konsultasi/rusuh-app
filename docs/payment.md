@@ -8,8 +8,8 @@ Payment follows the Midtrans Web UI (Snap hosted page) flow:
 1. User reaches the Payment screen after ticket selection
 2. App shows order summary with a 10-minute countdown
 3. User taps "Continue to payment" → opens Snap page in system tab
-4. User completes payment on Snap, then returns via App Link / Universal Link
-5. App polls status and shows the result (success / expired / failed)
+4. The app returns to the foreground or receives the return link
+5. The app refreshes the server deadline and checks status once; pending status stays on Payment
 
 The Midtrans mobile SDK is NOT used (it is being retired). The backend creates the Snap
 transaction, so no Midtrans server key is needed in the app.
@@ -124,6 +124,10 @@ The `PaymentResult` route:
 4. Shows the appropriate result screen
 
 Malformed or foreign URLs (wrong scheme/host, missing bookingId) are ignored.
+
+Returning with Back or closing the system tab triggers an `ON_RESUME` refresh even when the domain
+association files are unavailable. No status requests run while the app is backgrounded. A pending
+status is checked again only on a later resume.
 
 ## Screen States
 

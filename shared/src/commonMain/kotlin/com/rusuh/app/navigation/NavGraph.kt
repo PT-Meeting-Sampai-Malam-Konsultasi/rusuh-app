@@ -58,8 +58,10 @@ import com.rusuh.app.feature.home.HomeViewModel
 import com.rusuh.app.feature.payment.PaymentPageLauncher
 import com.rusuh.app.feature.payment.PaymentResultRoute
 import com.rusuh.app.feature.payment.PaymentResultViewModel
+import com.rusuh.app.feature.payment.PaymentReturnLinks
 import com.rusuh.app.feature.payment.PaymentRoute
 import com.rusuh.app.feature.payment.PaymentViewModel
+import com.rusuh.app.feature.payment.parsePaymentReturnBookingId
 import com.rusuh.app.feature.queues.MyQueuesRoute
 import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.TicketsActions
@@ -110,6 +112,23 @@ fun RusuhNavGraph(navController: NavHostController) {
     val consentLoaded by consentStore.loaded.collectAsState()
 
     LaunchedEffect(consentStore) { consentStore.load() }
+    LaunchedEffect(navController) {
+        PaymentReturnLinks.incoming.collect { url ->
+            val bookingId = parsePaymentReturnBookingId(url) ?: return@collect
+            val route = Screen.PaymentResult.routeFor(bookingId)
+            val currentBookingId =
+                navController.currentBackStackEntry?.arguments?.getString(Screen.PaymentResult.ARG_BOOKING_ID)
+            if (currentBookingId != bookingId) {
+                navController.navigate(route) {
+                    launchSingleTop = true
+                    popUpTo(Screen.Payment.route) {
+                        inclusive = true
+                        saveState = false
+                    }
+                }
+            }
+        }
+    }
     LaunchedEffect(consentLoaded, consent) {
         if (consentLoaded) {
             val granted = consent == AnalyticsConsent.Granted
