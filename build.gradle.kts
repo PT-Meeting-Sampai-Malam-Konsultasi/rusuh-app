@@ -36,7 +36,14 @@ kover {
         // services. Views, navigation, DI, DTOs/mappers/models, stubs, platform code and generated code are out.
         filters {
             includes {
-                classes("*ViewModel*", "*UseCase*", "*Repository*", "*ApiService*")
+                classes(
+                    "*ViewModel*",
+                    "*UseCase*",
+                    "*Repository*",
+                    "*ApiService*",
+                    "com.rusuh.app.data.repository.*",
+                    "com.rusuh.app.domain.usecase.*",
+                )
             }
             excludes {
                 classes("*Stub*", "*Fake*", "*\$\$serializer", "*ComposableSingletons*")
