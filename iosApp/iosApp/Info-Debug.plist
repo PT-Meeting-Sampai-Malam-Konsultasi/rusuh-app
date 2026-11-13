@@ -6,6 +6,8 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>$(RUSUH_APP_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -29,6 +31,10 @@
 			<array><string>rusuh</string></array>
 		</dict>
 	</array>
+	<key>RusuhEnvironment</key>
+	<string>$(RUSUH_ENVIRONMENT)</string>
+	<key>RusuhAllowDebugOptions</key>
+	<string>$(RUSUH_ALLOW_DEBUG_OPTIONS)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -43,7 +49,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<!-- Debug only (INFOPLIST_FILE of the Debug configuration): cleartext HTTP to the local mock.
+	<!-- Debug only (INFOPLIST_FILE of the Debug configurations): cleartext HTTP to the local mock.
 	     Keep every other key in sync with Info.plist. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

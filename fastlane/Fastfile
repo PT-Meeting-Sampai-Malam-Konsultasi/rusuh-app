@@ -10,7 +10,7 @@ ARCHIVE_PATH    = ENV["ARCHIVE_PATH"] ||
                             "Rusuh.xcarchive")
 
 platform :ios do
-  desc "Build the KMP shared framework, then produce an UNSIGNED Rusuh.xcarchive"
+  desc "Build the KMP shared framework, then produce an UNSIGNED Rusuh.xcarchive (staging scheme)"
   lane :build_unsigned do
     # Phase 1: build the Kotlin Multiplatform shared framework for the iOS device slice.
     gradle(
@@ -19,11 +19,11 @@ platform :ios do
       project_dir: REPO_ROOT
     )
 
-    # Phase 2: archive the Xcode app target without any code signing.
+    # Phase 2: archive the Xcode staging scheme without any code signing.
     build_app(
       project: XCODE_PROJECT,
-      scheme: "Rusuh",
-      configuration: "Release",
+      scheme: "Rusuh Staging",
+      configuration: "Release-Staging",
       skip_codesigning: true,
       skip_package_ipa: true,
       skip_archive: false,
@@ -32,6 +32,28 @@ platform :ios do
       xcargs: 'CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM=""'
     )
 
-    UI.success("Unsigned archive written to #{ARCHIVE_PATH}")
+    UI.success("Unsigned staging archive written to #{ARCHIVE_PATH}")
+  end
+
+  desc "Build the production scheme for simulator (verification only, no archive)"
+  lane :build_production_simulator do
+    # Build the KMP shared framework for simulator.
+    gradle(
+      task: ":shared:linkDebugFrameworkIosSimulatorArm64",
+      gradle_path: File.join(REPO_ROOT, "gradlew"),
+      project_dir: REPO_ROOT
+    )
+
+    # Build the production scheme for simulator (no archive, just verify it compiles).
+    xcodebuild(
+      project: XCODE_PROJECT,
+      scheme: "Rusuh Production",
+      configuration: "Debug-Production",
+      destination: "generic/platform=iOS Simulator",
+      build: true,
+      xcargs: 'CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO'
+    )
+
+    UI.success("Production scheme built successfully for simulator")
   end
 end
