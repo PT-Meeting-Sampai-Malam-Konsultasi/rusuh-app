@@ -74,3 +74,13 @@ internal fun WaitingRoomMissedTurnPreview() =
 
 @Composable
 internal fun WaitingRoomSoldOutPreview() = Preview(WaitingRoomUiState.Active(sampleEvent, WaitingRoomPhase.SoldOut))
+
+@Composable
+internal fun WaitingRoomYourTurnHeldPreview() =
+    Preview(
+        WaitingRoomUiState.Active(
+            sampleEvent,
+            WaitingRoomPhase.YourTurn(myNumber = 19_700, secondsLeft = 52, heldForSignIn = true),
+            isGuest = true,
+        ),
+    )

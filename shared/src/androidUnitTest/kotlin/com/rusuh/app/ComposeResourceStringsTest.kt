@@ -16,4 +16,18 @@ class ComposeResourceStringsTest {
             assertTrue(escapedApostrophes.isEmpty(), "Found \\' in ${file.path}: $escapedApostrophes")
         }
     }
+
+    @Test
+    fun allIndonesianFoldersExist() {
+        val resourceDirectory = File("src/commonMain/composeResources")
+        // Both values-id (iOS) and values-in (Android) must exist for Indonesian support
+        assertTrue(
+            File(resourceDirectory, "values-id/strings.xml").exists(),
+            "values-id/strings.xml must exist for iOS Indonesian support",
+        )
+        assertTrue(
+            File(resourceDirectory, "values-in/strings.xml").exists(),
+            "values-in/strings.xml must exist for Android Indonesian support",
+        )
+    }
 }

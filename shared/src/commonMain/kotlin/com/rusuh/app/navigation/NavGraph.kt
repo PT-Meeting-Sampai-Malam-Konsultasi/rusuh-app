@@ -143,9 +143,8 @@ fun RusuhNavGraph(navController: NavHostController) {
                     },
                 ),
         ) { backStackEntry ->
-            // TODO(AUTH-00 #103): resolve the event from the ARG_EVENT_ID argument and add the
-            //  waiting-room entry point (navigate(Screen.SignIn.routeFor(eventId))); until then
-            //  nothing pushes this route and the banner shows a placeholder event.
+            // The event is resolved from ARG_EVENT_ID; the waiting-room entry point navigates
+            // via Screen.SignIn.routeFor(eventId). When opened standalone the banner shows a placeholder.
             val koin = getKoin()
             val viewModel =
                 viewModel<SignInViewModelHolder>(
@@ -156,7 +155,8 @@ fun RusuhNavGraph(navController: NavHostController) {
             val state by viewModel.state.collectAsState()
             val lastState = remember { LastState() }
             lastState.value = state.step
-            // TODO(AUTH-00 #103): continue to the queue / Detail once signed in (today: close the screen).
+            // On SignedIn effect the screen closes. The waiting room (onSignIn callback) resumes the
+            // held turn automatically once the session state updates.
             LaunchedEffect(viewModel) {
                 viewModel.effect.collect { effect ->
                     when (effect) {
@@ -185,11 +185,13 @@ fun RusuhNavGraph(navController: NavHostController) {
             // so resolve once per event id to keep a single ViewModel for this destination.
             val koin = getKoin()
             val viewModel = remember(eventId) { koin.get<WaitingRoomViewModel> { parametersOf(eventId) } }
-            // TODO(AUTH-00 #103): open Screen.SignIn.routeFor(eventId) when the turn comes and the user is a guest.
+            // The onSignIn callback opens the sign-in route; once signed in the session updates and
+            // the VM's session observer auto-navigates to Detail with the remaining time.
             WaitingRoomRoute(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
+                onSignIn = { id -> navController.navigate(Screen.SignIn.routeFor(id)) },
                 // The turn: go to Detail and drop the Waiting Room so Back does not return into it.
                 onChooseTickets = { id ->
                     navController.navigate(Screen.Detail.routeFor(id)) {

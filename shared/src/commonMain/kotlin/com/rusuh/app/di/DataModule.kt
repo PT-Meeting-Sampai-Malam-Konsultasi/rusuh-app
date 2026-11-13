@@ -2,6 +2,7 @@ package com.rusuh.app.di
 
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.network.session.SessionManagerObserver
+import com.rusuh.app.data.network.session.SessionStateProvider
 import com.rusuh.app.data.platform.AttestationProvider
 import com.rusuh.app.data.platform.DevAttestationProvider
 import com.rusuh.app.data.platform.platformName
@@ -120,6 +121,7 @@ fun dataModule(
                 // In-memory tokens: the placeholder tokens of the stub never reach the real secure store, and a stub
                 // run always starts signed out.
                 single { SessionManager(tokenStore = InMemoryTokenStore(), events = get()) } onClose { it?.close() }
+                single<SessionStateProvider> { get<SessionManager>() }
                 single { StubClock.ticking() }
                 single<ServerClock> { get<StubClock>() }
                 single { StubEngine(get()) }
@@ -135,6 +137,7 @@ fun dataModule(
             }
             BackendMode.Real -> {
                 single { SessionManager(tokenStore = get(), events = get()) } onClose { it?.close() }
+                single<SessionStateProvider> { get<SessionManager>() }
                 // ServerClock: coreModule's MonotonicServerClock, the instance the response plugin keeps in sync.
                 single<HomeRepository> { RealHomeRepository(get(), get(), get()) }
                 single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }

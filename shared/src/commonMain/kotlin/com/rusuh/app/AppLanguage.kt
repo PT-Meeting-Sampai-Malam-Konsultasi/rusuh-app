@@ -1,5 +1,6 @@
 package com.rusuh.app
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.rusuh.app.data.network.AppLanguage
 import com.rusuh.app.data.network.LocaleProvider
@@ -16,6 +17,12 @@ import kotlinx.coroutines.launch
 val LocalAppLanguage = staticCompositionLocalOf { AppLanguage.Indonesian }
 
 internal expect fun applyPlatformLanguage(languageTag: String)
+
+@Composable
+internal expect fun ProvideAppLanguageResources(
+    language: AppLanguage,
+    content: @Composable () -> Unit,
+)
 
 class AppLanguageState(private val preferences: () -> AppPreferences) : LocaleProvider {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

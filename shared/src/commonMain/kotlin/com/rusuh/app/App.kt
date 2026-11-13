@@ -2,7 +2,6 @@ package com.rusuh.app
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -21,12 +20,17 @@ import org.koin.compose.koinInject
 fun App() {
     val state: AppLanguageState = koinInject()
     val language by state.language.collectAsState()
-    LaunchedEffect(language) { applyPlatformLanguage(language.tag) }
+    // Apply the platform locale SYNCHRONOUSLY before rendering.
+    // This ensures Locale.current (used by CMP Resources) is correct when
+    // stringResource/pluralStringResource are resolved during composition.
+    applyPlatformLanguage(language.tag)
     CompositionLocalProvider(LocalAppLanguage provides language) {
-        key(language) {
-            RusuhTheme {
-                val navController = rememberNavController()
-                RusuhNavGraph(navController = navController)
+        ProvideAppLanguageResources(language) {
+            key(language) {
+                RusuhTheme {
+                    val navController = rememberNavController()
+                    RusuhNavGraph(navController = navController)
+                }
             }
         }
     }

@@ -21,8 +21,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selectableGroup
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -132,7 +133,10 @@ internal fun LanguageToggle(
             Modifier
                 .border(RusuhBrandMetrics.borderWidth, RusuhBrandColors.Ink, RusuhShapes.pill)
                 .padding(RusuhSpacing.xs)
-                .clearAndSetSemantics { contentDescription = groupDescription },
+                .semantics {
+                    contentDescription = groupDescription
+                    selectableGroup()
+                },
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.xxs),
     ) {
         AppLanguageOption.entries.forEach { option ->
@@ -160,6 +164,7 @@ internal fun LanguageToggle(
                                 },
                             )
                         }
+                        .semantics { this.selected = isSelected }
                         .background(if (isSelected) RusuhBrandColors.Ink else Color.Transparent, RusuhShapes.pill)
                         .padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.xs),
             )
