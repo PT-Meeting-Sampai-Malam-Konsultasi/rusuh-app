@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Default (English) UI strings. EN is the base locale per ADR-0014; the
-  Indonesian translation lives in values-id/strings.xml. Add a key ONLY when a
-  string is actually rendered (issue #51) — do not pre-populate unused keys.
-  Accessed from composables via stringResource(Res.string.<key>).
+  Indonesian translation lives in values-id/ (for iOS) and values-in/ (for
+  Android). Add a key ONLY when a string is actually rendered (issue #51) —
+  do not pre-populate unused keys. Accessed from composables via
+  stringResource(Res.string.<key>).
 -->
 <resources>
     <!-- App / brand -->
@@ -83,6 +84,9 @@
     <string name="waiting_turn_cta">Choose tickets now</string>
     <string name="waiting_turn_timer_label">to enter</string>
     <string name="waiting_turn_hint">We'll move you in automatically. After that: 5 min to choose, 10 min to pay.</string>
+    <string name="waiting_turn_held_title">Your turn!</string>
+    <string name="waiting_turn_held_cta">Sign in to continue</string>
+    <string name="waiting_turn_held_hint">Sign in to keep your place. After that: 5 min to choose, 10 min to pay.</string>
     <string name="waiting_missed_lead">Your 60 seconds to enter ran out.</string>
     <string name="waiting_missed_title">Turn missed.</string>
     <string name="waiting_missed_body">We've passed your place to the next number. Tickets are still available — queue again for a new number.</string>
@@ -101,7 +105,7 @@
     <string name="waiting_note_nowait_body">If tickets sell out, the queue closes at once and we tell you.</string>
     <string name="waiting_note_app">In the app, we notify you when your turn is close.</string>
     <string name="waiting_leave">Leave the queue</string>
-    <string name="waiting_guest_banner">Sign in so your queue number stays saved.</string>
+    <string name="waiting_guest_banner">Sign in to keep your place in line</string>
     <string name="waiting_guest_sign_in">Sign in</string>
     <string name="queue_position_eta_minutes">about %1$d min left</string>
     <string name="queue_position_updated">Updated %1$d s ago</string>

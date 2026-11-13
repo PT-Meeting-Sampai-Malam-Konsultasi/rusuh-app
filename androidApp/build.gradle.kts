@@ -29,6 +29,7 @@ android {
         // CI passes -PversionCode=<run number> so every distributed build is distinguishable.
         versionCode = providers.gradleProperty("versionCode").orNull?.toIntOrNull() ?: 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -113,6 +114,10 @@ dependencies {
     implementation(compose.ui)
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

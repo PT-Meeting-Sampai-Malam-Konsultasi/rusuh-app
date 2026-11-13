@@ -44,7 +44,7 @@ sealed interface WaitingRoomPhase {
     data class Paused(val position: Int, val reason: PauseReason) : WaitingRoomPhase
 
     /** The customer's turn: [secondsLeft] of the 60 s window to enter. */
-    data class YourTurn(val myNumber: Int, val secondsLeft: Int) : WaitingRoomPhase
+    data class YourTurn(val myNumber: Int, val secondsLeft: Int, val heldForSignIn: Boolean = false) : WaitingRoomPhase
 
     /** The 60 s window ran out. */
     data class MissedTurn(val estimateMinutes: Int?) : WaitingRoomPhase
@@ -129,4 +129,22 @@ fun WaitingRoomPhase.showsNotes(): Boolean =
     }
 
 /** The guest login banner shows only while the customer is waiting (pre-queue, waiting, paused). */
-fun WaitingRoomPhase.showsGuestBanner(): Boolean = showsNotes()
+fun WaitingRoomPhase.showsGuestBanner(): Boolean =
+    when (this) {
+        is WaitingRoomPhase.PreQueue, is WaitingRoomPhase.Waiting, is WaitingRoomPhase.Paused -> true
+        is WaitingRoomPhase.YourTurn -> heldForSignIn
+        is WaitingRoomPhase.MissedTurn, WaitingRoomPhase.SoldOut -> false
+    }
+
+private const val NEAR_TURN_POSITION = 10
+
+/**
+ * Whether the guest banner should be prominent (pink background).
+ * True when the customer is near their turn (position ≤ 10) or held at their turn for sign-in.
+ */
+fun WaitingRoomPhase.isNearTurn(): Boolean =
+    when (this) {
+        is WaitingRoomPhase.Waiting -> queue.position <= NEAR_TURN_POSITION
+        is WaitingRoomPhase.YourTurn -> heldForSignIn
+        else -> false
+    }
