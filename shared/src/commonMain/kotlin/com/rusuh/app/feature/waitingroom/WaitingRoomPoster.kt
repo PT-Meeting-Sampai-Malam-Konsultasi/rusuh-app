@@ -4,7 +4,6 @@ package com.rusuh.app.feature.waitingroom
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +23,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -36,8 +34,6 @@ import com.rusuh.app.ui.theme.RusuhTextStyles
 import com.rusuh.app.ui.theme.rusuhDisplayFontFamily
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
-import rusuh_app.shared.generated.resources.waiting_guest_banner
-import rusuh_app.shared.generated.resources.waiting_guest_sign_in
 import rusuh_app.shared.generated.resources.waiting_poster_sold_out_stamp
 
 /**
@@ -132,41 +128,6 @@ internal fun DrawScope.drawHalftone(color: Color) {
             x += step
         }
         y += step
-    }
-}
-
-@Composable
-internal fun GuestBanner(
-    onSignIn: () -> Unit,
-    prominent: Boolean = false,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .border(RusuhSpacing.borderBold, RusuhColors.Ink)
-                .background(if (prominent) RusuhColors.Pink else RusuhColors.PaperDeep)
-                .padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.lg),
-    ) {
-        Text(
-            text = stringResource(Res.string.waiting_guest_banner),
-            style = MaterialTheme.typography.bodyMedium,
-            color = RusuhColors.Ink,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(Res.string.waiting_guest_sign_in),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = RusuhColors.Paper,
-            modifier =
-                Modifier
-                    .background(RusuhColors.Ink)
-                    .clickable(role = Role.Button, onClick = onSignIn)
-                    .padding(horizontal = RusuhSpacing.xl, vertical = RusuhSpacing.md),
-        )
     }
 }
 

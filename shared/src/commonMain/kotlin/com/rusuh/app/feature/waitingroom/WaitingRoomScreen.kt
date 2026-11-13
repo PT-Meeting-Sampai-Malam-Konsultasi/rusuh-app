@@ -60,9 +60,6 @@ import rusuh_app.shared.generated.resources.waiting_sold_out_notify
 import rusuh_app.shared.generated.resources.waiting_sold_out_title
 import rusuh_app.shared.generated.resources.waiting_title
 import rusuh_app.shared.generated.resources.waiting_turn_cta
-import rusuh_app.shared.generated.resources.waiting_turn_held_cta
-import rusuh_app.shared.generated.resources.waiting_turn_held_hint
-import rusuh_app.shared.generated.resources.waiting_turn_held_title
 import rusuh_app.shared.generated.resources.waiting_turn_hint
 import rusuh_app.shared.generated.resources.waiting_turn_lead
 import rusuh_app.shared.generated.resources.waiting_turn_title
@@ -148,10 +145,6 @@ private fun ActiveContent(
 ) {
     val phase = state.phase
     Column(Modifier.fillMaxWidth().padding(horizontal = RusuhSpacing.xl)) {
-        if (state.isGuest && phase.showsGuestBanner()) {
-            Spacer(Modifier.height(RusuhSpacing.lg))
-            GuestBanner(onSignIn = { dispatch(WaitingRoomAction.SignIn) }, prominent = phase.isNearTurn())
-        }
         Spacer(Modifier.height(RusuhSpacing.xl))
         EventPoster(event = state.event, phase = phase)
         Spacer(Modifier.height(RusuhSpacing.xxl))
@@ -179,7 +172,6 @@ private fun PhaseContent(
                 YourTurnContent(
                     phase = phase,
                     onEnter = { dispatch(WaitingRoomAction.EnterNow) },
-                    onSignIn = { dispatch(WaitingRoomAction.SignIn) },
                 )
             is WaitingRoomPhase.MissedTurn ->
                 MissedContent(
@@ -221,37 +213,20 @@ private fun PausedContent(phase: WaitingRoomPhase.Paused) {
 private fun YourTurnContent(
     phase: WaitingRoomPhase.YourTurn,
     onEnter: () -> Unit,
-    onSignIn: () -> Unit,
 ) {
     Lead(stringResource(Res.string.waiting_turn_lead, formatQueueNumber(phase.myNumber)))
     Spacer(Modifier.height(RusuhSpacing.lg))
     Headline(
-        text =
-            if (phase.heldForSignIn) {
-                stringResource(Res.string.waiting_turn_held_title)
-            } else {
-                stringResource(Res.string.waiting_turn_title)
-            },
+        text = stringResource(Res.string.waiting_turn_title),
         color = RusuhColors.Pink,
         shadow = RusuhColors.Blue,
     )
     Spacer(Modifier.height(RusuhSpacing.xxl))
-    if (phase.heldForSignIn) {
-        // Guest held: show sign-in button instead of "choose tickets".
-        PrimaryButton(text = stringResource(Res.string.waiting_turn_held_cta), onClick = onSignIn)
-    } else {
-        PrimaryButton(text = stringResource(Res.string.waiting_turn_cta), onClick = onEnter)
-    }
+    PrimaryButton(text = stringResource(Res.string.waiting_turn_cta), onClick = onEnter)
     Spacer(Modifier.height(RusuhSpacing.xl))
     TurnTimer(seconds = phase.secondsLeft)
     Spacer(Modifier.height(RusuhSpacing.xl))
-    Muted(
-        if (phase.heldForSignIn) {
-            stringResource(Res.string.waiting_turn_held_hint)
-        } else {
-            stringResource(Res.string.waiting_turn_hint)
-        },
-    )
+    Muted(stringResource(Res.string.waiting_turn_hint))
 }
 
 @Composable

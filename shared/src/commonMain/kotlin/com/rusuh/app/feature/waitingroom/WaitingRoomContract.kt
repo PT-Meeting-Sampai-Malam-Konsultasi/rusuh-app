@@ -33,8 +33,6 @@ sealed interface WaitingRoomIntent : MviIntent {
 
     data object Back : WaitingRoomIntent
 
-    data object SignIn : WaitingRoomIntent
-
     /** "Choose tickets now" on the your-turn phase. */
     data object ChooseTicketsNow : WaitingRoomIntent
 
@@ -61,20 +59,20 @@ sealed interface WaitingRoomEffect : MviEffect {
     /** Go to the Events tab. */
     data object NavigateToEvents : WaitingRoomEffect
 
-    data class OpenSignIn(val eventId: String) : WaitingRoomEffect
+    /**
+     * Defensive re-auth: the session was lost mid-queue (401/SignInRequiredException during polling).
+     * Opens sign-in for [eventId]; after re-signing in the user resumes the same place.
+     */
+    data class ReSignIn(val eventId: String) : WaitingRoomEffect
 
     /** Updates stopped after a place was already shown; the last place stays on screen. */
     data object ShowRefreshError : WaitingRoomEffect
-
-    /** Updates stopped after a place was shown because claiming needs a signed-in account. */
-    data object SignInRequired : WaitingRoomEffect
 }
 
 /** Maps a screen [WaitingRoomAction] onto the matching [WaitingRoomIntent]. */
 fun WaitingRoomAction.toIntent(): WaitingRoomIntent =
     when (this) {
         WaitingRoomAction.Back -> WaitingRoomIntent.Back
-        WaitingRoomAction.SignIn -> WaitingRoomIntent.SignIn
         WaitingRoomAction.EnterNow -> WaitingRoomIntent.ChooseTicketsNow
         WaitingRoomAction.QueueAgain -> WaitingRoomIntent.QueueAgain
         WaitingRoomAction.LeaveQueue -> WaitingRoomIntent.LeaveQueue

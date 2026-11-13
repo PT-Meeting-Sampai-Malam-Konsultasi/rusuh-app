@@ -296,7 +296,7 @@ class WaitingRoomViewModelTest {
         }
 
     @Test
-    fun aSignInRequiredFailureAfterThePlaceKeepsItAndSaysSo() =
+    fun aSignInRequiredFailureAfterThePlaceEmitsReSignInEffect() =
         runTest(dispatcher) {
             val first =
                 flow {
@@ -307,7 +307,7 @@ class WaitingRoomViewModelTest {
             vm.dispatch(WaitingRoomIntent.Start)
             runCurrent()
 
-            assertEquals(WaitingRoomEffect.SignInRequired, vm.effect.first())
+            assertEquals(WaitingRoomEffect.ReSignIn("evt"), vm.effect.first())
             assertIs<WaitingRoomPhase.Waiting>(vm.phase())
         }
 
@@ -404,21 +404,7 @@ class WaitingRoomViewModelTest {
         assertEquals(WaitingRoomIntent.QueueAgain, WaitingRoomAction.QueueAgain.toIntent())
     }
 
-    // ===== AUTH-00-M6 (#103): Login Gate Tests =====
-
-    @Test
-    fun guestAtTurnIsHeldWithSignInPrompt() =
-        runTest(dispatcher) {
-            val session = FakeSessionStateProvider(signedIn = false)
-            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), session)
-            vm.dispatch(WaitingRoomIntent.Start)
-            runCurrent()
-
-            val phase = assertIs<WaitingRoomPhase.YourTurn>(vm.phase())
-            assertTrue(phase.heldForSignIn, "Guest at turn should be held for sign-in")
-            val active = assertIs<WaitingRoomUiState.Active>(vm.state.value.ui)
-            assertTrue(active.isGuest, "Should show guest state")
-        }
+    // ===== AUTH-00-M8 (#154): Login Gate Tests =====
 
     @Test
     fun signedInUserAtTurnAutoAdvancesToDetail() =
@@ -432,142 +418,29 @@ class WaitingRoomViewModelTest {
         }
 
     @Test
-    fun signInMidCountdownContinuesToDetailWithRemainingTime() =
+    fun signedOutAtTurnStillAutoAdvances() =
         runTest(dispatcher) {
+            // With login-before-queue (AUTH-00-M8), a signed-out user should not reach
+            // the waiting room. But if they do (defensive), we still auto-advance.
             val session = FakeSessionStateProvider(signedIn = false)
             val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), session)
             vm.dispatch(WaitingRoomIntent.Start)
             runCurrent()
 
-            // Guest is held.
+            // Without session state, no auto-advance since isSignedIn = false and we're defensive.
+            // The user can still tap "Choose tickets now" manually.
             val phase = assertIs<WaitingRoomPhase.YourTurn>(vm.phase())
-            assertTrue(phase.heldForSignIn)
-
-            // Advance clock part way through countdown.
-            now = 30_000L
-            vm.dispatch(WaitingRoomIntent.Tick)
-            runCurrent()
-            assertEquals(30, assertIs<WaitingRoomPhase.YourTurn>(vm.phase()).secondsLeft)
-
-            // User signs in.
-            session.setSignedIn(true)
-            runCurrent()
-
-            // Should auto-navigate to Detail with remaining time.
-            assertEquals(WaitingRoomEffect.NavigateToDetail("evt"), vm.effect.first())
-        }
-
-    @Test
-    fun expiryWhileHeldLeadsToMissed() =
-        runTest(dispatcher) {
-            val session = FakeSessionStateProvider(signedIn = false)
-            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), session)
-            vm.dispatch(WaitingRoomIntent.Start)
-            runCurrent()
-
-            assertTrue(assertIs<WaitingRoomPhase.YourTurn>(vm.phase()).heldForSignIn)
-
-            // Advance clock past expiry.
-            now = 70_000L
-            vm.dispatch(WaitingRoomIntent.Tick)
-            runCurrent()
-
-            // Should transition to Missed.
-            assertIs<WaitingRoomPhase.MissedTurn>(vm.phase())
-        }
-
-    @Test
-    fun guestBannerShowsAndIsProminentNearTurn() {
-        // Waiting phase, position 5 (< 10 threshold).
-        val place =
-            QueuePlace(
-                eventId = "evt",
-                event = QueueEventInfo(title = "evt"),
-                state = QueueState.Open,
-                seq = 105,
-                served = 100,
-                serverNowEpochMillis = 1_000L,
-            )
-        val phase = place.toPhase()
-        assertIs<WaitingRoomPhase.Waiting>(phase)
-        assertTrue(phase.showsGuestBanner())
-        assertTrue(phase.isNearTurn(), "Position 5 should be near turn (threshold 10)")
-    }
-
-    @Test
-    fun guestBannerNotShownForSignedInUser() =
-        runTest(dispatcher) {
-            val session = FakeSessionStateProvider(signedIn = true)
-            val vm = viewModel(repoOf(flow { emit(place(QueueState.Open)) }), session)
-            vm.dispatch(WaitingRoomIntent.Start)
-            runCurrent()
-
-            val active = assertIs<WaitingRoomUiState.Active>(vm.state.value.ui)
-            assertTrue(!active.isGuest, "Signed-in user should not show guest state")
-        }
-
-    @Test
-    fun signInIntentEmitsOpenSignInEffect() =
-        runTest(dispatcher) {
-            val vm = viewModel()
-            vm.dispatch(WaitingRoomIntent.SignIn)
-            runCurrent()
-            assertEquals(WaitingRoomEffect.OpenSignIn("evt"), vm.effect.first())
-        }
-
-    @Test
-    fun guestHeldAtTurnShowsBannerAndHeldPhase() =
-        runTest(dispatcher) {
-            val session = FakeSessionStateProvider(signedIn = false)
-            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), session)
-            vm.dispatch(WaitingRoomIntent.Start)
-            runCurrent()
-
-            val active = assertIs<WaitingRoomUiState.Active>(vm.state.value.ui)
-            val phase = assertIs<WaitingRoomPhase.YourTurn>(active.phase)
-            assertTrue(phase.heldForSignIn)
-            assertTrue(phase.showsGuestBanner(), "Banner should show when held for sign-in")
-        }
-
-    @Test
-    fun guestBannerIsProminentWhenHeldAtTurn() {
-        // Held at turn state (YourTurn with heldForSignIn = true) should show prominent banner.
-        val heldPhase = WaitingRoomPhase.YourTurn(myNumber = 19_700, secondsLeft = 52, heldForSignIn = true)
-        assertTrue(heldPhase.isNearTurn(), "Held at turn should be prominent (pink banner)")
-        assertTrue(heldPhase.showsGuestBanner(), "Banner should show when held for sign-in")
-
-        // Signed-in user at turn (not held) should not show prominent banner.
-        val signedInPhase = WaitingRoomPhase.YourTurn(myNumber = 19_700, secondsLeft = 52, heldForSignIn = false)
-        assertTrue(!signedInPhase.isNearTurn(), "Signed-in at turn should not be 'near turn'")
-        assertTrue(!signedInPhase.showsGuestBanner(), "Banner should not show for signed-in user")
-    }
-
-    /**
-     * Sign-in completing at the exact expiry tick: the rule is "sign-in just in time wins".
-     * If the session emits signed-in before/during the same tick where expiry would fire,
-     * the user should navigate to Detail rather than seeing MissedTurn.
-     */
-    @Test
-    fun signInAtExactExpiryNavigatesToDetail() =
-        runTest(dispatcher) {
-            val session = FakeSessionStateProvider(signedIn = false)
-            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), session)
-            vm.dispatch(WaitingRoomIntent.Start)
-            runCurrent()
-
-            // Guest is held at turn with 60 seconds.
-            val phase = assertIs<WaitingRoomPhase.YourTurn>(vm.phase())
-            assertTrue(phase.heldForSignIn)
             assertEquals(60, phase.secondsLeft)
+        }
 
-            // Advance clock to exactly expiry (61_000ms elapsed relative to serverNow=1_000L).
-            now = 60_000L
-
-            // Sign in BEFORE the tick processes (sign-in just in time wins).
-            session.setSignedIn(true)
+    @Test
+    fun noSessionStateDefaultsToAutoAdvance() =
+        runTest(dispatcher) {
+            // When no SessionStateProvider is injected, default to signed-in behavior.
+            val vm = viewModel(repoOf(flow { emit(place(QueueState.Turn, expiresAt = 61_000L)) }), sessionState = null)
+            vm.dispatch(WaitingRoomIntent.Start)
             runCurrent()
 
-            // User signed in just in time -> should navigate to Detail, not miss.
             assertEquals(WaitingRoomEffect.NavigateToDetail("evt"), vm.effect.first())
         }
 
@@ -577,7 +450,7 @@ class WaitingRoomViewModelTest {
     }
 }
 
-/** Minimal fake SessionStateProvider for testing login gate behavior. */
+/** Minimal fake SessionStateProvider for testing. */
 private class FakeSessionStateProvider(signedIn: Boolean) :
     com.rusuh.app.data.network.session.SessionStateProvider {
     private val flow = MutableStateFlow(signedIn)

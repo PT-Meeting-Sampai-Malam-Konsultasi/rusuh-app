@@ -41,14 +41,12 @@ class WaitingRoomScreenTest {
     }
 
     @Test
-    fun notesAndGuestBannerOnlyWhileInLine() {
+    fun notesOnlyWhileInLine() {
         listOf("prequeue", "waiting", "paused").forEach {
             assertTrue(phases.getValue(it).showsNotes(), it)
-            assertTrue(phases.getValue(it).showsGuestBanner(), it)
         }
         listOf("turn", "missed", "soldout").forEach {
             assertFalse(phases.getValue(it).showsNotes(), it)
-            assertFalse(phases.getValue(it).showsGuestBanner(), it)
         }
     }
 }
