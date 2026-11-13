@@ -22,6 +22,9 @@ enum class DetailError {
 
     /** An attendee NIK was rejected by the server (TODO(FR-15-M1 #80)). */
     NikRejected,
+
+    /** Service temporarily unavailable (5xx). The user can retry with the same selection. */
+    ServiceUnavailable,
 }
 
 /** Lifecycle of the Detail page. */
@@ -146,3 +149,36 @@ internal fun DetailFormState.toBookingRequest(eventId: String): BookingRequest =
         tickets =
             attendees.map { BookingTicket(it.categoryId, it.name.trim(), it.nik) },
     )
+
+/** Booking request with validation tokens from server validation. */
+internal fun DetailFormState.toBookingRequestWithTokens(
+    eventId: String,
+    validatedAttendees: List<ValidatedAttendee>,
+): BookingRequest =
+    BookingRequest(
+        eventId = eventId,
+        tickets =
+            validatedAttendees.map {
+                BookingTicket(
+                    categoryId = it.categoryId,
+                    holderName = it.name,
+                    holderNik = it.nik,
+                    validationToken = it.validationToken,
+                )
+            },
+    )
+
+/**
+ * Validated attendee with the server-issued token.
+ *
+ * NIK is PII: [toString] redacts it to prevent accidental leaks in logs or error messages.
+ */
+internal data class ValidatedAttendee(
+    val categoryId: String,
+    val name: String,
+    val nik: String,
+    val validationToken: String,
+) {
+    override fun toString(): String =
+        "ValidatedAttendee(categoryId=$categoryId, name=$name, nik=<redacted>, validationToken=$validationToken)"
+}
