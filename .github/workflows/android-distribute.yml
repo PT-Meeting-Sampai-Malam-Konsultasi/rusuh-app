@@ -1,0 +1,55 @@
+name: Android Distribute
+# Manual only. Run it from Actions > Android Distribute > Run workflow, pick the branch and the target:
+#   staging    from main or from a release/** branch   (live staging API, launcher name "Rusuh Staging")
+#   production from a release/** branch only           (production API, launcher name "Rusuh")
+# Each target is its own job. Setup and key rotation: docs/firebase-distribution.md.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'What to distribute: staging (main or release/**) or production (release/** only)'
+        type: choice
+        options: [staging, production]
+        default: staging
+concurrency:
+  group: android-distribute-${{ github.ref }}-${{ github.event.inputs.target }}
+  cancel-in-progress: false
+jobs:
+  guard:
+    name: Check the branch for the target
+    runs-on: ubuntu-latest
+    steps:
+      - name: Branch rules
+        env:
+          TARGET: ${{ github.event.inputs.target }}
+          REF: ${{ github.ref }}
+        run: |
+          case "$TARGET" in
+            staging)
+              case "$REF" in
+                refs/heads/main|refs/heads/release/*) echo "OK: staging from $REF" ;;
+                *) echo "Staging can only be distributed from main or release/** (got $REF)." >&2; exit 1 ;;
+              esac ;;
+            production)
+              case "$REF" in
+                refs/heads/release/*) echo "OK: production from $REF" ;;
+                *) echo "Production can only be distributed from a release/** branch (got $REF)." >&2; exit 1 ;;
+              esac ;;
+            *) echo "Unknown target '$TARGET'." >&2; exit 1 ;;
+          esac
+  distribute-staging:
+    name: Distribute Staging
+    needs: guard
+    if: github.event.inputs.target == 'staging'
+    uses: ./.github/workflows/android-distribute-job.yml
+    with:
+      flavor: staging
+    secrets: inherit
+  distribute-production:
+    name: Distribute Production
+    needs: guard
+    if: github.event.inputs.target == 'production'
+    uses: ./.github/workflows/android-distribute-job.yml
+    with:
+      flavor: production
+    secrets: inherit

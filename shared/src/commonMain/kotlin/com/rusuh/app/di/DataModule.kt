@@ -139,7 +139,7 @@ fun liveDataModule(
             )
         }
         single<TicketsRepository> { TicketsRepositoryImpl(get(), get(), get(), get()) }
-        single<DetailRepository> { DetailRepositoryImpl(get(), get()) }
+        single<DetailRepository> { DetailRepositoryImpl(get(), get(), get(), get(), get()) }
         single<PaymentRepository> {
             stubOrFail("PaymentRepository", allowStubFallback, warn) {
                 StubPaymentRepository(StubClock.ticking())

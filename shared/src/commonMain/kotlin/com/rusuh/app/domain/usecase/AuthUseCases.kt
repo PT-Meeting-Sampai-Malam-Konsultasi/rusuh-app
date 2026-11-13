@@ -5,6 +5,7 @@ import com.rusuh.app.domain.model.AuthSession
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.OtpChallenge
 import com.rusuh.app.domain.model.UserLocale
+import com.rusuh.app.domain.repository.AccountEmailStore
 import com.rusuh.app.domain.repository.AuthRepository
 import com.rusuh.app.domain.repository.DisplayNameStore
 import com.rusuh.app.domain.session.SessionObserver
@@ -60,6 +61,7 @@ sealed interface VerifyOtpOutcome {
 class VerifyOtpUseCase(
     private val repository: AuthRepository,
     private val generation: AuthGeneration,
+    private val accountEmails: AccountEmailStore,
 ) {
     suspend operator fun invoke(
         challengeId: String,
@@ -67,28 +69,44 @@ class VerifyOtpUseCase(
     ): VerifyOtpOutcome {
         val started = generation.current()
         val result = repository.verifyOtp(challengeId, code)
-        if (generation.current() == started) return VerifyOtpOutcome.Completed(result)
+        if (generation.current() == started) {
+            if (result is DomainResult.Success) saveEmail(result.data)
+            return VerifyOtpOutcome.Completed(result)
+        }
         // The check started a session after the sign-out: end it again, even if this caller is cancelled now.
         if (result is DomainResult.Success) withContext(NonCancellable) { repository.logout() }
         return VerifyOtpOutcome.Superseded
     }
+
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    private suspend fun saveEmail(session: AuthSession) {
+        try {
+            accountEmails.saveEmail(session.user.userId, session.user.email)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            // Best effort: Detail falls back to the profile when no email is stored.
+        }
+    }
 }
 
 /**
- * Signs out. Order: the generation moves on (in-flight sign-ins become stale), the local name is dropped, then the
- * repository clears the local session first and revokes on the server (bounded). Navigate on the session phase,
- * not on this result.
+ * Signs out. Order: the generation moves on (in-flight sign-ins become stale), the local name and email are dropped,
+ * then the repository clears the local session first and revokes on the server (bounded). Navigate on the session
+ * phase, not on this result.
  */
 class SignOutUseCase(
     private val repository: AuthRepository,
     private val generation: AuthGeneration,
     private val displayNames: DisplayNameStore,
+    private val accountEmails: AccountEmailStore,
 ) {
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
     suspend operator fun invoke(): DomainResult<Unit> {
         generation.bump()
         try {
             displayNames.clear()
+            accountEmails.clearEmail()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Throwable) {
