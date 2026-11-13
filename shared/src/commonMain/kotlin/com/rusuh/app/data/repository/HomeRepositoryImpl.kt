@@ -18,7 +18,7 @@ import com.rusuh.app.feature.home.HomeRepository
  *
  * Cache-first rendering (`HomeCache`) is not wired yet.
  */
-class RealHomeRepository(
+class HomeRepositoryImpl(
     private val api: EventApiService,
     private val localeProvider: LocaleProvider,
     private val serverClock: ServerClock,

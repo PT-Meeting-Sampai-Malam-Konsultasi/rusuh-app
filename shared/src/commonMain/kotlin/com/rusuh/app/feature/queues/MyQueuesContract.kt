@@ -1,5 +1,6 @@
 package com.rusuh.app.feature.queues
 
+import com.rusuh.app.domain.model.OrderInProgress
 import com.rusuh.app.mvi.MviEffect
 import com.rusuh.app.mvi.MviIntent
 import com.rusuh.app.mvi.MviState
@@ -10,7 +11,7 @@ import com.rusuh.app.ui.components.RusuhTab
 enum class MyQueuesPhase { Loading, Ready, Empty, Error }
 
 /** Transient messages the host resolves to localized text (the ViewModel holds no raw text). */
-enum class MyQueuesMessage { RefreshFailed, }
+enum class MyQueuesMessage { RefreshFailed, ResumeExpired, }
 
 /**
  * MVI state for the My Queues tab. Carries no user-facing text; the host resolves
@@ -21,6 +22,7 @@ enum class MyQueuesMessage { RefreshFailed, }
 data class MyQueuesState(
     val phase: MyQueuesPhase = MyQueuesPhase.Loading,
     val queues: List<QueueListItemUi> = emptyList(),
+    val ordersInProgress: List<OrderInProgress> = emptyList(),
 ) : MviState
 
 /** User intents for the My Queues tab. */
@@ -37,6 +39,10 @@ sealed interface MyQueuesIntent : MviIntent {
     /** The user tapped the queue row for [eventId]. */
     data class OpenQueue(val eventId: String) : MyQueuesIntent
 
+    data class ContinueOrder(val order: OrderInProgress) : MyQueuesIntent
+
+    data object ResumeExpired : MyQueuesIntent
+
     /** The user tapped another bottom-bar [tab]. */
     data class SelectTab(val tab: RusuhTab) : MyQueuesIntent
 
@@ -48,6 +54,10 @@ sealed interface MyQueuesIntent : MviIntent {
 sealed interface MyQueuesEffect : MviEffect {
     /** Push the Waiting Room for [eventId]. */
     data class NavigateToWaitingRoom(val eventId: String) : MyQueuesEffect
+
+    data class ContinueBooking(val eventId: String) : MyQueuesEffect
+
+    data class ContinuePayment(val bookingId: String) : MyQueuesEffect
 
     /** Switch to another top-level [tab]. */
     data class SwitchTab(val tab: RusuhTab) : MyQueuesEffect
@@ -63,7 +73,7 @@ sealed interface MyQueuesEffect : MviEffect {
 internal fun MyQueuesState.toUiState(errorMessage: String): MyQueuesUiState =
     when (phase) {
         MyQueuesPhase.Loading -> MyQueuesUiState.Loading
-        MyQueuesPhase.Ready -> MyQueuesUiState.Content(queues)
+        MyQueuesPhase.Ready -> MyQueuesUiState.Content(queues, ordersInProgress)
         MyQueuesPhase.Empty -> MyQueuesUiState.Empty
         MyQueuesPhase.Error -> MyQueuesUiState.Error(errorMessage)
     }

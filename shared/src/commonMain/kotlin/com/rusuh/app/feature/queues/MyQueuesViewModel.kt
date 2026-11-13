@@ -4,6 +4,7 @@ import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
 import com.rusuh.app.mvi.MviViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -16,11 +17,23 @@ class MyQueuesViewModel(
     private val getMyQueues: GetMyQueuesUseCase,
 ) : MviViewModel<MyQueuesState, MyQueuesIntent, MyQueuesEffect>(MyQueuesState()) {
     private var loadJob: Job? = null
+    private var timerJob: Job? = null
 
     override suspend fun reduce(intent: MyQueuesIntent) {
         when (intent) {
             MyQueuesIntent.Load, MyQueuesIntent.Refresh, MyQueuesIntent.Retry -> startLoad()
             is MyQueuesIntent.OpenQueue -> sendEffect(MyQueuesEffect.NavigateToWaitingRoom(intent.eventId))
+            is MyQueuesIntent.ContinueOrder -> {
+                if (intent.order.bookingId == null) {
+                    sendEffect(MyQueuesEffect.ContinueBooking(intent.order.eventId))
+                } else {
+                    sendEffect(MyQueuesEffect.ContinuePayment(intent.order.bookingId))
+                }
+            }
+            MyQueuesIntent.ResumeExpired -> {
+                sendEffect(MyQueuesEffect.ShowError(MyQueuesMessage.ResumeExpired))
+                startLoad()
+            }
             is MyQueuesIntent.SelectTab -> sendEffect(MyQueuesEffect.SwitchTab(intent.tab))
             MyQueuesIntent.BrowseEvents -> sendEffect(MyQueuesEffect.GoToEvents)
         }
@@ -40,8 +53,31 @@ class MyQueuesViewModel(
         try {
             val queues = getMyQueues().toUiItems()
             currentCoroutineContext().ensureActive()
-            val phase = if (queues.isEmpty()) MyQueuesPhase.Empty else MyQueuesPhase.Ready
-            setState { copy(phase = phase, queues = queues) }
+            val orders = getMyQueues.getOrdersInProgress()
+            currentCoroutineContext().ensureActive()
+            val phase = if (queues.isEmpty() && orders.isEmpty()) MyQueuesPhase.Empty else MyQueuesPhase.Ready
+            setState { copy(phase = phase, queues = queues, ordersInProgress = orders) }
+            timerJob?.cancel()
+            if (orders.isNotEmpty()) {
+                timerJob =
+                    viewModelScope.launch {
+                        while (currentState.ordersInProgress.any { it.remainingMillis != null }) {
+                            delay(1000)
+                            val remaining =
+                                currentState.ordersInProgress.mapNotNull { order ->
+                                    val remaining = order.remainingMillis ?: return@mapNotNull order
+                                    val next = order.copy(remainingMillis = remaining - 1000)
+                                    next.takeIf { (it.remainingMillis ?: 0) > 0 }
+                                }
+                            setState {
+                                copy(
+                                    ordersInProgress = remaining,
+                                    phase = if (queues.isEmpty() && remaining.isEmpty()) MyQueuesPhase.Empty else phase,
+                                )
+                            }
+                        }
+                    }
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (

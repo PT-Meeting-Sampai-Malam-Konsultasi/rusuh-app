@@ -4,6 +4,7 @@ import com.rusuh.app.crash.CrashReporter
 import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.domain.model.UserLocale
+import com.rusuh.app.domain.usecase.ClaimQueueUseCase
 import com.rusuh.app.domain.usecase.CreateBookingUseCase
 import com.rusuh.app.domain.usecase.GetDetailUseCase
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
@@ -44,7 +45,11 @@ val appModule =
 
         // Waiting Room.
         factory { ObserveQueuePlaceUseCase(get()) }
-        factory { (eventId: String) -> WaitingRoomViewModel(eventId, get(), get(), sessionState = get()) }
+        factory { ClaimQueueUseCase(get()) }
+        factory {
+                (eventId: String) ->
+            WaitingRoomViewModel(eventId, get(), get(), claimQueue = get())
+        }
         // TODO(FR-04-M4 #30): the Waiting Room's LeaveQueue intent calls this once the ViewModel handles it.
         factory { LeaveQueueUseCase(get()) }
 
@@ -59,8 +64,8 @@ val appModule =
             val language = get<LocaleProvider>()
             RequestOtpUseCase(get()) { UserLocale.fromWire(language.language().tag) }
         }
-        factory { VerifyOtpUseCase(get(), get()) }
-        factory { SignOutUseCase(get(), get(), get()) }
+        factory { VerifyOtpUseCase(get(), get(), get()) }
+        factory { SignOutUseCase(get(), get(), get(), get()) }
         factory { GetProfileUseCase(get(), get()) }
         factory { SaveDisplayNameUseCase(get(), get()) }
         factory { ObserveSessionUseCase(get()) }

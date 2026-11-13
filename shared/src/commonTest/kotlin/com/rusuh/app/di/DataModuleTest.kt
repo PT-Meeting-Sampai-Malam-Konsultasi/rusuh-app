@@ -9,15 +9,15 @@ import com.rusuh.app.data.network.buildHttpClient
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.remote.AuthApiService
 import com.rusuh.app.data.remote.dto.RequestOtpDto
-import com.rusuh.app.data.repository.RealAuthRepository
-import com.rusuh.app.data.repository.RealDetailRepository
-import com.rusuh.app.data.repository.RealDeviceRepository
-import com.rusuh.app.data.repository.RealHomeRepository
-import com.rusuh.app.data.repository.RealMyQueuesRepository
-import com.rusuh.app.data.repository.RealQueueRepository
-import com.rusuh.app.data.repository.RealTicketsRepository
+import com.rusuh.app.data.repository.AuthRepositoryImpl
+import com.rusuh.app.data.repository.DetailRepositoryImpl
+import com.rusuh.app.data.repository.DeviceRepositoryImpl
+import com.rusuh.app.data.repository.HomeRepositoryImpl
+import com.rusuh.app.data.repository.MyQueuesRepositoryImpl
+import com.rusuh.app.data.repository.QueueRepositoryImpl
 import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.repository.StubPaymentRepository
+import com.rusuh.app.data.repository.TicketsRepositoryImpl
 import com.rusuh.app.data.storage.AppPreferences
 import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.data.storage.FakeSecureStore
@@ -152,13 +152,13 @@ class DataModuleTest {
     fun realModeBindsTheNetworkImplementationsForAllRealRepositories() {
         val koin = koin(AppEnvironment.Mock, BackendMode.Real, allowFallback = true)
 
-        assertIs<RealHomeRepository>(koin.get<HomeRepository>())
-        assertIs<RealQueueRepository>(koin.get<QueueRepository>())
-        assertIs<RealMyQueuesRepository>(koin.get<MyQueuesRepository>())
-        assertIs<RealDeviceRepository>(koin.get<DeviceRepository>())
-        assertIs<RealAuthRepository>(koin.get<AuthRepository>())
-        assertIs<RealTicketsRepository>(koin.get<TicketsRepository>())
-        assertIs<RealDetailRepository>(koin.get<DetailRepository>())
+        assertIs<HomeRepositoryImpl>(koin.get<HomeRepository>())
+        assertIs<QueueRepositoryImpl>(koin.get<QueueRepository>())
+        assertIs<MyQueuesRepositoryImpl>(koin.get<MyQueuesRepository>())
+        assertIs<DeviceRepositoryImpl>(koin.get<DeviceRepository>())
+        assertIs<AuthRepositoryImpl>(koin.get<AuthRepository>())
+        assertIs<TicketsRepositoryImpl>(koin.get<TicketsRepository>())
+        assertIs<DetailRepositoryImpl>(koin.get<DetailRepository>())
         assertSame<Any>(koin.get<QueueRepository>(), koin.get<WaitingRoomRepository>(), "one queue behind both seams")
     }
 
@@ -185,7 +185,7 @@ class DataModuleTest {
         assertIs<StubAuthRepository>(koin(AppEnvironment.Mock, BackendMode.Stub).get<AuthRepository>())
 
         val real = koin(AppEnvironment.Staging, BackendMode.Real)
-        assertIs<RealAuthRepository>(real.get<AuthRepository>())
+        assertIs<AuthRepositoryImpl>(real.get<AuthRepository>())
         assertTrue(warnings.none { "AuthRepository" in it }, "$warnings")
         assertTrue("AuthRepository" !in REPOSITORIES_STILL_ON_STUBS)
     }

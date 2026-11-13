@@ -76,7 +76,7 @@ class FakeDevices(
     }
 }
 
-/** The whole session stack on one [FakeBackend]: tokens, 401 refresh, [SessionManager] and [RealAuthRepository]. */
+/** The whole session stack on one [FakeBackend]: tokens, 401 refresh, [SessionManager] and [AuthRepositoryImpl]. */
 class AuthHarness(
     managerScope: CoroutineScope,
     val devices: FakeDevices = FakeDevices(),
@@ -88,7 +88,7 @@ class AuthHarness(
     val events = SessionEvents()
     val backend: FakeBackend
     val session: SessionManager
-    val repository: RealAuthRepository
+    val repository: AuthRepositoryImpl
 
     init {
         lateinit var fake: FakeBackend
@@ -101,9 +101,9 @@ class AuthHarness(
         val api = AuthApiService(backend.api)
         repository =
             if (logoutTimeout == null) {
-                RealAuthRepository(api, devices, session, refresher)
+                AuthRepositoryImpl(api, devices, session, refresher)
             } else {
-                RealAuthRepository(api, devices, session, refresher, logoutTimeout)
+                AuthRepositoryImpl(api, devices, session, refresher, logoutTimeout)
             }
     }
 

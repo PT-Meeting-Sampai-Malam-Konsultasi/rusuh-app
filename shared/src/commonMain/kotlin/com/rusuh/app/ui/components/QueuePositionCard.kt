@@ -1,6 +1,5 @@
 package com.rusuh.app.ui.components
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -19,14 +18,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.theme.RusuhColors
 import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhTextStyles
@@ -81,7 +79,7 @@ data class QueueProgressUi(
     val fraction: Float
         get() {
             val span = myNumber - servedAtJoin
-            return if (span <= 0) 1f else ((nowServing - servedAtJoin).toFloat() / span).coerceIn(0f, 1f)
+            return if (span <= 0) 0f else ((nowServing - servedAtJoin).toFloat() / span).coerceIn(0f, 1f)
         }
 }
 
@@ -200,7 +198,7 @@ private fun QueueMetaLine(data: QueuePositionUi) {
 }
 
 /**
- * Progress track: bordered bar, dotted fill up to the served share, pink marker
+ * Progress track: bordered bar, blue fill up to the served share, pink marker
  * for "my number", with join/turn labels and the "now serving" line underneath.
  */
 @Composable
@@ -213,19 +211,7 @@ private fun QueueProgressTrack(progress: QueueProgressUi) {
                 .height(RusuhSpacing.queueTrackHeight)
                 .border(RusuhSpacing.borderBold, RusuhColors.Ink),
     ) {
-        Canvas(modifier = Modifier.fillMaxHeight().fillMaxWidth(fraction)) {
-            val step = DOT_STEP.dp.toPx()
-            val radius = DOT_RADIUS.dp.toPx()
-            var y = step / 2
-            while (y < size.height) {
-                var x = step / 2
-                while (x < size.width) {
-                    drawCircle(color = RusuhColors.Blue, radius = radius, center = Offset(x, y))
-                    x += step
-                }
-                y += step
-            }
-        }
+        Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(RusuhColors.Blue).testTag(PROGRESS_FILL_TAG))
         Row(Modifier.fillMaxWidth().fillMaxHeight(), horizontalArrangement = Arrangement.End) {
             Box(Modifier.width(RusuhSpacing.queueTrackMarker).fillMaxHeight().background(RusuhColors.Pink))
         }
@@ -302,5 +288,4 @@ private const val META_SEPARATOR = " · "
 private const val GROUP_SIZE = 3
 private const val SECONDS_PER_MINUTE = 60
 private const val MAX_FULL_SIZE_CHARS = 5
-private const val DOT_STEP = 8
-private const val DOT_RADIUS = 2
+internal const val PROGRESS_FILL_TAG = "queue-progress-blue-fill"

@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -28,7 +29,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class RealQueueRepositoryTest {
+class QueueRepositoryImplTest {
     private val joinLine = "POST /queue/$EVT/join"
     private val frontierLine = "GET /queue/$EVT/frontier"
     private val meLine = "GET /queue/$EVT/me"
@@ -53,52 +54,61 @@ class RealQueueRepositoryTest {
     }
 
     @Test
-    fun theWaitingRoomCountsDownLikeTheMockAndEndsWithTheClaimedTurn() =
+    fun resumingRequiresStoredAdmissionAndRefreshesTheTokenFromTheSameClaim() =
         runTest {
-            // The Mockoon sequence: 100..400 in steps of 30 with the operator pausing twice, then served >= seq.
+            val h = QueueHarness()
+            h.tokens.setQueueToken(EVT, "queue-token")
+            h.queueCache.setAdmission(AdmissionInfo(EVT, "old-slot", 3, FIXTURE_NOW_MILLIS + 300_000))
+            h.backend.on(claimLine, Reply.ok(ADMISSION_JSON))
+
+            assertTrue(h.queue.resumeAdmission(EVT))
+            assertEquals("mock-admission-token", h.tokens.getAdmissionToken())
+            assertEquals("s_mock_01", h.queueCache.getAdmission()?.slotId)
+            assertEquals(1, h.backend.callsTo(claimLine))
+        }
+
+    @Test
+    fun expiredResumeClaimDropsTheStoredAdmission() =
+        runTest {
+            val h = QueueHarness()
+            h.tokens.setQueueToken(EVT, "queue-token")
+            h.queueCache.setAdmission(AdmissionInfo(EVT, "slot-1", 3, FIXTURE_NOW_MILLIS + 300_000))
+            h.backend.on(claimLine, Reply.problem(410, "EXPIRED"))
+
+            assertEquals(false, h.queue.resumeAdmission(EVT))
+            assertNull(h.queueCache.getAdmission())
+            assertNull(h.tokens.getAdmissionToken())
+        }
+
+    @Test
+    fun theWaitingRoomEmitsTheTurnWithoutClaiming() =
+        runTest {
             val served = listOf(100, 130, 160, 190)
             val frontiers =
                 served.map { frontierJson(it) } +
                     List(2) { frontierJson(190, "paused", "operator") } +
                     listOf(220, 250, 280, 310, 340, 370, 400).map { frontierJson(it) }
             val h = QueueHarness()
-            h.script(frontiers, claim = listOf(Reply.problem(409, "NOT_YET"), Reply.ok(ADMISSION_JSON)))
+            h.script(frontiers)
 
-            val places = h.places()
-
+            val places = h.queue.observePlace(EVT).take(13).toList()
             val waiting = places.dropLast(1)
             assertEquals(
-                listOf(100, 130, 160, 190, 190, 190, 220, 250, 280, 310, 340, 370),
-                waiting.map { it.served },
+                List(4) {
+                    QueueState.Open
+                } + List(2) { QueueState.Paused } + List(6) { QueueState.Open },
+                waiting.map { it.state },
             )
             assertEquals(
                 listOf(300, 270, 240, 210, 210, 210, 180, 150, 120, 90, 60, 30),
                 waiting.map { it.seq - it.served },
-                "position = seq - served",
-            )
-            assertEquals(
-                List(4) { QueueState.Open } + List(2) { QueueState.Paused } + List(6) { QueueState.Open },
-                waiting.map { it.state },
             )
             assertTrue(waiting.all { it.seq == 400 && it.ratePerMinute == 300 })
-            assertEquals("Samudra", waiting.first().event.title)
-            assertEquals("Stadion Utama GBK, Jakarta", waiting.first().event.venueLine)
-
             val turn = places.last()
             assertEquals(QueueState.Turn, turn.state)
-            assertEquals(
-                turn.serverNowEpochMillis + 60_000L,
-                turn.turnExpiresAtEpochMillis,
-                "60 s window on server time",
-            )
-            assertEquals(1, places.count { it.state == QueueState.Turn }, "the 60 s countdown is not re-emitted")
-            assertEquals("mock-admission-token", h.tokens.getAdmissionToken())
-            assertEquals(
-                AdmissionInfo(EVT, "s_mock_01", 3, FIXTURE_NOW_MILLIS + 300_000L),
-                h.queueCache.getAdmission(),
-                "details for Detail are kept without the secret",
-            )
-            assertEquals(2, h.backend.callsTo(claimLine))
+            assertEquals(turn.serverNowEpochMillis + 60_000L, turn.turnExpiresAtEpochMillis)
+            assertEquals(0, h.backend.callsTo(claimLine))
+            assertNull(h.tokens.getAdmissionToken())
         }
 
     @Test
@@ -212,63 +222,164 @@ class RealQueueRepositoryTest {
     @Test
     fun theTurnDeadlineComesFromMeWhenTheServerGivesIt() =
         runTest {
-            val deadline = "2026-11-11T17:38:10+07:00" // FIXTURE_NOW + 41 s
+            val deadline = "2026-11-11T17:38:10+07:00"
             val h = QueueHarness()
-            h.script(listOf(frontierJson(400)), claim = listOf(Reply.ok(ADMISSION_JSON)))
+            h.script(listOf(frontierJson(400)))
             h.backend.on(meLine, Reply.ok(placeJson(EVT, served = 400, extra = ""","turnExpiresAt":"$deadline"""")))
-
-            val places = h.places()
-
-            assertEquals(FIXTURE_NOW_MILLIS + 41_000L, places.first().turnExpiresAtEpochMillis)
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            assertEquals(FIXTURE_NOW_MILLIS + 41_000L, turn.turnExpiresAtEpochMillis)
+            assertEquals(0, h.backend.callsTo(claimLine))
         }
 
     @Test
-    fun claimingSendsTheQueueTokenAndRetriesNotYetThenFullWithinTheWindow() =
+    fun pressingClaimRetriesNotYetAndFullUntilAdmitted() =
         runTest {
             val h = QueueHarness()
             h.script(
                 listOf(frontierJson(400)),
                 claim = listOf(Reply.problem(409, "NOT_YET"), Reply.problem(409, "FULL"), Reply.ok(ADMISSION_JSON)),
             )
-
-            h.places()
-
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Admitted,
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
+            )
             assertEquals(3, h.backend.callsTo(claimLine))
             h.backend.seen.filter { it.line == claimLine }.forEach {
                 assertEquals("mock-queue-token-$EVT", it.headers["X-Queue-Token"])
             }
-            val (notYet, full) = h.delays
-            assertTrue(notYet in 800L..1_200L, "NOT_YET waits about 1 s: $notYet")
-            assertTrue(full in 1_000L..2_400L, "FULL waits 1-2 s: $full")
+            val (notYet, full) = h.delays.takeLast(2)
+            assertTrue(notYet in 800L..1_200L)
+            assertTrue(full in 1_000L..2_400L)
+            assertEquals("mock-admission-token", h.tokens.getAdmissionToken())
+            assertEquals(AdmissionInfo(EVT, "s_mock_01", 3, FIXTURE_NOW_MILLIS + 300_000L), h.queueCache.getAdmission())
         }
 
     @Test
-    fun anExhaustedTurnWindowIsMissed() =
+    fun claimWindowExpiresAsMissed() =
         runTest {
             val h = QueueHarness()
             h.script(listOf(frontierJson(400)), claim = listOf(Reply.problem(409, "NOT_YET")))
-
-            val places = h.places()
-
-            assertEquals(listOf(QueueState.Turn, QueueState.Missed), places.map { it.state })
-            assertEquals(60_000L, h.delays.sum(), "waits are cut to exactly the 60 s window")
-            assertTrue(h.backend.callsTo(claimLine) > 40, "retried about every second")
-            assertNull(h.tokens.getQueueToken(EVT), "a missed place drops its token")
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            val result = h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis)
+            assertEquals(com.rusuh.app.domain.repository.QueueClaimOutcome.Missed, result)
+            assertEquals(60_000L, h.delays.sum())
+            assertTrue(h.backend.callsTo(claimLine) > 40)
+            assertNull(h.tokens.getQueueToken(EVT))
             assertNull(h.tokens.getAdmissionToken())
-            assertEquals(emptyList(), h.queueCache.getJoinedEventIds())
         }
 
     @Test
-    fun aMissedClaimEmitsMissed() =
+    fun missedClaimReturnsMissedOutcome() =
         runTest {
             val h = QueueHarness()
             h.script(listOf(frontierJson(400)), claim = listOf(Reply.problem(410, "MISSED")))
-
-            val places = h.places()
-
-            assertEquals(listOf(QueueState.Turn, QueueState.Missed), places.map { it.state })
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Missed,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
             assertEquals(1, h.backend.callsTo(claimLine))
-            assertNull(h.tokens.getAdmissionToken())
+        }
+
+    @Test
+    fun aClosedClaimClearsTheQueueToken() =
+        runTest {
+            val h = QueueHarness()
+            h.script(listOf(frontierJson(400)), claim = listOf(Reply.problem(410, "QUEUE_CLOSED")))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Closed,
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
+            )
+            assertNull(h.tokens.getQueueToken(EVT))
+        }
+
+    @Test
+    fun retryEndingInNoStockReturnsToWaiting() =
+        runTest {
+            val h = QueueHarness()
+            h.script(
+                listOf(frontierJson(400), frontierJson(400)),
+                claim = listOf(Reply.problem(409, "NOT_YET"), Reply.problem(409, "NO_STOCK")),
+            )
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.BackToWaiting,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
+            assertEquals(QueueState.Open, h.queue.observePlace(EVT).first().state)
+        }
+
+    @Test
+    fun deviceRejectedOnTheLastRetryRegistersAgainThenAdmits() =
+        runTest {
+            val h = QueueHarness()
+            h.script(
+                listOf(frontierJson(400)),
+                claim =
+                    listOf(
+                        Reply.problem(409, "NOT_YET"),
+                        Reply.problem(401, "DEVICE_REJECTED"),
+                        Reply.ok(ADMISSION_JSON),
+                    ),
+            )
+            h.backend.on("POST /queue/devices", Reply.created(DEVICE_JSON), Reply.created(DEVICE_JSON))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Admitted,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
+            assertEquals(2, h.backend.callsTo("POST /queue/devices"))
+            assertEquals(3, h.backend.callsTo(claimLine))
+        }
+
+    @Test
+    fun deviceReRegistrationCanReturnToWaitingAfterTheLastRetry() =
+        runTest {
+            val h = QueueHarness()
+            h.script(
+                listOf(frontierJson(400)),
+                claim =
+                    listOf(
+                        Reply.problem(409, "NOT_YET"),
+                        Reply.problem(401, "DEVICE_REJECTED"),
+                        Reply.problem(409, "NO_STOCK"),
+                    ),
+            )
+            h.backend.on("POST /queue/devices", Reply.created(DEVICE_JSON), Reply.created(DEVICE_JSON))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.BackToWaiting,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
+        }
+
+    @Test
+    fun aMissAfterDeviceReRegistrationClearsThePlace() =
+        runTest {
+            val h = QueueHarness()
+            h.script(
+                listOf(frontierJson(400)),
+                claim =
+                    listOf(
+                        Reply.problem(409, "NOT_YET"),
+                        Reply.problem(401, "DEVICE_REJECTED"),
+                        Reply.problem(410, "MISSED"),
+                    ),
+            )
+            h.backend.on("POST /queue/devices", Reply.created(DEVICE_JSON), Reply.created(DEVICE_JSON))
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.Missed,
+                h.queue.claim(EVT, turn.serverNowEpochMillis + 500L, turn.serverNowEpochMillis),
+            )
+            assertNull(h.tokens.getQueueToken(EVT))
         }
 
     @Test
@@ -285,7 +396,7 @@ class RealQueueRepositoryTest {
         }
 
     @Test
-    fun noStockOnClaimGoesBackToTheWaitingRoom() =
+    fun noStockClaimReturnsToWaiting() =
         runTest {
             val h = QueueHarness()
             h.script(
@@ -296,27 +407,25 @@ class RealQueueRepositoryTest {
                 ),
                 claim = listOf(Reply.problem(409, "NO_STOCK")),
             )
-
-            val places = h.places()
-
-            assertEquals(listOf(QueueState.Turn, QueueState.Paused, QueueState.Closed), places.map { it.state })
-            assertEquals(QueuePauseReason.StockFull, places[1].pauseReason)
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            assertEquals(
+                com.rusuh.app.domain.repository.QueueClaimOutcome.BackToWaiting,
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis),
+            )
+            assertEquals(1, h.backend.callsTo("POST /queue/$EVT/join"))
         }
 
     @Test
-    fun aGuestWhoIsAskedToSignInFailsTheFlowAfterShowingTheTurn() =
+    fun unauthorizedClaimRequiresSignInOnlyAfterTheUserPresses() =
         runTest {
             val h = QueueHarness()
             h.script(listOf(frontierJson(400)), claim = listOf(Reply.problem(401, "UNAUTHORIZED")))
-            val seen = mutableListOf<QueuePlace>()
-
-            val failure =
-                assertFailsWith<SignInRequiredException> {
-                    h.queue.observePlace(EVT).collect { seen += it }
-                }
-
-            assertNotNull(failure)
-            assertEquals(listOf(QueueState.Turn), seen.map { it.state })
+            val turn = h.queue.observePlace(EVT).first { it.state == QueueState.Turn }
+            assertEquals(0, h.backend.callsTo(claimLine))
+            assertFailsWith<SignInRequiredException> {
+                h.queue.claim(EVT, turn.turnExpiresAtEpochMillis!!, turn.serverNowEpochMillis)
+            }
+            assertEquals(1, h.backend.callsTo(claimLine))
             assertNull(h.tokens.getAdmissionToken())
         }
 
@@ -460,7 +569,7 @@ class RealQueueRepositoryTest {
             val waiting = CompletableDeferred<Unit>()
             var waitWasCancelled = false
             val queue =
-                RealQueueRepository(
+                QueueRepositoryImpl(
                     queueApi = QueueApiService(h.backend.api),
                     eventApi = EventApiService(h.backend.api),
                     devices = h.devices,

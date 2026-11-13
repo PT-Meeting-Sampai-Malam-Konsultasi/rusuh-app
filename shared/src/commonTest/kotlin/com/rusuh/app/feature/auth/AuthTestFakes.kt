@@ -7,6 +7,7 @@ import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.ErrorCode
 import com.rusuh.app.domain.model.OtpChallenge
 import com.rusuh.app.domain.model.UserLocale
+import com.rusuh.app.domain.repository.AccountEmailStore
 import com.rusuh.app.domain.repository.AuthRepository
 import com.rusuh.app.domain.repository.DisplayNameStore
 import com.rusuh.app.domain.session.SessionObserver
@@ -150,5 +151,26 @@ class FakeDisplayNames : DisplayNameStore {
         clears++
         userId = null
         name = null
+    }
+}
+
+class FakeAccountEmails : AccountEmailStore {
+    var userId: String? = null
+    var stored: String? = null
+    var clears = 0
+
+    override suspend fun email(): String? = stored
+
+    override suspend fun saveEmail(
+        userId: String,
+        email: String,
+    ) {
+        this.userId = userId
+        stored = email
+    }
+
+    override suspend fun clearEmail() {
+        clears++
+        stored = null
     }
 }

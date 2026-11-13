@@ -16,12 +16,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.action_retry
 import rusuh_app.shared.generated.resources.waiting_error_body
+import rusuh_app.shared.generated.resources.waiting_no_stock
 import rusuh_app.shared.generated.resources.waiting_refresh_error
 
 private const val TICK_MILLIS = 1_000L
@@ -48,6 +52,7 @@ fun WaitingRoomRoute(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnBack by rememberUpdatedState(onBack)
     val currentOnBrowseEvents by rememberUpdatedState(onBrowseEvents)
     val currentOnChooseTickets by rememberUpdatedState(onChooseTickets)
@@ -55,9 +60,26 @@ fun WaitingRoomRoute(
     val scope = rememberCoroutineScope()
     val refreshMessage = stringResource(Res.string.waiting_refresh_error)
     val retryLabel = stringResource(Res.string.action_retry)
+    val noStockMessage = stringResource(Res.string.waiting_no_stock)
 
     LaunchedEffect(viewModel) { viewModel.dispatch(WaitingRoomIntent.Start) }
     DisposableEffect(viewModel) { onDispose { viewModel.clear() } }
+    DisposableEffect(viewModel, lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) viewModel.dispatch(WaitingRoomIntent.ScreenActive)
+                if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                    viewModel.dispatch(WaitingRoomIntent.ScreenInactive)
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            viewModel.dispatch(WaitingRoomIntent.ScreenActive)
+        } else {
+            viewModel.dispatch(WaitingRoomIntent.ScreenInactive)
+        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     // Ticks only while a countdown is on screen; the ViewModel derives seconds from server time.
     LaunchedEffect(viewModel, state.hasCountdown) {
         while (state.hasCountdown) {
@@ -77,6 +99,7 @@ fun WaitingRoomRoute(
                         val result = snackbarHostState.showSnackbar(refreshMessage, actionLabel = retryLabel)
                         if (result == SnackbarResult.ActionPerformed) viewModel.dispatch(WaitingRoomIntent.Retry)
                     }
+                WaitingRoomEffect.ShowNoStock -> scope.launch { snackbarHostState.showSnackbar(noStockMessage) }
                 is WaitingRoomEffect.NavigateToDetail -> currentOnChooseTickets(effect.eventId)
             }
         }

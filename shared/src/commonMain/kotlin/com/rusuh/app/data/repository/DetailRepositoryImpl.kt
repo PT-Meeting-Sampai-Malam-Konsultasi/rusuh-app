@@ -3,9 +3,12 @@ package com.rusuh.app.data.repository
 import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.isNetworkFailure
+import com.rusuh.app.data.network.newIdempotencyKey
 import com.rusuh.app.data.remote.BookingApiService
+import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.dto.BookingTicketDto
 import com.rusuh.app.data.remote.dto.CreateBookingRequestDto
+import com.rusuh.app.data.remote.dto.EventDto
 import com.rusuh.app.data.remote.dto.ValidateAttendeeRequestDto
 import com.rusuh.app.data.remote.mapper.expiresAtMillis
 import com.rusuh.app.data.remote.mapper.serverNowMillis
@@ -22,7 +25,10 @@ import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.ErrorCode
 import com.rusuh.app.domain.model.EventDetail
+import com.rusuh.app.domain.repository.AccountEmailStore
+import com.rusuh.app.domain.repository.AuthRepository
 import com.rusuh.app.domain.repository.DetailRepository
+import kotlinx.coroutines.CancellationException
 
 /**
  * Default retry-after seconds when the server returns 429 without a Retry-After header.
@@ -31,7 +37,7 @@ import com.rusuh.app.domain.repository.DetailRepository
 private const val DEFAULT_RETRY_AFTER_SECONDS = 30
 
 /**
- * Real [DetailRepository] backed by the booking API.
+ * [DetailRepositoryImpl] backed by the booking API.
  *
  * - Categories: GET /core/events/{eventId}/categories (requires Bearer + X-Admission-Token).
  * - Attendee validation: POST /core/events/{eventId}/attendees/validate.
@@ -46,9 +52,12 @@ private const val DEFAULT_RETRY_AFTER_SECONDS = 30
  * supports sync) so Detail's countdown is server-aligned.
  */
 @Suppress("TooManyFunctions")
-class RealDetailRepository(
+class DetailRepositoryImpl(
     private val api: BookingApiService,
     private val serverClock: ServerClock,
+    private val events: EventApiService,
+    private val auth: AuthRepository,
+    private val accountEmails: AccountEmailStore,
 ) : DetailRepository {
     override suspend fun getDetail(eventId: String): DetailOffering {
         val result = api.getCategories(eventId)
@@ -57,18 +66,23 @@ class RealDetailRepository(
                 val dto = result.data
                 // Sync the server clock from the categories response.
                 syncClock(dto.serverNowMillis())
+                val event = loadEvent(eventId)
                 return DetailOffering(
-                    // TODO(FR-05-M4 #38): fetch event detail from cache or dedicated endpoint.
                     event =
                         EventDetail(
                             id = dto.eventId,
-                            title = "Event",
-                            subtitle = null,
-                            meta = "",
+                            title = event?.name?.takeIf { it.isNotBlank() } ?: "Event",
+                            subtitle = event?.subtitle?.takeIf { it.isNotBlank() },
+                            meta =
+                                event?.let {
+                                    listOf(
+                                        it.venue,
+                                        it.city,
+                                    ).filter(String::isNotBlank).joinToString(", ")
+                                }.orEmpty(),
                         ),
                     categories = dto.toDomainCategories(),
-                    // TODO(FR-05-M4 #38): fetch profile from auth/session.
-                    profile = AccountProfile(name = "", email = ""),
+                    profile = AccountProfile(name = "", email = loadAccountEmail()),
                     adminFeeRupiah = dto.adminFee.amount,
                     reservedUnits = dto.maxTickets,
                     expiresAtMillis = dto.expiresAtMillis(),
@@ -77,6 +91,35 @@ class RealDetailRepository(
             is ApiResult.Error -> throw result.toException()
             is ApiResult.Failure -> throw result.toException()
         }
+    }
+
+    private suspend fun loadEvent(eventId: String): EventDto? =
+        try {
+            (events.getEvent(eventId) as? ApiResult.Success)?.data
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (
+            @Suppress("TooGenericExceptionCaught", "SwallowedException") failure: Exception,
+        ) {
+            null
+        }
+
+    /** The email saved at sign-in; only when none is stored (an older session) is the profile read and kept. */
+    private suspend fun loadAccountEmail(): String =
+        try {
+            accountEmails.email() ?: readProfileEmail()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (
+            @Suppress("TooGenericExceptionCaught", "SwallowedException") failure: Exception,
+        ) {
+            ""
+        }
+
+    private suspend fun readProfileEmail(): String {
+        val user = (auth.me() as? DomainResult.Success)?.data ?: return ""
+        accountEmails.saveEmail(user.userId, user.email)
+        return user.email
     }
 
     override suspend fun validateAttendee(
@@ -266,6 +309,3 @@ class RealDetailRepository(
         val HTTP_SERVER_ERROR_RANGE = 500..599
     }
 }
-
-/** Generates a new idempotency key (UUID v4). */
-internal expect fun newIdempotencyKey(): String

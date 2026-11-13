@@ -53,7 +53,7 @@ class SignInViewModelTest {
         val viewModel =
             SignInViewModel(
                 requestOtp = RequestOtpUseCase(repository) { UserLocale.Indonesian },
-                verifyOtp = VerifyOtpUseCase(repository, generation),
+                verifyOtp = VerifyOtpUseCase(repository, generation, FakeAccountEmails()),
                 saveDisplayName = SaveDisplayNameUseCase(names, FakeAuthRepository()),
                 observeSession = ObserveSessionUseCase(observer),
                 clock = clock,

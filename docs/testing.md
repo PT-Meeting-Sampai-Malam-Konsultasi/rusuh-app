@@ -1,4 +1,22 @@
-# UI testing
+# Testing
+
+## Coverage
+
+Kover collects coverage for `:shared` and `:androidApp`. Run the tests and generate the XML report:
+
+```sh
+./gradlew :shared:allTests :androidApp:testStagingDebugUnitTest koverXmlReport
+```
+
+The report is written to `build/reports/kover/report.xml` (JaCoCo XML format). HTML is at `build/reports/kover/html/`.
+
+Coverage is measured only for the code that unit tests belong to: **ViewModels, use cases, repositories and API
+services**. The Kover report is filtered to those classes (`build.gradle.kts`, `kover { reports { filters } }`, stubs and
+fakes out) and `sonar-project.properties` excludes everything else from the coverage figure (views, screens, routes,
+navigation, DI, DTOs/mappers/models, stubs, platform code, generated code); those files are still analysed for bugs,
+smells and security. The SonarCloud quality gate asks for 80% on new code.
+
+SonarCloud reads the coverage from the Kover XML report during CI. The `sonar.yml` workflow runs tests, generates the report, and uploads to SonarCloud when `SONAR_TOKEN` is configured.
 
 ## Run tests
 

@@ -31,7 +31,7 @@ import kotlinx.coroutines.sync.withLock
  * A failed call throws [DomainException], which the use case catches and presents as an error state with retry.
  * A 401 is handled by the session layer (refresh or session expired).
  */
-class RealTicketsRepository(
+class TicketsRepositoryImpl(
     private val api: TicketApiService,
     private val cache: TicketsCache,
     private val localeProvider: LocaleProvider,

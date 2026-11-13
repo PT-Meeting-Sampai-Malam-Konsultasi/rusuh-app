@@ -12,6 +12,7 @@ import com.rusuh.app.domain.usecase.AuthGeneration
 import com.rusuh.app.domain.usecase.GetProfileUseCase
 import com.rusuh.app.domain.usecase.ObserveSessionUseCase
 import com.rusuh.app.domain.usecase.SignOutUseCase
+import com.rusuh.app.feature.auth.FakeAccountEmails
 import com.rusuh.app.feature.auth.FakeAuthRepository
 import com.rusuh.app.feature.auth.FakeDisplayNames
 import com.rusuh.app.feature.auth.FakeSessionObserver
@@ -60,7 +61,7 @@ class AccountViewModelTest {
         val viewModel =
             AccountViewModel(
                 getProfile = GetProfileUseCase(repository, names),
-                signOut = SignOutUseCase(repository, generation, names),
+                signOut = SignOutUseCase(repository, generation, names, FakeAccountEmails()),
                 observeSession = ObserveSessionUseCase(observer),
                 consentStore = consentStore,
                 analytics = analytics,

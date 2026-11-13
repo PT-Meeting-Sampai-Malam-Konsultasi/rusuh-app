@@ -1,10 +1,18 @@
 # Firebase App Distribution (Android demo builds)
 
-The `distribute` job in `.github/workflows/android-build.yml` sends a **debug APK of the staging or production flavor**
-to testers on every push to `main` (staging) and on manual dispatch (Actions > Android Build > Run workflow, input
-`flavor`: `staging` or `production`):
+Distribution is **manual only**. Nothing is sent on a push or a pull request. Run it from Actions > **Android
+Distribute** > Run workflow, pick the branch and the `target`. Two separate jobs, each with a branch rule:
 
-- **staging** (default for pushes): `-PmockApi=false`, launcher name "Rusuh Staging", the app talks to the staging API
+| Target | Job | Allowed from |
+| --- | --- | --- |
+| `staging` | Distribute Staging | `main` or a `release/**` branch |
+| `production` | Distribute Production | a `release/**` branch only |
+
+The workflow is `.github/workflows/android-distribute.yml` (branch rule and the two jobs); the steps live in the
+reusable `.github/workflows/android-distribute-job.yml`. A run from any other branch fails at the first step. Each build
+sends a **debug APK**:
+
+- **staging**: `-PmockApi=false`, launcher name "Rusuh Staging", the app talks to the staging API
   `https://api.rusuh-tiket.web.id/v1`.
 - **production**: launcher name "Rusuh", always the production API (the production flavor ignores `-PmockApi` and
   `-PbackendMode`).

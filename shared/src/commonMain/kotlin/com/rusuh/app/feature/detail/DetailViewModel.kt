@@ -1,6 +1,6 @@
 package com.rusuh.app.feature.detail
 
-import com.rusuh.app.data.repository.newIdempotencyKey
+import com.rusuh.app.data.network.newIdempotencyKey
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.AttendeeValidation
 import com.rusuh.app.domain.model.BookingResult
