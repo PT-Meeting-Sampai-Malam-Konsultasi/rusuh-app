@@ -10,6 +10,7 @@ import com.rusuh.app.domain.usecase.GetDetailUseCase
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
 import com.rusuh.app.domain.usecase.GetProfileUseCase
 import com.rusuh.app.domain.usecase.LeaveQueueUseCase
+import com.rusuh.app.domain.usecase.CancelBookingUseCase
 import com.rusuh.app.domain.usecase.LoadPaymentUseCase
 import com.rusuh.app.domain.usecase.ObservePaymentStatusUseCase
 import com.rusuh.app.domain.usecase.ObserveSessionUseCase
@@ -89,6 +90,7 @@ val appModule =
         factory { LoadPaymentUseCase(get()) }
         factory { StartSnapPaymentUseCase(get()) }
         factory { ObservePaymentStatusUseCase(get()) }
+        factory { CancelBookingUseCase(get()) }
         factory {
                 (bookingId: String) ->
             PaymentViewModel(bookingId, get(), get(), get(), tracker = get(), cancelBooking = get())
