@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Indonesian (id) translation of the UI strings. Values are the original
-  hardcoded literals from the migrated screens (issue #51). EN base is in
-  values/strings.xml. Keep keys in sync with the EN base.
+  Indonesian translation (values-in folder for Android resource resolution).
+  Android's Locale.getLanguage() returns "in" (legacy ISO 639-1 code) for
+  Indonesian, so CMP Resources looks for values-in/. Keep this file IDENTICAL
+  to values-id/strings.xml; a unit test (LanguageStringParityTest) fails if
+  they drift.
+  EN base is in values/strings.xml. Keep keys in sync with the EN base.
 -->
 <resources>
     <!-- App / brand -->

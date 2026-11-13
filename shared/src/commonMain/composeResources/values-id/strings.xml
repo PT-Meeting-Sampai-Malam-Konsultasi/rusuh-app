@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Indonesian translation (values-id folder for iOS resource resolution).
+  iOS's NSLocale.languageCode returns "id" for Indonesian, so CMP Resources
+  looks for values-id/. Keep this file IDENTICAL to values-in/strings.xml;
+  a unit test (LanguageStringParityTest) fails if they drift.
+  EN base is in values/strings.xml. Keep keys in sync with the EN base.
+-->
+<resources>
+    <!-- App / brand -->
+    <string name="app_name">Rusuh</string>
+
+    <!-- Shared navigation / actions -->
+    <string name="action_back">‹ Kembali</string>
+    <string name="action_retry">Coba lagi</string>
+
+    <!-- Home screen -->
+    <string name="home_empty_title">Belum ada event</string>
+    <string name="home_pull_to_refresh">Tarik ke bawah untuk memuat ulang.</string>
+    <string name="home_loading_description">Memuat daftar event</string>
+
+    <!-- Event status badge labels (home cards) -->
+    <string name="status_available">Antrian dibuka</string>
+    <string name="status_temporarily_full">Penuh sementara</string>
+    <string name="status_sold_out">Habis terjual</string>
+    <string name="status_coming_soon">Segera dijual</string>
+    <string name="status_prefix">Status: %1$s</string>
+    <!-- Passthrough untuk teks yang sudah diformat & tidak bergantung locale (mis. hitung mundur dari pemanggil). -->
+    <string name="status_passthrough">%1$s</string>
+
+    <!-- Event card status footers -->
+    <string name="event_footer_temporarily_full">Sisa tiket sedang dibayar pembeli lain. Yang tidak jadi dibayar kembali dalam 10 menit.</string>
+    <string name="event_footer_sold_out">Semua %1$s tiket terjual dalam %2$d menit.</string>
+
+    <!-- Home header + list (Figma: Home · Event list · Mobile 390) -->
+    <string name="home_logo_wordmark">RUSUH</string>
+    <string name="home_logo_accent">!</string>
+    <string name="home_logo_description">Rusuh, ke beranda</string>
+    <string name="home_language_toggle_description">Bahasa</string>
+    <string name="home_section_all_events">Semua event</string>
+    <string name="home_section_all_events_count">%1$d event · urut tanggal penjualan</string>
+
+    <!-- Event card (home) -->
+    <string name="event_card_status_on_sale">Dijual</string>
+    <string name="event_card_status_almost_gone">Hampir habis</string>
+    <string name="event_card_status_ended">Penjualan berakhir</string>
+    <string name="event_card_price_from">Mulai</string>
+    <string name="event_card_poster_sold_out">HABIS</string>
+    <string name="event_card_footer_opens">Dibuka %1$s</string>
+    <string name="event_card_footer_ended">Penjualan online ditutup %1$s.</string>
+    <string name="event_card_action_remind">Ingatkan saya</string>
+    <string name="event_card_action_join_queue">Masuk antrian</string>
+    <string name="event_card_action_queue_anyway">Tetap antre</string>
+    <string name="event_card_action_buy">Beli tiket</string>
+
+    <!-- Waiting Room screen -->
+    <string name="waiting_title">Ruang Tunggu</string>
+    <string name="waiting_loading_description">Memuat posisi antrian</string>
+    <string name="waiting_loading">Memuat posisi antrian…</string>
+    <string name="waiting_empty_title">Tidak ada antrian</string>
+    <string name="waiting_empty_body">Anda tidak sedang berada dalam antrian untuk acara ini.</string>
+    <string name="waiting_error_title">Gagal memuat antrian</string>
+    <string name="waiting_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="waiting_refresh_error">Koneksi terputus. Menampilkan posisi terakhir Anda.</string>
+
+    <!-- Queue position card -->
+    <string name="waiting_back_description">Kembali</string>
+    <string name="waiting_poster_live">LIVE · Antrian dibuka</string>
+    <string name="waiting_poster_prequeue">Antrian dibuka %1$s</string>
+    <string name="waiting_poster_paused">Antrian dijeda</string>
+    <string name="waiting_poster_closed">Antrian ditutup</string>
+    <string name="waiting_poster_sold_out_stamp">HABIS</string>
+    <string name="waiting_prequeue_lead">Antrian dibuka dalam</string>
+    <string name="waiting_prequeue_title">Anda sudah di dalam.</string>
+    <string name="waiting_prequeue_body">Tetap di halaman ini. Nomor antrian dibagikan tepat pukul %1$s.</string>
+    <string name="waiting_prequeue_hint">Tidak perlu refresh. Halaman berganti sendiri saat antrian dibuka.</string>
+    <string name="waiting_paused_lead">Antrian dijeda sebentar. Nomor Anda tetap</string>
+    <string name="waiting_paused_title">Lanjut otomatis</string>
+    <string name="waiting_paused_reason_stock">Penuh sementara. Antrian lanjut otomatis begitu ada tiket yang dilepas.</string>
+    <string name="waiting_paused_reason_operator">Penyelenggara sedang memeriksa sistem. Biasanya kurang dari 5 menit.</string>
+    <string name="waiting_paused_hint">Jangan tutup atau refresh berulang — tidak mempercepat, tidak memperlambat.</string>
+    <string name="waiting_turn_lead">Nomor %1$s, silakan masuk.</string>
+    <string name="waiting_turn_title">Giliran Anda!</string>
+    <string name="waiting_turn_cta">Pilih tiket sekarang</string>
+    <string name="waiting_turn_timer_label">untuk masuk</string>
+    <string name="waiting_turn_hint">Kami pindahkan Anda otomatis. Setelah masuk: 5 menit pilih tiket, 10 menit bayar.</string>
+    <string name="waiting_missed_lead">Waktu 60 detik untuk masuk sudah habis.</string>
+    <string name="waiting_missed_title">Giliran terlewat.</string>
+    <string name="waiting_missed_body">Tempat Anda kami berikan ke nomor berikutnya. Tiket masih tersedia — antre lagi untuk mendapat nomor baru.</string>
+    <string name="waiting_missed_cta">Antre lagi</string>
+    <string name="waiting_missed_estimate">Perkiraan antrian saat ini: ± %1$d menit</string>
+    <string name="waiting_sold_out_lead">Antrian %1$s ditutup.</string>
+    <string name="waiting_sold_out_title">Tiket habis.</string>
+    <string name="waiting_sold_out_body">Semua tiket sudah terjual sebelum giliran Anda. Kami tutup antrian sekarang supaya Anda tidak menunggu sia-sia. Tidak ada biaya apa pun.</string>
+    <string name="waiting_sold_out_cta">Lihat event lain</string>
+    <string name="waiting_sold_out_notify">Kabari saya jika ada pertunjukan tambahan</string>
+    <string name="waiting_note_safe_title">Posisi Anda aman</string>
+    <string name="waiting_note_safe_body">Refresh atau tutup halaman, nomor Anda tetap sama.</string>
+    <string name="waiting_note_turn_title">60 detik untuk masuk</string>
+    <string name="waiting_note_turn_body">Saat giliran tiba, kami arahkan Anda otomatis ke pemilihan tiket.</string>
+    <string name="waiting_note_nowait_title">Tidak menunggu sia-sia</string>
+    <string name="waiting_note_nowait_body">Kalau tiket habis, antrian langsung ditutup dan Anda diberi tahu.</string>
+    <string name="waiting_note_app">Di aplikasi, kami kirim notifikasi saat giliran Anda dekat.</string>
+    <string name="waiting_leave">Keluar dari antrian</string>
+    <string name="waiting_guest_banner">Masuk agar nomor antrian Anda tetap tersimpan.</string>
+    <string name="waiting_guest_sign_in">Masuk</string>
+    <string name="queue_position_eta_minutes">± %1$d menit lagi</string>
+    <string name="queue_position_updated">Diperbarui %1$d detik lalu</string>
+    <string name="queue_position_rate">%1$d orang masuk / menit</string>
+    <string name="queue_position_track_joined">Saat Anda bergabung</string>
+    <string name="queue_position_track_turn">Giliran Anda</string>
+    <string name="queue_position_track_serving">Sedang dilayani No. %1$s · Nomor Anda No. %2$s</string>
+    <string name="queue_position_paused_description">Antrian dijeda. Nomor Anda tetap.</string>
+    <string name="queue_position_waiting">Anda antrian ke-</string>
+
+    <!-- Detail (Pilih tiket) screen -->
+    <string name="detail_title">Pilih tiket</string>
+    <string name="detail_back_description">Kembali</string>
+    <string name="detail_timer_description">Sisa waktu %1$s</string>
+    <string name="detail_section_categories">Kategori</string>
+    <string name="detail_categories_hint">Maks. %1$d tiket per transaksi. Tanpa nomor kursi — masuk sesuai kategori.</string>
+    <string name="detail_cap_chip">%1$d/%2$d</string>
+    <string name="detail_cap_message">Batas %1$d tiket tercapai. Kurangi satu untuk ganti kategori.</string>
+    <string name="detail_section_holders">Pemegang tiket</string>
+    <string name="detail_holders_hint">Nama dan NIK sesuai KTP. 1 NIK = 1 tiket per event — di pintu masuk, e-tiket dicocokkan dengan KTP asli.</string>
+    <string name="detail_ticket_label">Tiket %1$d · %2$s</string>
+    <string name="detail_name_label">Nama sesuai KTP</string>
+    <string name="detail_name_placeholder">Nama lengkap</string>
+    <string name="detail_name_hint">Dicetak di e-tiket.</string>
+    <string name="detail_nik_label">NIK</string>
+    <string name="detail_nik_field_description">NIK, tiket %1$d</string>
+    <string name="detail_name_field_description">Nama sesuai KTP, tiket %1$d</string>
+    <string name="detail_nik_placeholder">16 digit sesuai KTP</string>
+    <string name="detail_nik_example">Contoh: 3201 1234 5678 0001</string>
+    <string name="detail_nik_invalid">NIK harus %1$d digit angka.</string>
+    <string name="detail_nik_duplicate">NIK ini sudah dipakai di Tiket %1$d. Setiap tiket butuh NIK orang yang berbeda.</string>
+    <string name="detail_section_email">Kirim e-tiket ke</string>
+    <string name="detail_email_label">Email</string>
+    <string name="detail_email_hint">Dari akun Anda. E-tiket juga muncul di menu Tiket Saya.</string>
+    <string name="detail_email_change">Ubah</string>
+    <string name="detail_summary_subtotal">Subtotal tiket</string>
+    <string name="detail_summary_admin_fee">Biaya layanan</string>
+    <string name="detail_total">Total</string>
+    <string name="detail_bar_tickets">%1$d tiket</string>
+    <string name="detail_proceed">Lanjut bayar</string>
+    <string name="detail_loading_description">Memuat detail tiket</string>
+    <string name="detail_loading">Memuat detail tiket…</string>
+    <string name="detail_empty_title">Belum ada kategori</string>
+    <string name="detail_empty_body">Tiket untuk acara ini belum tersedia.</string>
+    <string name="detail_error_title">Gagal memuat detail</string>
+    <string name="detail_error_load">Detail tidak bisa dimuat. Coba lagi.</string>
+    <string name="detail_error_booking">Belum bisa lanjut ke pembayaran. Coba lagi.</string>
+    <string name="detail_error_nik_rejected">Salah satu NIK tidak bisa diverifikasi. Periksa NIK lalu coba lagi.</string>
+    <string name="detail_expired_description">Waktu habis. 5 menit sudah lewat. Pilihan Anda belum disimpan.</string>
+    <string name="detail_expired_badge">Waktu habis</string>
+    <string name="detail_expired_headline">5 menit sudah lewat.</string>
+    <string name="detail_expired_body">Pilihan Anda belum disimpan dan tempat Anda kami berikan ke nomor berikutnya. Antre lagi untuk mencoba lagi.</string>
+    <string name="detail_expired_action">Antre lagi</string>
+    <string name="detail_expired_home">Ke beranda</string>
+
+    <!-- Seat category card -->
+    <string name="seat_category_available">Tersedia</string>
+    <string name="seat_category_almost_gone">Hampir habis</string>
+    <string name="seat_category_sold_out">Habis</string>
+    <string name="seat_category_selected">%1$d dipilih</string>
+    <string name="seat_decrement">Kurangi %1$s</string>
+    <string name="seat_increment">Tambah %1$s</string>
+
+    <!-- My Queues (Antrian) screen + queue list item -->
+    <string name="my_queues_title">Antrian saya</string>
+    <plurals name="my_queues_count">
+        <item quantity="other">%1$d antrian aktif</item>
+    </plurals>
+    <string name="my_queues_logo_description">Rusuh</string>
+    <string name="eticket_page_title">Tiket Saya</string>
+    <string name="eticket_qr_error">QR tidak bisa dibuat. Tampilkan kode tiket ke petugas.</string>
+    <string name="my_queues_language_group">Bahasa</string>
+    <string name="my_queues_language_id">ID</string>
+    <string name="my_queues_language_en">EN</string>
+    <string name="my_queues_loading_description">Memuat antrian Anda</string>
+    <string name="my_queues_empty_title">Anda belum ada di antrian mana pun</string>
+    <string name="my_queues_empty_body">Pilih event lalu masuk antriannya. Posisi Anda akan muncul di sini.</string>
+    <string name="my_queues_empty_action">Lihat event</string>
+    <string name="my_queues_error_title">Gagal memuat antrian</string>
+    <string name="my_queues_refresh_failed">Gagal memperbarui antrian.</string>
+    <string name="my_queues_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="queue_list_item_phase_open">Antrian dibuka</string>
+    <string name="queue_list_item_phase_live">Berlangsung</string>
+    <string name="queue_list_item_phase_paused">Dijeda</string>
+    <string name="queue_list_item_phase_your_turn">Giliran Anda</string>
+    <string name="queue_list_item_phase_closed">Ditutup</string>
+    <string name="queue_list_item_position_lead">Anda antrian ke-</string>
+    <string name="queue_list_item_your_turn_headline">Giliran Anda!</string>
+    <string name="queue_list_item_closed_headline">Antrian ditutup</string>
+    <string name="queue_list_item_now_serving">Sedang dilayani No. %1$s</string>
+    <string name="queue_list_item_open_hint">Nomor dibagikan saat antrian dimulai.</string>
+    <string name="queue_list_item_paused_hint">Antrian dijeda. Nomor Anda tetap.</string>
+    <string name="queue_list_item_your_turn_hint">Buka sekarang untuk memilih tiket.</string>
+    <string name="queue_list_item_closed_hint">Tiket habis sebelum giliran Anda.</string>
+    <string name="queue_list_item_updated_seconds">Diperbarui %1$d detik lalu</string>
+    <string name="queue_list_item_updated_minutes">Diperbarui %1$d menit lalu</string>
+    <string name="queue_list_item_updated_hours">Diperbarui %1$d jam lalu</string>
+    <string name="queue_list_item_open_action">Lihat antrian</string>
+    <string name="queue_list_item_description">%1$s. %2$s. %3$s. %4$s. %5$s.</string>
+    <string name="tab_event">Event</string>
+    <string name="tab_queues">Antrian</string>
+    <string name="tab_tickets">Tiket</string>
+    <string name="tab_account">Akun</string>
+    <string name="tab_coming_soon">%1$s — segera hadir</string>
+    <string name="tickets_title">Tiket Saya.</string>
+    <string name="tickets_subtitle">Semua pesanan sudah lunas. Di pintu masuk, tunjukkan QR-nya bersama KTP asli pemegang.</string>
+    <string name="tickets_upcoming_title">Akan datang</string>
+    <string name="tickets_past_title">Sudah lewat</string>
+    <string name="tickets_loading_description">Memuat tiket Anda</string>
+    <string name="tickets_empty_title">Belum ada tiket.</string>
+    <string name="tickets_empty_body">Tiket muncul di sini begitu pembayaran lunas — lengkap dengan QR untuk tiap pemegang. E-tiket juga kami kirim ke email Anda.</string>
+    <string name="tickets_empty_action">Lihat event →</string>
+    <string name="tickets_signed_out_title">Masuk untuk melihat tiket.</string>
+    <string name="tickets_signed_out_body">Tiket tersimpan di akun Anda. Masuk dengan email yang dipakai saat memesan.</string>
+    <string name="tickets_signed_out_action">Masuk →</string>
+    <string name="ticket_order_paid_badge">✓ LUNAS</string>
+    <string name="ticket_order_done_badge">SELESAI</string>
+    <string name="ticket_order_view_eticket">Lihat e-tiket</string>
+    <string name="ticket_order_view_eticket_primary">Lihat e-tiket →</string>
+    <string name="ticket_order_view_eticket_for">Lihat e-tiket %1$s</string>
+    <string name="ticket_order_paid_description">Lunas</string>
+    <string name="ticket_order_summary">Pesanan %1$s · %2$s</string>
+    <string name="tickets_count_summary">%1$s · %2$s</string>
+    <plurals name="tickets_orders_count">
+        <item quantity="other">%1$d pesanan</item>
+    </plurals>
+    <plurals name="tickets_tickets_count">
+        <item quantity="other">%1$d tiket</item>
+    </plurals>
+    <string name="tickets_error_title">Tiket tidak bisa dimuat</string>
+    <string name="tickets_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="tickets_error_action">Coba lagi</string>
+    <string name="eticket_loading_description">Memuat e-tiket Anda</string>
+    <string name="eticket_error_title">E-tiket tidak bisa dimuat</string>
+    <string name="eticket_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="eticket_error_action">Coba lagi</string>
+    <string name="eticket_not_found_title">E-tiket tidak ditemukan</string>
+    <string name="eticket_not_found_body">Pesanan ini tidak punya tiket yang bisa ditampilkan. Kembali ke tiket Anda dan pilih pesanan lain.</string>
+    <string name="eticket_not_found_action">Kembali ke tiket saya</string>
+    <string name="eticket_stamp_paid">✓ LUNAS · %1$s %2$s</string>
+    <string name="eticket_stamp_paid_description">Lunas pukul %1$s %2$s</string>
+    <string name="eticket_headline">Sampai jumpa di %1$s!</string>
+    <plurals name="eticket_intro">
+        <item quantity="one">Tiket %2$s sudah atas nama pemegang NIK. Kami juga mengirim e-tiket ke %3$s.</item>
+        <item quantity="other">%1$d tiket %2$s sudah atas nama pemegang NIK masing-masing. Kami juga mengirim e-tiket ke %3$s.</item>
+    </plurals>
+    <string name="eticket_add_to_calendar">Tambah ke kalender</string>
+    <string name="eticket_order_line">Pesanan %1$s · %2$s · %3$s</string>
+    <string name="eticket_ticket_label">TIKET %1$d/%2$d</string>
+    <string name="eticket_holder_label">PEMEGANG</string>
+    <string name="eticket_holder_nik">NIK %1$s</string>
+    <string name="eticket_entry_label">MASUK</string>
+    <string name="eticket_doors_label">PINTU DIBUKA</string>
+    <string name="eticket_doors_value">%1$s, %2$d %3$s · %4$s %5$s</string>
+    <string name="eticket_time_format">%1$s.%2$s</string>
+    <string name="eticket_seating_standing">berdiri</string>
+    <string name="eticket_seating_seated">duduk bebas</string>
+    <string name="eticket_qr_description">Kode QR untuk tiket %1$s</string>
+    <string name="eticket_ticket_summary">Tiket %1$d dari %2$d, %3$s, NIK %4$s, masuk %5$s, pintu dibuka %6$s</string>
+    <string name="eticket_ticket_summary_no_entry">Tiket %1$d dari %2$d, %3$s, NIK %4$s, pintu dibuka %5$s</string>
+    <string name="eticket_at_door_title">Di pintu masuk</string>
+    <string name="eticket_step_1">Tunjukkan QR tiket — dari aplikasi atau cetakan.</string>
+    <string name="eticket_step_2">Bawa %1$s dengan NIK yang sama seperti di tiket. Tanpa KTP yang cocok, petugas tidak bisa memindai.</string>
+    <string name="eticket_step_2_bold">KTP asli</string>
+    <string name="eticket_step_3">Satu QR hanya bisa dipindai sekali. Jangan unggah tiket ke media sosial.</string>
+    <string name="eticket_step_number">%1$d.</string>
+    <string-array name="eticket_weekdays_short">
+        <item>Sen</item>
+        <item>Sel</item>
+        <item>Rab</item>
+        <item>Kam</item>
+        <item>Jum</item>
+        <item>Sab</item>
+        <item>Min</item>
+    </string-array>
+    <string-array name="eticket_months_short">
+        <item>Jan</item>
+        <item>Feb</item>
+        <item>Mar</item>
+        <item>Apr</item>
+        <item>Mei</item>
+        <item>Jun</item>
+        <item>Jul</item>
+        <item>Agu</item>
+        <item>Sep</item>
+        <item>Okt</item>
+        <item>Nov</item>
+        <item>Des</item>
+    </string-array>
+    <string name="otp_input_label">Kode verifikasi</string>
+    <string name="otp_input_progress">%1$d dari %2$d digit terisi</string>
+    <string name="sign_in_back">Kembali</string>
+    <string name="sign_in_top_title">Masuk atau daftar</string>
+    <string name="sign_in_event_label">Setelah masuk, Anda lanjut ke</string>
+    <string name="sign_in_event_opens">Antrian dibuka %1$s</string>
+    <string name="sign_in_event_description">%1$s, %2$s, %3$s</string>
+    <string name="sign_in_email_headline">Masuk tanpa kata sandi.</string>
+    <string name="sign_in_email_body">Masukkan email, kami kirim kode 6 digit. Belum punya akun? Kode yang sama langsung membuatnya.</string>
+    <string name="sign_in_email_label">Email</string>
+    <string name="sign_in_email_placeholder">nama@email.com</string>
+    <string name="sign_in_email_hint">Pakai email yang aktif — nomor antrian, e-tiket dan info refund dikirim ke sini.</string>
+    <string name="sign_in_send_code">Kirim kode</string>
+    <string name="sign_in_terms">Dengan lanjut, Anda setuju dengan %1$s dan %2$s Rusuh.</string>
+    <string name="sign_in_terms_link">Syarat &amp; Ketentuan</string>
+    <string name="sign_in_privacy_link">Kebijakan Privasi</string>
+    <string name="sign_in_code_headline">Cek email Anda.</string>
+    <string name="sign_in_code_sent_to">Kode dikirim ke %1$s</string>
+    <string name="sign_in_change_email">Ganti email</string>
+    <string name="sign_in_code_label">Kode 6 digit</string>
+    <string name="sign_in_verify">Masuk</string>
+    <string name="sign_in_resend_wait">Kirim ulang kode dalam %1$s</string>
+    <string name="sign_in_resend">Kirim ulang kode</string>
+    <string name="sign_in_code_hint">Tidak ada di kotak masuk? Cek folder Spam atau Promosi. Pengirim: %1$s. Kode berlaku %2$s.</string>
+    <plurals name="sign_in_wrong_attempts">
+        <item quantity="other">Kode salah. Sisa %1$d percobaan — setelah itu tunggu %2$d menit untuk minta kode baru.</item>
+    </plurals>
+    <string name="sign_in_expired_headline">Kode kedaluwarsa.</string>
+    <string name="sign_in_expired_error">Kode hanya berlaku %1$d menit. Minta kode baru — kode lama otomatis tidak berlaku.</string>
+    <string name="sign_in_send_new_code">Kirim kode baru</string>
+    <string name="sign_in_badge">Akun baru dibuat</string>
+    <string name="sign_in_new_headline">Satu langkah lagi.</string>
+    <string name="sign_in_new_body">Email %1$s sudah terverifikasi. Siapa nama Anda?</string>
+    <string name="sign_in_name_label">Nama</string>
+    <string name="sign_in_name_placeholder">Nama lengkap Anda</string>
+    <string name="sign_in_name_hint">Untuk sapaan di email dan akun. NIK tetap diisi per tiket saat memesan.</string>
+    <string name="sign_in_consent">Kabari saya soal presale dan event baru lewat email.</string>
+    <string name="sign_in_continue_queue">Lanjut ke antrian</string>
+    <string name="sign_in_continue">Lanjut</string>
+    <string name="sign_in_info_1_title">Tanpa kata sandi</string>
+    <string name="sign_in_info_1_body">Setiap kali masuk cukup pakai kode dari email. Tidak ada yang perlu diingat.</string>
+    <string name="sign_in_info_2_title">Daftar = masuk</string>
+    <string name="sign_in_info_2_body">Email baru otomatis dibuatkan akun begitu kodenya benar.</string>
+    <string name="sign_in_info_3_title">Satu akun, banyak antrian</string>
+    <string name="sign_in_info_3_body">Antre beberapa event sekaligus, semua tercatat di akun yang sama.</string>
+    <string name="account_sign_in_section">Masuk</string>
+    <string name="account_change_email">Ganti email</string>
+    <string name="account_email_label">Email</string>
+    <string name="account_verified">Terverifikasi</string>
+    <string name="account_email_row_description">Email %1$s, %2$s</string>
+    <string name="account_login_method_label">Cara masuk</string>
+    <string name="account_login_method_value">Kode 6 digit ke email ini. Tanpa kata sandi.</string>
+    <string name="account_sign_out">Keluar</string>
+    <string name="account_delete">Hapus akun</string>
+    <string name="sign_in_error_network">Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="sign_in_error_rate_limited">Terlalu banyak percobaan. Coba lagi dalam %1$s.</string>
+    <string name="sign_in_error_rate_limited_now">Terlalu banyak percobaan. Coba lagi sebentar lagi.</string>
+    <string name="sign_in_error_invalid">Permintaan ditolak. Periksa data yang Anda masukkan lalu coba lagi.</string>
+    <string name="sign_in_error_unknown">Terjadi kesalahan. Coba lagi.</string>
+    <string name="account_session_expired">Sesi Anda berakhir. Masuk lagi.</string>
+    <string name="account_loading">Memuat akun Anda</string>
+    <string name="account_error_title">Gagal memuat akun Anda</string>
+    <string name="account_error_body">Periksa koneksi Anda lalu coba lagi.</string>
+    <!-- Localized API error messages, keyed by stable ErrorCode names. -->
+    <string name="error_code_validation_failed">Permintaan gagal (validation failed). Silakan coba lagi.</string>
+    <string name="error_code_internal_error">Permintaan gagal (internal error). Silakan coba lagi.</string>
+    <string name="error_code_verification_unavailable">Permintaan gagal (verification unavailable). Silakan coba lagi.</string>
+    <string name="error_code_unauthorized">Permintaan gagal (unauthorized). Silakan coba lagi.</string>
+    <string name="error_code_admission_invalid">Permintaan gagal (admission invalid). Silakan coba lagi.</string>
+    <string name="error_code_not_found">Permintaan gagal (not found). Silakan coba lagi.</string>
+    <string name="error_code_rate_limited">Permintaan gagal (rate limited). Silakan coba lagi.</string>
+    <string name="error_code_queue_closed">Permintaan gagal (queue closed). Silakan coba lagi.</string>
+    <string name="error_code_not_yet">Permintaan gagal (not yet). Silakan coba lagi.</string>
+    <string name="error_code_full">Permintaan gagal (full). Silakan coba lagi.</string>
+    <string name="error_code_missed">Permintaan gagal (missed). Silakan coba lagi.</string>
+    <string name="error_code_expired">Permintaan gagal (expired). Silakan coba lagi.</string>
+    <string name="error_code_no_stock">Permintaan gagal (no stock). Silakan coba lagi.</string>
+    <string name="error_code_too_far">Permintaan gagal (too far). Silakan coba lagi.</string>
+    <string name="error_code_stream_full">Permintaan gagal (stream full). Silakan coba lagi.</string>
+    <string name="error_code_account_has_place_elsewhere">Permintaan gagal (account has place elsewhere). Silakan coba lagi.</string>
+    <string name="error_code_moved">Permintaan gagal (moved). Silakan coba lagi.</string>
+    <string name="error_code_wrong_code">Permintaan gagal (wrong code). Silakan coba lagi.</string>
+    <string name="error_code_challenge_expired">Permintaan gagal (challenge expired). Silakan coba lagi.</string>
+    <string name="error_code_challenge_locked">Permintaan gagal (challenge locked). Silakan coba lagi.</string>
+    <string name="error_code_nik_invalid">Permintaan gagal (nik invalid). Silakan coba lagi.</string>
+    <string name="error_code_nik_seat_taken">Permintaan gagal (nik seat taken). Silakan coba lagi.</string>
+    <string name="error_code_duplicate_nik">Permintaan gagal (duplicate nik). Silakan coba lagi.</string>
+    <string name="error_code_attendee_not_validated">Permintaan gagal (attendee not validated). Silakan coba lagi.</string>
+    <string name="error_code_quantity_over_reservation">Permintaan gagal (quantity over reservation). Silakan coba lagi.</string>
+    <string name="error_code_dukcapil_unavailable">Permintaan gagal (dukcapil unavailable). Silakan coba lagi.</string>
+    <string name="error_code_account_has_active_booking">Permintaan gagal (account has active booking). Silakan coba lagi.</string>
+    <string name="error_code_category_sold_out">Permintaan gagal (category sold out). Silakan coba lagi.</string>
+    <string name="error_code_booking_not_held">Permintaan gagal (booking not held). Silakan coba lagi.</string>
+    <string name="error_code_booking_not_paid">Permintaan gagal (booking not paid). Silakan coba lagi.</string>
+    <string name="error_code_not_cancellable">Permintaan gagal (not cancellable). Silakan coba lagi.</string>
+    <string name="error_code_code_invalid">Permintaan gagal (code invalid). Silakan coba lagi.</string>
+    <string name="error_code_payment_provider_busy">Permintaan gagal (payment provider busy). Silakan coba lagi.</string>
+    <string name="error_code_forbidden">Permintaan gagal (forbidden). Silakan coba lagi.</string>
+    <string name="error_code_service_unavailable">Permintaan gagal (service unavailable). Silakan coba lagi.</string>
+    <string name="error_code_tiket_tidak_ditemukan">Permintaan gagal (tiket tidak ditemukan). Silakan coba lagi.</string>
+    <string name="error_code_tiket_sudah_digunakan">Permintaan gagal (tiket sudah digunakan). Silakan coba lagi.</string>
+    <string name="error_code_tiket_tidak_berlaku">Permintaan gagal (tiket tidak berlaku). Silakan coba lagi.</string>
+    <string name="error_code_unknown">Permintaan gagal (unknown). Silakan coba lagi.</string>
+</resources>

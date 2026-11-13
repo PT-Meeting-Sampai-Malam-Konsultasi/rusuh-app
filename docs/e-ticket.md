@@ -17,7 +17,7 @@ orders without tickets to `NotFound`; `ETicketViewModel` (MVI) exposes Loading /
 Real wiring (TICKET-00-M4) is `GET /tickets` grouped by `bookingId` plus an event lookup for the order-level facts.
 
 Door and paid times are formatted on the event's wall clock (WIB / WITA / WIT) without a date library; weekday and
-month names and the time separator live in `values/` and `values-id/` string resources.
+month names and the time separator live in `values/`, `values-id/`, and `values-in/` string resources.
 
 ## QR code (#108)
 

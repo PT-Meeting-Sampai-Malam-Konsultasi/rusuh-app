@@ -195,7 +195,7 @@ Implement `requestOtp`, `verifyOtp`, `refreshSession` (rotating, single-flight r
 - **Validate in mappers, not `require()`.** `EventStatus` / `QueueListItemUi` must not crash on bad mapper data; return a safe fallback status (or drop item) and log. AC: mapper tests with unknown enum / negative values.
 - **Ticking ETA / updatedAgo.** Drive from an injectable `Clock`/ticker in the VM (1 s tick when visible), never from the device clock for countdowns that have `expiresAt`/`serverNow`. AC: virtual-time tests.
 - **Home card `onActionClick` vs `onClick`.** Clarify: card body opens event, action button performs CTA; avoid double handling. AC: UI test + doc comment.
-- **Test gaps.** Compose UI tests (at least Home, Waiting Room states, Detail steppers, My Queues empty) and a unit test asserting `values/strings.xml` and `values-id/strings.xml` have identical key sets.
+- **Test gaps.** Compose UI tests (at least Home, Waiting Room states, Detail steppers, My Queues empty) and a unit test asserting `values/strings.xml`, `values-id/strings.xml`, and `values-in/strings.xml` have identical key sets, plus `values-id/` and `values-in/` have identical content.
 - **Figma visual pass.** When the Figma MCP quota resets, redo Home `4:1544`, Waiting Room `5:266` (six states), My Queues (use Waiting Room language, no Figma frame found; confirm) and Detail expired `60:2395` against real frames, via `get_design_context` per child frame. Detail Booking `60:2093` was already built from Figma.
 - **Duplicate colour tokens** and **language toggle visual only**: covered by INFRA items above.
 

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Default (English) UI strings. EN is the base locale per ADR-0014; the
-  Indonesian translation lives in values-id/strings.xml. Add a key ONLY when a
-  string is actually rendered (issue #51) — do not pre-populate unused keys.
-  Accessed from composables via stringResource(Res.string.<key>).
+  Indonesian translation lives in values-id/ (for iOS) and values-in/ (for
+  Android). Add a key ONLY when a string is actually rendered (issue #51) —
+  do not pre-populate unused keys. Accessed from composables via
+  stringResource(Res.string.<key>).
 -->
 <resources>
     <!-- App / brand -->
