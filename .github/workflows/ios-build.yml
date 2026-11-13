@@ -1,7 +1,7 @@
 name: iOS Build
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   pull_request:
     branches: [main]
 concurrency:
@@ -54,8 +54,9 @@ jobs:
       - name: Build production scheme for simulator (Fastlane)
         run: bundle exec fastlane build_production_simulator
 
+      # Saved only for builds of main and release/** (not for pull requests).
       - name: Upload Staging Archive
-        if: success()
+        if: success() && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: ios-archive-staging-unsigned
