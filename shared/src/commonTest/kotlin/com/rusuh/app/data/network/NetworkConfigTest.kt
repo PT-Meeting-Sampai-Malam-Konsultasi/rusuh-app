@@ -245,4 +245,98 @@ class NetworkConfigTest {
     fun productionStillRejectsStubEvenWhenAskedDirectly() {
         assertFailsWith<IllegalArgumentException> { initKoin(AppEnvironment.Production, BackendMode.Stub) }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // iOS flavor tests (environment name + allow debug options from plist)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun iosStagingDebugAllowsMockApi() {
+        val startup =
+            NetworkConfig.startup(
+                isDebug = true,
+                allowDebugOptions = true,
+                environmentName = "Staging",
+                backendModeOverride = null,
+                mockApi = true,
+            )
+
+        assertEquals(AppEnvironment.Mock, startup.environment)
+        assertEquals(BackendMode.Real, startup.backendMode)
+    }
+
+    @Test
+    fun iosStagingDebugAllowsStubMode() {
+        val startup =
+            NetworkConfig.startup(
+                isDebug = true,
+                allowDebugOptions = true,
+                environmentName = "Staging",
+                backendModeOverride = "Stub",
+                mockApi = false,
+            )
+
+        assertEquals(AppEnvironment.Staging, startup.environment)
+        assertEquals(BackendMode.Stub, startup.backendMode)
+    }
+
+    @Test
+    fun iosProductionDebugIgnoresMockApi() {
+        val startup =
+            NetworkConfig.startup(
+                isDebug = true,
+                allowDebugOptions = false,
+                environmentName = "Production",
+                backendModeOverride = null,
+                mockApi = true,
+            )
+
+        assertEquals(AppEnvironment.Production, startup.environment)
+        assertEquals(BackendMode.Real, startup.backendMode)
+    }
+
+    @Test
+    fun iosProductionDebugIgnoresStubMode() {
+        val startup =
+            NetworkConfig.startup(
+                isDebug = true,
+                allowDebugOptions = false,
+                environmentName = "Production",
+                backendModeOverride = "Stub",
+                mockApi = false,
+            )
+
+        assertEquals(AppEnvironment.Production, startup.environment)
+        assertEquals(BackendMode.Real, startup.backendMode)
+    }
+
+    @Test
+    fun iosStagingReleaseIsAlwaysProductionReal() {
+        val startup =
+            NetworkConfig.startup(
+                isDebug = false,
+                allowDebugOptions = true,
+                environmentName = "Staging",
+                backendModeOverride = "Stub",
+                mockApi = true,
+            )
+
+        assertEquals(AppEnvironment.Production, startup.environment)
+        assertEquals(BackendMode.Real, startup.backendMode)
+    }
+
+    @Test
+    fun iosProductionReleaseIsAlwaysProductionReal() {
+        val startup =
+            NetworkConfig.startup(
+                isDebug = false,
+                allowDebugOptions = false,
+                environmentName = "Production",
+                backendModeOverride = null,
+                mockApi = false,
+            )
+
+        assertEquals(AppEnvironment.Production, startup.environment)
+        assertEquals(BackendMode.Real, startup.backendMode)
+    }
 }
