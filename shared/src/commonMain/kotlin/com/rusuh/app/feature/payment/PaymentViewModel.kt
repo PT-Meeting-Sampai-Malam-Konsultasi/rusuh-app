@@ -48,6 +48,7 @@ class PaymentViewModel(
             PaymentIntent.GoToTickets -> sendEffect(PaymentEffect.NavigateToTickets)
             PaymentIntent.QueueAgain -> queueAgain()
             PaymentIntent.GoHome -> sendEffect(PaymentEffect.NavigateToHome)
+            PaymentIntent.SnapClosed -> refreshAfterResume()
         }
     }
 
