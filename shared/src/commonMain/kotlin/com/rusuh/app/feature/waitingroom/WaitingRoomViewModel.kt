@@ -1,9 +1,11 @@
 package com.rusuh.app.feature.waitingroom
 
+import com.rusuh.app.data.network.session.SessionStateProvider
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.SignInRequiredException
 import com.rusuh.app.domain.usecase.LeaveQueueUseCase
 import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
+import com.rusuh.app.feature.waitingroom.domain.model.QueueState
 import com.rusuh.app.feature.waitingroom.domain.usecase.ObserveQueuePlaceUseCase
 import com.rusuh.app.mvi.MviViewModel
 import kotlinx.coroutines.Job
@@ -22,18 +24,34 @@ import kotlin.time.TimeSource
  * arrives, and [WaitingRoomIntent.Tick] re-derives them as `serverNow + (now - receivedAt)`.
  * The device wall clock is never read.
  *
+ * ## Login gate (AUTH-00-M6 #103)
+ *
+ * A guest can wait in the queue. When the turn arrives:
+ * - Signed-in users go straight to Detail (auto-advance or the manual "Choose tickets now" tap).
+ * - Guests are HELD in the waiting room on a `YourTurn(heldForSignIn = true)` state: the
+ *   admission countdown runs (from the cached `AdmissionInfo.expiresAt`, never the device clock)
+ *   and a sign-in prompt replaces the "choose tickets" button. After a successful sign-in
+ *   (SessionManager.isSignedIn becomes true, the sign-in route pops back) the user continues
+ *   to Detail with the remaining time. If the countdown ends while held, the turn is lost
+ *   (MissedTurn state).
+ *
  * @param monotonicMillis monotonic milliseconds; injectable so tests can fake time.
+ * @param sessionState provides the signed-in state for guest vs signed-in branching.
  */
 class WaitingRoomViewModel(
     private val eventId: String,
     private val observeQueuePlace: ObserveQueuePlaceUseCase,
     private val leaveQueue: LeaveQueueUseCase,
     private val monotonicMillis: () -> Long = defaultMonotonicMillis(),
+    private val sessionState: SessionStateProvider? = null,
 ) : MviViewModel<WaitingRoomState, WaitingRoomIntent, WaitingRoomEffect>(WaitingRoomState()) {
     private var observeJob: Job? = null
     private var lastPlace: QueuePlace? = null
     private var receivedAtMillis: Long = 0L
     private var backSent = false
+    private var sessionJob: Job? = null
+    private var signedIn = sessionState?.isSignedIn?.value ?: false
+    private var navigatedToDetail = false
 
     override suspend fun reduce(intent: WaitingRoomIntent) {
         when (intent) {
@@ -43,12 +61,19 @@ class WaitingRoomViewModel(
             WaitingRoomIntent.Retry -> startObserving(keepPlace = true)
             WaitingRoomIntent.Tick -> tick()
             WaitingRoomIntent.Back -> sendBackOnce()
-            WaitingRoomIntent.ChooseTicketsNow -> sendEffect(WaitingRoomEffect.NavigateToDetail(eventId))
+            WaitingRoomIntent.ChooseTicketsNow -> navigateToDetail()
             WaitingRoomIntent.BrowseOtherEvents -> sendEffect(WaitingRoomEffect.NavigateToEvents)
             WaitingRoomIntent.LeaveQueue -> leave()
-            // TODO(AUTH-00 #77): sign-in; notify-me needs its own API.
-            WaitingRoomIntent.SignIn, WaitingRoomIntent.NotifyMe -> Unit
+            WaitingRoomIntent.SignIn -> sendEffect(WaitingRoomEffect.OpenSignIn(eventId))
+            WaitingRoomIntent.NotifyMe -> Unit
         }
+    }
+
+    /** Navigate to the Detail screen (manual path via "Choose tickets now"). */
+    private fun navigateToDetail() {
+        if (navigatedToDetail) return
+        navigatedToDetail = true
+        sendEffect(WaitingRoomEffect.NavigateToDetail(eventId))
     }
 
     /** Leaves the queue on the server, then goes back; a failed call keeps the place and shows the refresh error. */
@@ -68,10 +93,39 @@ class WaitingRoomViewModel(
         sendEffect(WaitingRoomEffect.NavigateBack)
     }
 
+    @Suppress("ReturnCount") // Early returns for guard clauses and expired-turn transition.
     private fun tick() {
         val place = lastPlace ?: return
         if (!currentState.hasCountdown) return
-        setState { copy(ui = place.toUiState(monotonicMillis() - receivedAtMillis)) }
+        val elapsed = monotonicMillis() - receivedAtMillis
+        val active = currentState.ui as? WaitingRoomUiState.Active
+        val phase = active?.phase
+
+        // If a guest is held on YourTurn and the countdown hits zero, transition to MissedTurn.
+        if (phase is WaitingRoomPhase.YourTurn && phase.heldForSignIn) {
+            val newPhase = place.toPhase(elapsed)
+            if (newPhase is WaitingRoomPhase.YourTurn && newPhase.secondsLeft <= 0) {
+                // Turn expired while waiting for sign-in -> missed.
+                setState { copy(ui = active.copy(phase = WaitingRoomPhase.MissedTurn(place.rejoinEstimateMinutes))) }
+                return
+            }
+        }
+        val mapped = place.toUiState(elapsed)
+        val updated =
+            (mapped as? WaitingRoomUiState.Active)?.let { m ->
+                val yourTurnPhase = m.phase as? WaitingRoomPhase.YourTurn
+                val isHeld = !signedIn && yourTurnPhase != null
+                m.copy(
+                    isGuest = !signedIn,
+                    phase =
+                        if (isHeld && yourTurnPhase != null) {
+                            yourTurnPhase.copy(heldForSignIn = true)
+                        } else {
+                            m.phase
+                        },
+                )
+            } ?: mapped
+        setState { copy(ui = updated) }
     }
 
     /**
@@ -80,6 +134,8 @@ class WaitingRoomViewModel(
      * after an error) the screen returns to Loading.
      */
     private fun startObserving(keepPlace: Boolean) {
+        navigatedToDetail = false
+        startSessionObserver()
         observeJob?.cancel()
         if (!keepPlace || currentState.ui !is WaitingRoomUiState.Active) {
             lastPlace = null
@@ -100,10 +156,61 @@ class WaitingRoomViewModel(
             }
     }
 
+    private fun startSessionObserver() {
+        if (sessionJob != null || sessionState == null) return
+        sessionJob =
+            viewModelScope.launch {
+                sessionState.isSignedIn.collect { value ->
+                    val wasSignedOut = !signedIn
+                    signedIn = value
+                    val active = currentState.ui as? WaitingRoomUiState.Active ?: return@collect
+
+                    // If user just signed in while held at YourTurn, continue to Detail.
+                    val wasHeld =
+                        active.phase is WaitingRoomPhase.YourTurn && active.phase.heldForSignIn
+                    if (value && wasSignedOut && wasHeld) {
+                        navigateToDetail()
+                        return@collect
+                    }
+
+                    // Otherwise update the guest/held state accordingly.
+                    val newPhase =
+                        if (active.phase is WaitingRoomPhase.YourTurn) {
+                            active.phase.copy(heldForSignIn = !value)
+                        } else {
+                            active.phase
+                        }
+                    setState { copy(ui = active.copy(isGuest = !value, phase = newPhase)) }
+                }
+            }
+    }
+
     private fun onPlace(place: QueuePlace) {
         lastPlace = place
         receivedAtMillis = monotonicMillis()
-        setState { copy(ui = place.toUiState()) }
+        val mapped = place.toUiState()
+
+        // Determine the UI state with guest/held adjustments.
+        val adjusted =
+            (mapped as? WaitingRoomUiState.Active)?.let { active ->
+                val yourTurnPhase = active.phase as? WaitingRoomPhase.YourTurn
+                val isHeld = !signedIn && yourTurnPhase != null
+                val newPhase =
+                    if (isHeld && yourTurnPhase != null) {
+                        yourTurnPhase.copy(heldForSignIn = true)
+                    } else {
+                        active.phase
+                    }
+                active.copy(isGuest = !signedIn, phase = newPhase)
+            } ?: mapped
+
+        setState { copy(ui = adjusted) }
+
+        // Auto-advance: signed-in user at the turn goes straight to Detail.
+        // The existing copy says "We'll move you in automatically" (waiting_turn_hint).
+        if (signedIn && place.state == QueueState.Turn) {
+            navigateToDetail()
+        }
     }
 
     private fun onStreamFailed(cause: Throwable) {

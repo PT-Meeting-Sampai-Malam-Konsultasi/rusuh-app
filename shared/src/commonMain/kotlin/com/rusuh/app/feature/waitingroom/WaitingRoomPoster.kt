@@ -136,13 +136,16 @@ internal fun DrawScope.drawHalftone(color: Color) {
 }
 
 @Composable
-internal fun GuestBanner(onSignIn: () -> Unit) {
+internal fun GuestBanner(
+    onSignIn: () -> Unit,
+    prominent: Boolean = false,
+) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .border(RusuhSpacing.borderBold, RusuhColors.Ink)
-                .background(RusuhColors.PaperDeep)
+                .background(if (prominent) RusuhColors.Pink else RusuhColors.PaperDeep)
                 .padding(horizontal = RusuhSpacing.lg, vertical = RusuhSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.lg),

@@ -84,6 +84,9 @@
     <string name="waiting_turn_cta">Pilih tiket sekarang</string>
     <string name="waiting_turn_timer_label">untuk masuk</string>
     <string name="waiting_turn_hint">Kami pindahkan Anda otomatis. Setelah masuk: 5 menit pilih tiket, 10 menit bayar.</string>
+    <string name="waiting_turn_held_title">Giliran Anda!</string>
+    <string name="waiting_turn_held_cta">Masuk untuk melanjutkan</string>
+    <string name="waiting_turn_held_hint">Masuk untuk mempertahankan giliran. Setelah masuk: 5 menit pilih tiket, 10 menit bayar.</string>
     <string name="waiting_missed_lead">Waktu 60 detik untuk masuk sudah habis.</string>
     <string name="waiting_missed_title">Giliran terlewat.</string>
     <string name="waiting_missed_body">Tempat Anda kami berikan ke nomor berikutnya. Tiket masih tersedia — antre lagi untuk mendapat nomor baru.</string>
@@ -102,7 +105,7 @@
     <string name="waiting_note_nowait_body">Kalau tiket habis, antrian langsung ditutup dan Anda diberi tahu.</string>
     <string name="waiting_note_app">Di aplikasi, kami kirim notifikasi saat giliran Anda dekat.</string>
     <string name="waiting_leave">Keluar dari antrian</string>
-    <string name="waiting_guest_banner">Masuk agar nomor antrian Anda tetap tersimpan.</string>
+    <string name="waiting_guest_banner">Masuk untuk mempertahankan antrian</string>
     <string name="waiting_guest_sign_in">Masuk</string>
     <string name="queue_position_eta_minutes">± %1$d menit lagi</string>
     <string name="queue_position_updated">Diperbarui %1$d detik lalu</string>

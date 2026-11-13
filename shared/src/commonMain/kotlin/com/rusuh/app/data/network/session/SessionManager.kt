@@ -37,13 +37,13 @@ class SessionManager(
     private val events: SessionEvents,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val restoreTimeout: Duration = DEFAULT_RESTORE_TIMEOUT,
-) {
+) : SessionStateProvider {
     private val lock = Mutex()
     private val signedIn = MutableStateFlow(false)
     private val restored = MutableStateFlow(false)
     private val jobs: List<Job>
 
-    val isSignedIn: StateFlow<Boolean> = signedIn.asStateFlow()
+    override val isSignedIn: StateFlow<Boolean> = signedIn.asStateFlow()
 
     /** False until the cold-start read of the stored refresh token finished (or a login/logout decided first). */
     val isRestored: StateFlow<Boolean> = restored.asStateFlow()

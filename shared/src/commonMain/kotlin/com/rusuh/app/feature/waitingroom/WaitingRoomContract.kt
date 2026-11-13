@@ -61,6 +61,8 @@ sealed interface WaitingRoomEffect : MviEffect {
     /** Go to the Events tab. */
     data object NavigateToEvents : WaitingRoomEffect
 
+    data class OpenSignIn(val eventId: String) : WaitingRoomEffect
+
     /** Updates stopped after a place was already shown; the last place stays on screen. */
     data object ShowRefreshError : WaitingRoomEffect
 
