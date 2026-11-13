@@ -33,7 +33,7 @@ const val NIK_VALIDATION_DEBOUNCE_MS = 600L
  * The result is shown inline and a valid token is cached for the booking request.
  *
  * @param eventId the event this order is for.
- * @param serverClock server-time source (fake in tests). TODO(FR-17-M1 #82): synced clock.
+ * @param serverClock server-time source (fake in tests).
  */
 @Suppress("TooManyFunctions")
 class DetailViewModel(

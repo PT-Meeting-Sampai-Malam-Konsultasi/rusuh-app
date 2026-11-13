@@ -8,6 +8,7 @@
 package com.rusuh.app.feature.payment
 
 import com.rusuh.app.domain.model.*
+import com.rusuh.app.domain.repository.DetailRepository
 import com.rusuh.app.domain.repository.PaymentRepository
 import com.rusuh.app.domain.usecase.*
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,7 @@ class PaymentViewModelCoverageTest {
 
     private fun vm(
         repo: Repo,
+        cancelBooking: CancelBookingUseCase? = null,
         now: () -> Long = {
             0L
         },
@@ -72,7 +74,36 @@ class PaymentViewModelCoverageTest {
         StartSnapPaymentUseCase(repo),
         ObservePaymentStatusUseCase(repo),
         now,
+        cancelBooking = cancelBooking,
     )
+
+    private class BookingRepo(var cancelResult: DomainResult<Booking>) : DetailRepository {
+        override suspend fun getDetail(eventId: String): DetailOffering = error("unused")
+
+        override suspend fun validateAttendee(
+            eventId: String,
+            fieldIndex: Int,
+            fullName: String,
+            nik: String,
+        ) = AttendeeValidation.NetworkError
+
+        @Suppress("DEPRECATION")
+        override suspend fun isNikAccepted(nik: String) = false
+
+        override suspend fun createBooking(
+            request: BookingRequest,
+            idempotencyKey: String,
+        ): BookingResult = BookingResult.NetworkError
+
+        override suspend fun getBooking(bookingId: String): DomainResult<Booking> = DomainResult.Empty
+
+        override suspend fun cancelBooking(bookingId: String) = cancelResult
+
+        override suspend fun getActiveBookings(): DomainResult<List<Booking>> = DomainResult.Empty
+
+        @Suppress("DEPRECATION")
+        override suspend fun createBooking(request: BookingRequest): Booking = Booking(bookingId = "bk_test")
+    }
 
     private fun TestScope.send(
         vm: PaymentViewModel,
@@ -120,6 +151,21 @@ class PaymentViewModelCoverageTest {
             repo.snap = DomainResult.Error(code = 409, errorCode = ErrorCode.BOOKING_NOT_HELD)
             send(viewModel, PaymentIntent.RetrySnap)
             assertIs<PaymentUiState.Expired>(viewModel.state.value.ui)
+        }
+
+    @Test fun cancellationHandlesSuccessAndNotCancellable() =
+        runTest(dispatcher) {
+            val bookingRepo =
+                BookingRepo(DomainResult.Success(Booking(bookingId = "bk_test", status = BookingStatus.CANCELLED)))
+            val viewModel = vm(Repo(DomainResult.Success(summary())), cancelBooking = CancelBookingUseCase(bookingRepo))
+            send(viewModel, PaymentIntent.Load, PaymentIntent.CancelBooking)
+            assertIs<PaymentUiState.Expired>(viewModel.state.value.ui)
+
+            bookingRepo.cancelResult = DomainResult.Error(code = 409, errorCode = ErrorCode.NOT_CANCELLABLE)
+            val blocked = vm(Repo(DomainResult.Success(summary())), cancelBooking = CancelBookingUseCase(bookingRepo))
+            send(blocked, PaymentIntent.Load, PaymentIntent.CancelBooking)
+            assertEquals(CancelError.NOT_CANCELLABLE, blocked.state.value.cancelError)
+            assertIs<PaymentUiState.Ready>(blocked.state.value.ui)
         }
 
     @Test fun backAndExpiredActionsEmitNavigationEffects() =

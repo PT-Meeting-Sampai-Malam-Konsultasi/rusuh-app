@@ -65,6 +65,7 @@ fun PaymentRoute(
         onGoToTickets = { viewModel.dispatch(PaymentIntent.GoToTickets) },
         onQueueAgain = { viewModel.dispatch(PaymentIntent.QueueAgain) },
         onGoHome = { viewModel.dispatch(PaymentIntent.GoHome) },
+        onCancelBooking = { viewModel.dispatch(PaymentIntent.CancelBooking) },
     )
 }
 

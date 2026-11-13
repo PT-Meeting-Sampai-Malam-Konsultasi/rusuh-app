@@ -5,6 +5,7 @@ import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.ErrorCode
 import com.rusuh.app.domain.model.PaymentStatus
 import com.rusuh.app.domain.model.PaymentSummary
+import com.rusuh.app.domain.usecase.CancelBookingUseCase
 import com.rusuh.app.domain.usecase.LoadPaymentUseCase
 import com.rusuh.app.domain.usecase.ObservePaymentStatusUseCase
 import com.rusuh.app.domain.usecase.StartSnapPaymentUseCase
@@ -28,6 +29,7 @@ class PaymentViewModel(
     private val startSnapPayment: StartSnapPaymentUseCase,
     private val observePaymentStatus: ObservePaymentStatusUseCase,
     private val monotonicMillis: () -> Long = defaultMonotonicMillis(),
+    private val cancelBooking: CancelBookingUseCase? = null,
 ) : MviViewModel<PaymentContract.State, PaymentIntent, PaymentEffect>(PaymentContract.State()) {
     private var pollingJob: Job? = null
     private var summary: PaymentSummary? = null
@@ -48,6 +50,39 @@ class PaymentViewModel(
             PaymentIntent.GoToTickets -> sendEffect(PaymentEffect.NavigateToTickets)
             PaymentIntent.QueueAgain -> queueAgain()
             PaymentIntent.GoHome -> sendEffect(PaymentEffect.NavigateToHome)
+            PaymentIntent.CancelBooking -> cancel()
+        }
+    }
+
+    private suspend fun cancel() {
+        if (currentState.isCancelling || currentState.ui !is PaymentUiState.Ready || cancelBooking == null) return
+        val action = checkNotNull(cancelBooking)
+        setState { copy(isCancelling = true, cancelError = null) }
+        when (val result = action(bookingId)) {
+            is DomainResult.Success -> {
+                val current = summary
+                if (current == null) {
+                    setState { copy(isCancelling = false, cancelError = CancelError.GENERIC) }
+                } else {
+                    setExpiredState(current.toUi(), current.customerEmail, refundRequired = false)
+                }
+            }
+            is DomainResult.Error ->
+                setState {
+                    copy(
+                        isCancelling = false,
+                        cancelError =
+                            if (result.errorCode == ErrorCode.NOT_CANCELLABLE) {
+                                CancelError.NOT_CANCELLABLE
+                            } else {
+                                CancelError.GENERIC
+                            },
+                    )
+                }
+            is DomainResult.NetworkError, DomainResult.Empty, DomainResult.TechnicalError ->
+                setState {
+                    copy(isCancelling = false, cancelError = CancelError.GENERIC)
+                }
         }
     }
 
@@ -84,6 +119,8 @@ class PaymentViewModel(
                             hasOpenedSnap = hasOpenedSnap,
                         ),
                     remainingSeconds = remaining,
+                    cancelError = null,
+                    isCancelling = false,
                 )
             }
         }
@@ -120,6 +157,8 @@ class PaymentViewModel(
                         refundRequired = refundRequired,
                     ),
                 remainingSeconds = 0,
+                isCancelling = false,
+                cancelError = null,
             )
         }
     }

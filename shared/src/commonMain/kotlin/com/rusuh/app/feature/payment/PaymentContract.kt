@@ -25,6 +25,8 @@ object PaymentContract {
         val ui: PaymentUiState = PaymentUiState.Loading,
         val remainingSeconds: Int = PAYMENT_WINDOW_SECONDS,
         val isSnapLaunching: Boolean = false,
+        val isCancelling: Boolean = false,
+        val cancelError: CancelError? = null,
     ) : MviState
 }
 
@@ -59,6 +61,8 @@ sealed interface PaymentIntent : MviIntent {
 
     /** Go to Home after payment expired or cancelled. */
     data object GoHome : PaymentIntent
+
+    data object CancelBooking : PaymentIntent
 }
 
 /** Side effects emitted by the Payment ViewModel. */
@@ -128,6 +132,8 @@ sealed interface PaymentUiState {
     @Immutable
     data class Error(val message: String) : PaymentUiState
 }
+
+enum class CancelError { NOT_CANCELLABLE, GENERIC }
 
 /** Error state for 503 PAYMENT_PROVIDER_BUSY. */
 @Immutable

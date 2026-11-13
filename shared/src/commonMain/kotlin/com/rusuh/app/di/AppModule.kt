@@ -88,7 +88,7 @@ val appModule =
         factory { LoadPaymentUseCase(get()) }
         factory { StartSnapPaymentUseCase(get()) }
         factory { ObservePaymentStatusUseCase(get()) }
-        factory { (bookingId: String) -> PaymentViewModel(bookingId, get(), get(), get()) }
+        factory { (bookingId: String) -> PaymentViewModel(bookingId, get(), get(), get(), cancelBooking = get()) }
         factory { (bookingId: String) -> PaymentResultViewModel(bookingId, get(), get()) }
 
         // Analytics consent.
