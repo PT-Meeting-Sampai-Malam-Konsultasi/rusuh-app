@@ -1,5 +1,7 @@
 package com.rusuh.app.feature.payment
 
+import com.rusuh.app.analytics.AnalyticsTracker
+import com.rusuh.app.analytics.ItemData
 import com.rusuh.app.domain.model.BookingStatus
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.ErrorCode
@@ -12,6 +14,7 @@ import com.rusuh.app.domain.usecase.StartSnapPaymentUseCase
 import com.rusuh.app.mvi.MviViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -22,7 +25,7 @@ import kotlin.time.TimeSource
  * Manages the payment flow: load summary → open Snap → poll status → show result.
  * Countdowns are driven by server time, not the device clock.
  */
-@Suppress("TooManyFunctions") // Split for readability and to keep cyclomatic complexity low per function
+@Suppress("TooManyFunctions", "LongParameterList") // Split for readability; the collaborators are injected
 class PaymentViewModel(
     private val bookingId: String,
     private val loadPayment: LoadPaymentUseCase,
@@ -30,6 +33,7 @@ class PaymentViewModel(
     private val observePaymentStatus: ObservePaymentStatusUseCase,
     private val monotonicMillis: () -> Long = defaultMonotonicMillis(),
     private val cancelBooking: CancelBookingUseCase? = null,
+    private val tracker: AnalyticsTracker? = null,
 ) : MviViewModel<PaymentContract.State, PaymentIntent, PaymentEffect>(PaymentContract.State()) {
     private var pollingJob: Job? = null
     private var summary: PaymentSummary? = null
@@ -37,6 +41,7 @@ class PaymentViewModel(
     private var receivedAtMillis: Long = 0L
     private var lastIdempotencyKey: String? = null
     private var backSent = false
+    private var lastPaymentType: String? = null
 
     override suspend fun reduce(intent: PaymentIntent) {
         when (intent) {
@@ -198,6 +203,9 @@ class PaymentViewModel(
         when (snapResult) {
             is DomainResult.Success -> {
                 markSnapOpened()
+                val method = snapResult.data.method?.name?.lowercase() ?: "unknown"
+                lastPaymentType = method
+                tracker?.addPaymentInfo(currentSummary.price.total, method)
                 sendEffect(PaymentEffect.LaunchSnap(snapResult.data.redirectUrl))
             }
             is DomainResult.Error -> handleSnapError(snapResult.errorCode, snapResult.retryAfterSeconds, currentSummary)
@@ -307,6 +315,7 @@ class PaymentViewModel(
     ) {
         when {
             bookingStatus.isPaid -> {
+                trackPurchase(currentSummary)
                 setState {
                     copy(
                         ui =
@@ -321,10 +330,33 @@ class PaymentViewModel(
                 pollingJob?.cancel()
             }
             bookingStatus == BookingStatus.EXPIRED || bookingStatus == BookingStatus.CANCELLED -> {
+                tracker?.paymentExpired(bookingId)
                 setExpiredState(currentSummary.toUi(), currentSummary.customerEmail, refundRequired = paymentSuccess)
                 pollingJob?.cancel()
             }
             // Still pending: continue polling
+        }
+    }
+
+    private fun trackPurchase(summary: PaymentSummary) {
+        viewModelScope.launch {
+            val items =
+                summary.attendees.map { attendee ->
+                    val price = summary.price.lines.find { it.categoryId == attendee.categoryId }?.unitPrice ?: 0L
+                    ItemData(
+                        itemId = attendee.categoryId,
+                        itemName = attendee.categoryName,
+                        itemBrand = summary.eventName,
+                        price = price,
+                        quantity = 1,
+                    )
+                }
+            tracker?.purchase(
+                summary.orderCode,
+                summary.price.total,
+                items,
+                lastPaymentType ?: "unknown",
+            )
         }
     }
 

@@ -1,6 +1,7 @@
 package com.rusuh.app.feature.payment
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -114,3 +115,18 @@ actual fun PaymentSnapWebView(
         },
     )
 }
+
+@Composable
+actual fun rememberPaymentBrowserLauncher(onFailure: () -> Unit): (String) -> Unit =
+    remember(onFailure) {
+        { url ->
+            val external = NSURL.URLWithString(url)
+            if (external == null) {
+                onFailure()
+            } else {
+                UIApplication.sharedApplication.openURL(external, emptyMap<Any?, Any?>()) { opened ->
+                    if (!opened) onFailure()
+                }
+            }
+        }
+    }

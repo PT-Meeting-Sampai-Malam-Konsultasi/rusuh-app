@@ -64,7 +64,6 @@ import rusuh_app.shared.generated.resources.detail_bar_tickets
 import rusuh_app.shared.generated.resources.detail_cap_chip
 import rusuh_app.shared.generated.resources.detail_cap_message
 import rusuh_app.shared.generated.resources.detail_categories_hint
-import rusuh_app.shared.generated.resources.detail_email_change
 import rusuh_app.shared.generated.resources.detail_email_hint
 import rusuh_app.shared.generated.resources.detail_email_label
 import rusuh_app.shared.generated.resources.detail_empty_body
@@ -287,7 +286,7 @@ private fun DetailContentBody(
 
             StepHeader(number = 3, title = stringResource(Res.string.detail_section_email))
             Spacer(Modifier.height(RusuhSpacing.xl))
-            EmailBlock(email = detail.accountEmail, onChange = { dispatch(DetailIntent.ChangeEmail) })
+            EmailBlock(email = detail.accountEmail)
 
             if (total > 0) {
                 Spacer(Modifier.height(RusuhSpacing.xxl))
@@ -397,12 +396,9 @@ private fun CapNotice(
     }
 }
 
-/** Read-only e-ticket destination: the account email, with a way to change it later. */
+/** Read-only e-ticket destination: the account email. The change link is hidden until changing the email works. */
 @Composable
-private fun EmailBlock(
-    email: String,
-    onChange: () -> Unit,
-) {
+private fun EmailBlock(email: String) {
     Column(verticalArrangement = Arrangement.spacedBy(RusuhSpacing.lg)) {
         Text(
             text = stringResource(Res.string.detail_email_label),
@@ -422,16 +418,6 @@ private fun EmailBlock(
                 style = RusuhBrandTextStyles.input.body(),
                 color = RusuhColors.BrandInk,
                 modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = stringResource(Res.string.detail_email_change),
-                style = RusuhBrandTextStyles.label.body(),
-                color = RusuhColors.BrandMuted,
-                textDecoration = TextDecoration.Underline,
-                modifier =
-                    Modifier
-                        .clickable(role = Role.Button, onClick = onChange)
-                        .padding(start = RusuhSpacing.lg, top = RusuhSpacing.md, bottom = RusuhSpacing.md),
             )
         }
         FieldNote(stringResource(Res.string.detail_email_hint))
