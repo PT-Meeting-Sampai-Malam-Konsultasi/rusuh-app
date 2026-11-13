@@ -8,8 +8,6 @@ import com.rusuh.app.data.storage.SecureStore
 import com.rusuh.app.data.storage.UserDefaultsAppPreferences
 import com.rusuh.app.feature.eticket.CalendarLauncher
 import com.rusuh.app.feature.eticket.IosCalendarLauncher
-import com.rusuh.app.feature.payment.IosPaymentPageLauncher
-import com.rusuh.app.feature.payment.PaymentPageLauncher
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -21,7 +19,6 @@ actual val platformModule: Module =
         // iOS calendar: the presenter callback is provided from Swift via setCalendarPresenter().
         // Until then, launch() returns NoCalendarApp. Verified on simulator by user.
         single<CalendarLauncher> { IosCalendarLauncher(iosCalendarPresenter) }
-        single<PaymentPageLauncher> { IosPaymentPageLauncher() }
     }
 
 /**

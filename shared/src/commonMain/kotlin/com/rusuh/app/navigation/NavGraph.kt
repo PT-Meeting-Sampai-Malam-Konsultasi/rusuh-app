@@ -56,7 +56,6 @@ import com.rusuh.app.feature.eticket.ETicketViewModel
 import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.HomeScreen
 import com.rusuh.app.feature.home.HomeViewModel
-import com.rusuh.app.feature.payment.PaymentPageLauncher
 import com.rusuh.app.feature.payment.PaymentResultRoute
 import com.rusuh.app.feature.payment.PaymentResultViewModel
 import com.rusuh.app.feature.payment.PaymentReturnLinks
@@ -310,10 +309,9 @@ fun RusuhNavGraph(navController: NavHostController) {
             val bookingId = backStackEntry.arguments?.getString(Screen.Payment.ARG_BOOKING_ID).orEmpty()
             val koin = getKoin()
             val viewModel = remember(bookingId) { koin.get<PaymentViewModel> { parametersOf(bookingId) } }
-            val launcher = remember { koin.get<PaymentPageLauncher>() }
             PaymentRoute(
                 viewModel = viewModel,
-                launcher = launcher,
+                bookingId = bookingId,
                 onBack = { navController.popBackStack() },
                 onNavigateToTickets = { navController.switchTab(RusuhTab.Tiket) },
                 onNavigateToHome = { navController.switchTab(RusuhTab.Event) },
