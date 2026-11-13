@@ -7,6 +7,7 @@ import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.remote.BookingApiService
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
+import com.rusuh.app.data.remote.dto.BookingDto
 import com.rusuh.app.data.remote.dto.EventDto
 import com.rusuh.app.data.remote.dto.FrontierDto
 import com.rusuh.app.data.remote.dto.QueuePlaceDto
@@ -62,15 +63,24 @@ class MyQueuesRepositoryImpl(
             }
         }
         if (active != null) {
-            active.items.filter { it.status.equals("HELD", ignoreCase = true) }.forEach { booking ->
-                val expiresAt = booking.expiresAt?.let(::parseStringDateMillis) ?: return@forEach
-                val now = parseStringDateMillis(booking.serverNow) ?: serverNow ?: return@forEach
-                val remaining = expiresAt - now
-                if (remaining > 0) orders += OrderInProgress(booking.eventId, booking.bookingId, remaining)
+            bookingOrders(active.items, serverNow).forEach { order ->
+                // A booking supersedes the stored admission of the same event: continue at payment.
+                orders.removeAll { it.bookingId == null && it.eventId == order.eventId }
+                orders += order
             }
         }
         return orders
     }
+
+    private fun bookingOrders(
+        items: List<BookingDto>,
+        serverNow: Long?,
+    ): List<OrderInProgress> =
+        items.filter { it.status.uppercase() in RESUMABLE_STATUSES }.mapNotNull { booking ->
+            val expiresAt = booking.expiresAt?.let(::parseStringDateMillis) ?: return@mapNotNull null
+            val now = parseStringDateMillis(booking.serverNow) ?: serverNow ?: return@mapNotNull null
+            (expiresAt - now).takeIf { it > 0 }?.let { OrderInProgress(booking.eventId, booking.bookingId, it) }
+        }
 
     /** What happened to one entry. */
     private sealed interface Entry {
@@ -200,6 +210,7 @@ class MyQueuesRepositoryImpl(
     companion object {
         /** How many entries are read at the same time. */
         const val DEFAULT_PARALLEL = 4
+        private val RESUMABLE_STATUSES = setOf("SELECTION", "PAYMENT_PENDING", "HELD")
         private const val HTTP_NOT_FOUND = 404
         private const val HTTP_GONE = 410
         private const val HTTP_UNAUTHORIZED = 401

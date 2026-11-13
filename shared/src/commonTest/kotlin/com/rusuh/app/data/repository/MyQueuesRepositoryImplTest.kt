@@ -373,4 +373,26 @@ class MyQueuesRepositoryImplTest {
             val failure = assertFailsWith<DomainException> { offline.myQueues.getMyQueues() }
             assertEquals(DomainResult.NetworkError, failure.result)
         }
+
+    @Test
+    fun aSelectionOrPaymentPendingBookingResumesAtPaymentAndReplacesTheStoredAdmission() =
+        runTest {
+            listOf("SELECTION", "PAYMENT_PENDING").forEach { status ->
+                val h = QueueHarness()
+                h.queueCache.setAdmission(AdmissionInfo("evt_pay", "slot-1", 3, 1_794_653_100_000))
+                h.backend.on(
+                    "GET /core/bookings/active",
+                    Reply.ok(
+                        "{\"serverNow\":\"2026-11-14T10:40:00Z\",\"items\":[{" +
+                            "\"bookingId\":\"booking-1\",\"eventId\":\"evt_pay\",\"status\":\"$status\"," +
+                            "\"expiresAt\":\"2026-11-14T10:50:00Z\",\"serverNow\":\"2026-11-14T10:40:00Z\"}]}",
+                    ),
+                )
+
+                val order = h.myQueues.getOrdersInProgress().single()
+
+                assertEquals("booking-1", order.bookingId, status)
+                assertEquals(600_000, order.remainingMillis, status)
+            }
+        }
 }

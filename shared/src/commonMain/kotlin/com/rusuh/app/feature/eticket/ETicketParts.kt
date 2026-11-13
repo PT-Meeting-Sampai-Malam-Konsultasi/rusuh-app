@@ -64,6 +64,7 @@ import rusuh_app.shared.generated.resources.eticket_headline
 import rusuh_app.shared.generated.resources.eticket_holder_label
 import rusuh_app.shared.generated.resources.eticket_holder_nik
 import rusuh_app.shared.generated.resources.eticket_intro
+import rusuh_app.shared.generated.resources.eticket_intro_no_email
 import rusuh_app.shared.generated.resources.eticket_months_short
 import rusuh_app.shared.generated.resources.eticket_order_line
 import rusuh_app.shared.generated.resources.eticket_qr_description
@@ -103,7 +104,11 @@ internal fun ETicketIntro(
         )
         val email = ui.contactEmail
         val intro =
-            pluralStringResource(Res.plurals.eticket_intro, ui.tickets.size, ui.tickets.size, ui.eventName, email)
+            if (email.isBlank()) {
+                pluralStringResource(Res.plurals.eticket_intro_no_email, ui.tickets.size, ui.tickets.size, ui.eventName)
+            } else {
+                pluralStringResource(Res.plurals.eticket_intro, ui.tickets.size, ui.tickets.size, ui.eventName, email)
+            }
         Text(
             text = boldText(intro, email),
             style = RusuhBrandTextStyles.bodyLarge.body(),

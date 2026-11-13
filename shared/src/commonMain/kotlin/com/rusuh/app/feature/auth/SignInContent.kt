@@ -143,12 +143,13 @@ private fun EmailStep(
     Spacer(Modifier.height(RusuhSpacing.md))
     HintText(stringResource(Res.string.sign_in_email_hint))
     Spacer(Modifier.height(RusuhSpacing.xl))
-    // TODO(AUTH-00): the two links are inert until the legal pages exist.
+    // Terms opens the website page; the privacy link stays inert until its page exists.
     val terms = stringResource(Res.string.sign_in_terms_link)
     val privacy = stringResource(Res.string.sign_in_privacy_link)
     HintText(
         text = stringResource(Res.string.sign_in_terms, terms, privacy),
         underline = listOf(terms, privacy),
+        links = mapOf(terms to LegalLinks.TERMS_URL),
     )
 }
 
