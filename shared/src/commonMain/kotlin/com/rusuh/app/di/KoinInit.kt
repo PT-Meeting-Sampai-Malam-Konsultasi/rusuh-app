@@ -2,6 +2,8 @@ package com.rusuh.app.di
 
 import com.rusuh.app.analytics.Analytics
 import com.rusuh.app.analytics.NoOpAnalytics
+import com.rusuh.app.crash.CrashReporter
+import com.rusuh.app.crash.NoOpCrashReporter
 import com.rusuh.app.data.network.AppEnvironment
 import com.rusuh.app.data.network.NetworkConfig
 import org.koin.core.KoinApplication
@@ -17,17 +19,25 @@ import org.koin.dsl.module
  * [BackendMode.Stub] is rejected.
  * Platform entry points may pass [appDeclaration] (e.g. androidContext on Android).
  */
+@Suppress("LongParameterList") // Entry point for Koin startup with platform-specific dependencies.
 fun initKoin(
     environment: AppEnvironment,
     backendMode: BackendMode = BackendMode.defaultFor(environment),
+    allowDebugOptions: Boolean = true,
     platformAnalytics: () -> Analytics = { NoOpAnalytics },
+    platformCrashReporter: () -> CrashReporter = { NoOpCrashReporter },
     appDeclaration: KoinAppDeclaration = {},
 ): KoinApplication {
     BackendMode.verify(environment, backendMode)
     return startKoin {
         appDeclaration()
-        modules(module { single { environment } })
-        modules(sharedModules(backendMode, platformAnalytics))
+        modules(
+            module {
+                single { environment }
+                single { allowDebugOptions }
+            },
+        )
+        modules(sharedModules(backendMode, platformAnalytics, platformCrashReporter))
     }
 }
 
@@ -54,6 +64,7 @@ fun initKoinForBuild(
     backendModeName: String? = null,
     mockApiOverride: Boolean? = null,
     platformAnalytics: () -> Analytics = { NoOpAnalytics },
+    platformCrashReporter: () -> CrashReporter = { NoOpCrashReporter },
     appDeclaration: KoinAppDeclaration = {},
 ): KoinApplication {
     val startup =
@@ -64,5 +75,12 @@ fun initKoinForBuild(
             backendModeOverride = backendModeName,
             mockApi = mockApiOverride ?: NetworkConfig.MOCK_API,
         )
-    return initKoin(startup.environment, startup.backendMode, platformAnalytics, appDeclaration)
+    return initKoin(
+        startup.environment,
+        startup.backendMode,
+        allowDebugOptions,
+        platformAnalytics,
+        platformCrashReporter,
+        appDeclaration,
+    )
 }

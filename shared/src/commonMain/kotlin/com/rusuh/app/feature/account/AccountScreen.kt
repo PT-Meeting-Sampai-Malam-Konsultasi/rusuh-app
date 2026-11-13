@@ -107,6 +107,8 @@ fun AccountContent(
                 body.sessionExpired,
                 body.analyticsEnabled,
                 profileActions.onToggleAnalytics,
+                if (body.allowDebugOptions) profileActions.onTestCrash else null,
+                if (body.allowDebugOptions) profileActions.onTestNonFatal else null,
                 modifier,
             )
         is AccountBody.Profile -> AccountProfileContent(body.profile, profileActions, modifier)
@@ -123,6 +125,8 @@ private fun CompactSignIn(
     sessionExpired: Boolean,
     analyticsEnabled: Boolean,
     onToggleAnalytics: ((Boolean) -> Unit)?,
+    onTestCrash: (() -> Unit)?,
+    onTestNonFatal: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -140,6 +144,10 @@ private fun CompactSignIn(
         SignInContent(state = state, actions = actions, variant = SignInVariant.Compact, status = status)
         Spacer(Modifier.height(RusuhSpacing.xxl))
         AnalyticsRow(analyticsEnabled, onToggleAnalytics)
+        if (onTestCrash != null || onTestNonFatal != null) {
+            Spacer(Modifier.height(RusuhSpacing.md))
+            DebugRows(onTestCrash, onTestNonFatal)
+        }
     }
 }
 

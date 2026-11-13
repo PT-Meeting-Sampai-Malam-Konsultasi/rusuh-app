@@ -4,6 +4,8 @@ import com.rusuh.app.analytics.Analytics
 import com.rusuh.app.analytics.AnalyticsConsent
 import com.rusuh.app.analytics.AnalyticsConsentStore
 import com.rusuh.app.analytics.AnalyticsEvents
+import com.rusuh.app.crash.CrashReporter
+import com.rusuh.app.crash.NoOpCrashReporter
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.session.SessionPhase
 import com.rusuh.app.domain.usecase.GetProfileUseCase
@@ -22,16 +24,20 @@ import kotlinx.coroutines.launch
  *   during the new-account step, so the device-only name is already stored). Signing out or an expired session drops
  *   it.
  */
+@Suppress("LongParameterList") // ViewModel with DI-injected dependencies.
 class AccountViewModel(
     private val getProfile: GetProfileUseCase,
     private val signOut: SignOutUseCase,
     private val observeSession: ObserveSessionUseCase,
     private val consentStore: AnalyticsConsentStore,
     private val analytics: Analytics,
+    private val crashReporter: CrashReporter = NoOpCrashReporter,
+    private val allowDebugOptions: Boolean = false,
 ) : MviViewModel<AccountState, AccountIntent, AccountEffect>(
         AccountState(
             phase = observeSession.currentPhase,
             analyticsConsent = consentStore.consent.value,
+            allowDebugOptions = allowDebugOptions,
         ),
     ) {
     private var heldByNameStep = false
@@ -48,12 +54,22 @@ class AccountViewModel(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod") // MVI reduce with many intents.
     override suspend fun reduce(intent: AccountIntent) {
         when (intent) {
             AccountIntent.LoadProfile ->
                 if (currentState.profile == ProfileLoad.Idle || currentState.profile == ProfileLoad.Failed) load()
             AccountIntent.RetryProfile -> if (currentState.profile != ProfileLoad.Loading) load()
             AccountIntent.SignOut -> signOutNow()
+            AccountIntent.TestCrash ->
+                @Suppress("TooGenericExceptionThrown") // Intentional test crash for Crashlytics verification.
+                if (allowDebugOptions) throw RuntimeException("Crashlytics test crash")
+            AccountIntent.TestNonFatal ->
+                if (allowDebugOptions) {
+                    crashReporter.recordNonFatal(
+                        RuntimeException("Crashlytics test non-fatal"),
+                    )
+                }
             is AccountIntent.NameStepVisibilityChanged -> {
                 if (heldByNameStep && !intent.held) {
                     profileLoadGeneration++

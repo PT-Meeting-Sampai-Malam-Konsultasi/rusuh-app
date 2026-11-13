@@ -1,5 +1,6 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.crash.CrashReporter
 import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.domain.model.UserLocale
@@ -69,7 +70,7 @@ val appModule =
         factory { SaveDisplayNameUseCase(get(), get()) }
         factory { ObserveSessionUseCase(get()) }
         factory { SignInViewModel(get(), get(), get(), get(), get(), get(), get()) }
-        factory { AccountViewModel(get(), get(), get(), get(), get()) }
+        factory { AccountViewModel(get(), get(), get(), get(), get(), get<CrashReporter>(), get<Boolean>()) }
         factory { GetETicketUseCase(get()) }
         factory { (orderId: String) -> ETicketViewModel(orderId, get(), get(), get()) }
 

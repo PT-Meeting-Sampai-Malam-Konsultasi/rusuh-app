@@ -487,4 +487,8 @@
     <string name="continue_payment">Continue payment</string>
     <string name="order_time_remaining">%1$d seconds remaining</string>
     <string name="resume_expired_notice">Order expired. Join the queue again.</string>
+
+    <!-- Debug options (staging only) -->
+    <string name="debug_send_test_crash">Send test crash</string>
+    <string name="debug_send_test_nonfatal">Send test non-fatal</string>
 </resources>

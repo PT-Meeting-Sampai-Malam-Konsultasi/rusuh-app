@@ -483,4 +483,8 @@
     <string name="continue_payment">Lanjutkan pembayaran</string>
     <string name="order_time_remaining">Sisa %1$d detik</string>
     <string name="resume_expired_notice">Waktu pemesanan habis. Antri lagi.</string>
+
+    <!-- Debug options (staging only) -->
+    <string name="debug_send_test_crash">Send test crash</string>
+    <string name="debug_send_test_nonfatal">Send test non-fatal</string>
 </resources>
