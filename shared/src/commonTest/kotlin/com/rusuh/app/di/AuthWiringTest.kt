@@ -1,5 +1,6 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.analytics.NoOpAnalytics
 import com.rusuh.app.data.network.AppEnvironment
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.data.storage.AppPreferences
@@ -60,6 +61,7 @@ class AuthWiringTest {
                 storageModule,
                 coreModule(),
                 *dataModules(BackendMode.Stub, true) { }.toTypedArray(),
+                analyticsModule(BackendMode.Stub) { NoOpAnalytics },
                 appModule,
             )
         }.koin

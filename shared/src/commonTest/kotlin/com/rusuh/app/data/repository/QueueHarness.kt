@@ -52,7 +52,7 @@ class QueueHarness(
         )
 
     val devices =
-        RealDeviceRepository(
+        DeviceRepositoryImpl(
             api = DeviceApiService(backend.api),
             tokens = tokens,
             secureStore = secure,
@@ -64,7 +64,7 @@ class QueueHarness(
         )
 
     val queue =
-        RealQueueRepository(
+        QueueRepositoryImpl(
             queueApi = QueueApiService(backend.api),
             eventApi = EventApiService(backend.api),
             devices = devices,
@@ -76,7 +76,7 @@ class QueueHarness(
         )
 
     val myQueues =
-        RealMyQueuesRepository(
+        MyQueuesRepositoryImpl(
             queueApi = QueueApiService(backend.api),
             eventApi = EventApiService(backend.api),
             tokens = tokens,

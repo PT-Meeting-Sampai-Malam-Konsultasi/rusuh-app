@@ -449,4 +449,22 @@
     <string name="payment_expired_queue_again">Queue again →</string>
     <string name="payment_expired_home">Go home</string>
     <string name="payment_error_load">Could not load payment details. Please try again.</string>
+
+    <!-- Analytics consent screen -->
+    <string name="consent_title">Help us improve</string>
+    <string name="consent_body">We use analytics to make the app better. Your choice is saved and you can change it any time in Account settings.</string>
+    <string name="consent_collected_title">What we collect</string>
+    <string name="consent_collected_item_1">Screens you visit</string>
+    <string name="consent_collected_item_2">Queue and purchase steps</string>
+    <string name="consent_collected_item_3">App language</string>
+    <string name="consent_not_collected_title">What we never collect</string>
+    <string name="consent_not_collected_item_1">Email, name, NIK, or phone</string>
+    <string name="consent_not_collected_item_2">Tokens or passwords</string>
+    <string name="consent_accept">Accept</string>
+    <string name="consent_decline">Decline</string>
+
+    <!-- Account analytics toggle -->
+    <string name="account_analytics_label">Analytics</string>
+    <string name="account_analytics_enabled">Enabled</string>
+    <string name="account_analytics_disabled">Disabled</string>
 </resources>

@@ -1,6 +1,8 @@
 package com.rusuh.app.di
 
 import com.rusuh.app.AppLanguageState
+import com.rusuh.app.analytics.Analytics
+import com.rusuh.app.analytics.AnalyticsEvents
 import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.clock.ServerTimeSink
 import com.rusuh.app.data.network.ApiClient
@@ -44,7 +46,14 @@ fun coreModule(): Module =
                 }
             }
         }
-        single { AppLanguageState { get() } }
+        single {
+            AppLanguageState(
+                onLanguageChanged = { language ->
+                    runCatching { get<Analytics>().setUserProperty(AnalyticsEvents.APP_LANGUAGE, language.tag) }
+                },
+                preferences = { get() },
+            )
+        }
         single<LocaleProvider> { get<AppLanguageState>() }
         single { MonotonicServerClock() } binds arrayOf(ServerClock::class, ServerTimeSink::class)
         single { SessionEvents() }

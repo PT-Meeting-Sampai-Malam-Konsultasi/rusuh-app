@@ -1,5 +1,9 @@
 package com.rusuh.app.feature.account
 
+import com.rusuh.app.analytics.Analytics
+import com.rusuh.app.analytics.AnalyticsConsent
+import com.rusuh.app.analytics.AnalyticsConsentStore
+import com.rusuh.app.analytics.AnalyticsEvents
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.session.SessionPhase
 import com.rusuh.app.domain.usecase.GetProfileUseCase
@@ -22,16 +26,22 @@ class AccountViewModel(
     private val getProfile: GetProfileUseCase,
     private val signOut: SignOutUseCase,
     private val observeSession: ObserveSessionUseCase,
-) : MviViewModel<AccountState, AccountIntent, AccountEffect>(AccountState(phase = observeSession.currentPhase)) {
+    private val consentStore: AnalyticsConsentStore,
+    private val analytics: Analytics,
+) : MviViewModel<AccountState, AccountIntent, AccountEffect>(
+        AccountState(
+            phase = observeSession.currentPhase,
+            analyticsConsent = consentStore.consent.value,
+        ),
+    ) {
     private var heldByNameStep = false
     private var profileLoadGeneration = 0
 
     init {
         viewModelScope.launch { observeSession.phase().collect { onPhase(it) } }
         viewModelScope.launch { observeSession.expired().collect { setState { copy(sessionExpiredNotice = true) } } }
+        viewModelScope.launch { consentStore.consent.collect { setState { copy(analyticsConsent = it) } } }
         viewModelScope.launch {
-            // A storage read that hangs must not leave the tab on the neutral state: fall back to signed out.
-            // (A true answer is delivered by the phase flow; only "not signed in" can be the timeout.)
             if (!observeSession.awaitSignedIn()) {
                 setState { if (phase == SessionPhase.Restoring) copy(phase = SessionPhase.SignedOut) else this }
             }
@@ -51,6 +61,7 @@ class AccountViewModel(
                 }
                 heldByNameStep = intent.held
             }
+            is AccountIntent.SetAnalyticsConsent -> setAnalyticsConsent(intent.enabled)
         }
     }
 
@@ -63,6 +74,12 @@ class AccountViewModel(
                 isSigningOut = isSigningOut && phase == SessionPhase.SignedIn,
             )
         }
+        if (phase == SessionPhase.SignedOut) {
+            analytics.setUserId(null)
+            analytics.setUserProperty(AnalyticsEvents.SIGNED_IN, "false")
+        } else if (phase == SessionPhase.SignedIn) {
+            analytics.setUserProperty(AnalyticsEvents.SIGNED_IN, "true")
+        }
     }
 
     private suspend fun load() {
@@ -70,8 +87,8 @@ class AccountViewModel(
         val generation = ++profileLoadGeneration
         setState { copy(profile = ProfileLoad.Loading) }
         val result = getProfile()
-        // Signed out (or a different login) while waiting: the answer is not for this screen any more.
         if (currentState.phase != SessionPhase.SignedIn || generation != profileLoadGeneration) return
+        if (result is DomainResult.Success) analytics.setUserId(result.data.userId)
         setState {
             copy(profile = if (result is DomainResult.Success) ProfileLoad.Loaded(result.data) else ProfileLoad.Failed)
         }
@@ -80,8 +97,15 @@ class AccountViewModel(
     private suspend fun signOutNow() {
         if (currentState.isSigningOut || currentState.phase != SessionPhase.SignedIn) return
         setState { copy(isSigningOut = true) }
-        // The local session is cleared first (the phase flips at once); the result only describes the server revoke.
+        analytics.setUserId(null)
+        analytics.setUserProperty(AnalyticsEvents.SIGNED_IN, "false")
         signOut()
         setState { copy(isSigningOut = false) }
+    }
+
+    private suspend fun setAnalyticsConsent(enabled: Boolean) {
+        val consent = if (enabled) AnalyticsConsent.Granted else AnalyticsConsent.Denied
+        consentStore.set(consent)
+        analytics.setCollectionEnabled(enabled)
     }
 }

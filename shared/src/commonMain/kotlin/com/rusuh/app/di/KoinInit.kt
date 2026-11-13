@@ -1,5 +1,7 @@
 package com.rusuh.app.di
 
+import com.rusuh.app.analytics.Analytics
+import com.rusuh.app.analytics.NoOpAnalytics
 import com.rusuh.app.data.network.AppEnvironment
 import com.rusuh.app.data.network.NetworkConfig
 import org.koin.core.KoinApplication
@@ -18,13 +20,14 @@ import org.koin.dsl.module
 fun initKoin(
     environment: AppEnvironment,
     backendMode: BackendMode = BackendMode.defaultFor(environment),
+    platformAnalytics: () -> Analytics = { NoOpAnalytics },
     appDeclaration: KoinAppDeclaration = {},
 ): KoinApplication {
     BackendMode.verify(environment, backendMode)
     return startKoin {
         appDeclaration()
         modules(module { single { environment } })
-        modules(sharedModules(backendMode))
+        modules(sharedModules(backendMode, platformAnalytics))
     }
 }
 
@@ -50,6 +53,7 @@ fun initKoinForBuild(
     environmentName: String = "",
     backendModeName: String? = null,
     mockApiOverride: Boolean? = null,
+    platformAnalytics: () -> Analytics = { NoOpAnalytics },
     appDeclaration: KoinAppDeclaration = {},
 ): KoinApplication {
     val startup =
@@ -60,5 +64,5 @@ fun initKoinForBuild(
             backendModeOverride = backendModeName,
             mockApi = mockApiOverride ?: NetworkConfig.MOCK_API,
         )
-    return initKoin(startup.environment, startup.backendMode, appDeclaration)
+    return initKoin(startup.environment, startup.backendMode, platformAnalytics, appDeclaration)
 }

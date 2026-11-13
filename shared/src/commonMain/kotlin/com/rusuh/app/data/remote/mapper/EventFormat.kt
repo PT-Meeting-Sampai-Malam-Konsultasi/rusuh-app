@@ -56,10 +56,8 @@ private val EN_WORDS =
         lessThanMinute = "less than 1 min left",
     )
 
-private fun Int.twoDigits(): String = if (this < 10) "0$this" else toString()
-
 internal fun LocalMoment.time(words: FormatWords): String =
-    "${hour.twoDigits()}${words.timeSeparator}${minute.twoDigits()}"
+    "${hour.toString().padStart(2, '0')}${words.timeSeparator}${minute.toString().padStart(2, '0')}"
 
 /** `9 Jan 2027`. */
 internal fun LocalMoment.dayMonthYear(words: FormatWords): String = "$day ${words.months[month - 1]} $year"

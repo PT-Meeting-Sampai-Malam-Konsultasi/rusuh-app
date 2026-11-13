@@ -19,6 +19,7 @@ import com.rusuh.app.domain.usecase.ValidateAttendeeUseCase
 import com.rusuh.app.domain.usecase.VerifyOtpUseCase
 import com.rusuh.app.feature.account.AccountViewModel
 import com.rusuh.app.feature.auth.SignInViewModel
+import com.rusuh.app.feature.consent.ConsentViewModel
 import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.eticket.ETicketViewModel
 import com.rusuh.app.feature.eticket.GetETicketUseCase
@@ -62,8 +63,8 @@ val appModule =
         factory { GetProfileUseCase(get(), get()) }
         factory { SaveDisplayNameUseCase(get(), get()) }
         factory { ObserveSessionUseCase(get()) }
-        factory { SignInViewModel(get(), get(), get(), get(), get()) }
-        factory { AccountViewModel(get(), get(), get()) }
+        factory { SignInViewModel(get(), get(), get(), get(), get(), get()) }
+        factory { AccountViewModel(get(), get(), get(), get(), get()) }
         factory { GetETicketUseCase(get()) }
         factory { (orderId: String) -> ETicketViewModel(orderId, get(), get()) }
 
@@ -84,4 +85,7 @@ val appModule =
         factory { ObservePaymentStatusUseCase(get()) }
         factory { (bookingId: String) -> PaymentViewModel(bookingId, get(), get(), get()) }
         factory { (bookingId: String) -> PaymentResultViewModel(bookingId, get(), get()) }
+
+        // Analytics consent.
+        factory { ConsentViewModel(get(), get()) }
     }

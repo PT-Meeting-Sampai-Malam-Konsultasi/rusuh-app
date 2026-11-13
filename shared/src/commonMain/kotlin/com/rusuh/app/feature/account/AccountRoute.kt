@@ -41,7 +41,13 @@ fun AccountRoute(
         signInState = signIn.step,
         signInStatus = signIn.status,
         signInActions = actions,
-        profileActions = AccountProfileActions(onSignOut = { accountViewModel.dispatch(AccountIntent.SignOut) }),
+        profileActions =
+            AccountProfileActions(
+                onSignOut = { accountViewModel.dispatch(AccountIntent.SignOut) },
+                onToggleAnalytics = { enabled ->
+                    accountViewModel.dispatch(AccountIntent.SetAnalyticsConsent(enabled))
+                },
+            ),
         onRetryProfile = { accountViewModel.dispatch(AccountIntent.RetryProfile) },
         onTabSelected = onTabSelected,
     )

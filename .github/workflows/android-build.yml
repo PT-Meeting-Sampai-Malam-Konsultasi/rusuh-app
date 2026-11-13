@@ -21,6 +21,14 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
+      - name: Write google-services.json if available
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            umask 077
+            printf '%s' "$GOOGLE_SERVICES_JSON" > androidApp/google-services.json
+          fi
       - name: Build debug APKs (both flavors)
         run: ./gradlew :androidApp:assembleDebug --stacktrace
       - name: Guard cleartext config (debug only)
@@ -51,6 +59,15 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
         if: env.HAS_FIREBASE == 'true'
+      - name: Write google-services.json if available
+        if: env.HAS_FIREBASE == 'true'
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            umask 077
+            printf '%s' "$GOOGLE_SERVICES_JSON" > androidApp/google-services.json
+          fi
       - name: Pick the flavor (staging or production only)
         if: env.HAS_FIREBASE == 'true'
         env:
