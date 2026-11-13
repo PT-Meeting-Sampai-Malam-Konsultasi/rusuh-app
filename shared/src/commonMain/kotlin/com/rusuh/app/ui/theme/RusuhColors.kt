@@ -77,6 +77,8 @@ object RusuhColors {
     val BrandDanger = Color(0xFFC21F1F)
     val BrandDangerSurface = Color(0xFFFFF7F5)
     val BrandBlue = Color(0xFF2F5BEA)
+    val BrandSuccess = Color(0xFF16784A)
+    val BrandPrimary = Color(0xFFD81F72)
 
     // Scrim applied over a poster image so overlaid chrome stays legible.
     val PosterScrim = Color(0x99000000)

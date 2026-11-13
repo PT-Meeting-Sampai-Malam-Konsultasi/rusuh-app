@@ -50,6 +50,25 @@ sealed interface AttendeeValidation {
 
 val AttendeeValidation.isValid: Boolean get() = this is AttendeeValidation.Valid
 
+/** Returns true when the validation is a failed response (not pending, not valid). */
+val AttendeeValidation.isRejected: Boolean
+    get() =
+        when (this) {
+            is AttendeeValidation.Valid -> false
+            AttendeeValidation.MissingName -> true
+            AttendeeValidation.InvalidNik -> true
+            is AttendeeValidation.DuplicateNik -> true
+            AttendeeValidation.NikInvalid -> true
+            AttendeeValidation.NikSeatTaken -> true
+            AttendeeValidation.ServerDuplicateNik -> true
+            AttendeeValidation.DukcapilUnavailable -> false
+            is AttendeeValidation.RateLimited -> false
+            AttendeeValidation.AdmissionInvalid -> true
+            AttendeeValidation.NetworkError -> false
+            is AttendeeValidation.ServerError -> false
+            AttendeeValidation.RejectedByServer -> true
+        }
+
 /**
  * Local (no I/O) attendee rules: name present, NIK is 16 digits, and the NIK is not used by an
  * earlier ticket in [earlierNiks] (one NIK = one ticket per order).

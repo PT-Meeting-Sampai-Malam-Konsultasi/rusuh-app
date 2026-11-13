@@ -3,6 +3,7 @@
 package com.rusuh.app.feature.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
 import com.rusuh.app.ui.components.BrutalTextField
 import com.rusuh.app.ui.theme.RusuhBrandTextStyles
 import com.rusuh.app.ui.theme.RusuhColors
@@ -57,11 +60,20 @@ import rusuh_app.shared.generated.resources.detail_nik_invalid
 import rusuh_app.shared.generated.resources.detail_nik_label
 import rusuh_app.shared.generated.resources.detail_nik_placeholder
 import rusuh_app.shared.generated.resources.detail_ticket_label
+import rusuh_app.shared.generated.resources.detail_validation_checking
+import rusuh_app.shared.generated.resources.detail_validation_duplicate
+import rusuh_app.shared.generated.resources.detail_validation_nik_invalid
+import rusuh_app.shared.generated.resources.detail_validation_retry
+import rusuh_app.shared.generated.resources.detail_validation_seat_taken
+import rusuh_app.shared.generated.resources.detail_validation_unavailable
+import rusuh_app.shared.generated.resources.detail_validation_valid
 
 /**
  * One attendee block ("Tiket 1 · Festival B"): name as on the KTP and NIK.
  *
  * @param duplicateOf 1-based earlier ticket that already uses this NIK, or null.
+ * @param validationStatus inline server validation status for this attendee.
+ * @param onRetryValidation callback when user taps retry on an unavailable validation.
  */
 @Composable
 internal fun AttendeeBlock(
@@ -69,8 +81,10 @@ internal fun AttendeeBlock(
     categoryName: String,
     attendee: AttendeeForm,
     duplicateOf: Int?,
+    validationStatus: AttendeeValidationStatus,
     onNameChange: (String) -> Unit,
     onNikChange: (String) -> Unit,
+    onRetryValidation: () -> Unit,
     modifier: Modifier = Modifier,
     isLast: Boolean = true,
 ) {
@@ -132,13 +146,101 @@ internal fun AttendeeBlock(
                         keyboard?.hide()
                     },
                 ),
-            // NIK is PII: masked to the last 4 digits whenever the field is not being edited.
             visualTransformation = NikVisualTransformation(masked = !nikFocused),
             onFocusChange = { nikFocused = it },
             onFocusLost = { nikTouched = true },
         )
-        if (nikError != null) FieldError(nikError) else FieldNote(stringResource(Res.string.detail_nik_example))
+
+        when {
+            nikError != null -> FieldError(nikError)
+            else -> ValidationStatusRow(validationStatus, onRetryValidation)
+        }
+
         Box(Modifier.fillMaxWidth().height(RusuhSpacing.borderThin).background(RusuhColors.BrandHairline))
+    }
+}
+
+@Composable
+private fun ValidationStatusRow(
+    status: AttendeeValidationStatus,
+    onRetry: () -> Unit,
+) {
+    when (status) {
+        AttendeeValidationStatus.None -> {
+            FieldNote(stringResource(Res.string.detail_nik_example))
+        }
+        AttendeeValidationStatus.Checking -> {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = RusuhColors.BrandMuted,
+                )
+                Text(
+                    text = stringResource(Res.string.detail_validation_checking),
+                    style = RusuhBrandTextStyles.note.body(),
+                    color = RusuhColors.BrandMuted,
+                )
+            }
+        }
+        AttendeeValidationStatus.Valid -> {
+            ValidationSuccess(stringResource(Res.string.detail_validation_valid))
+        }
+        is AttendeeValidationStatus.Rejected -> {
+            val message =
+                when (status.reason) {
+                    RejectedReason.NIK_INVALID -> stringResource(Res.string.detail_validation_nik_invalid)
+                    RejectedReason.SEAT_TAKEN -> stringResource(Res.string.detail_validation_seat_taken)
+                    RejectedReason.DUPLICATE -> stringResource(Res.string.detail_validation_duplicate)
+                }
+            FieldError(message)
+        }
+        AttendeeValidationStatus.Unavailable -> {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(Res.string.detail_validation_unavailable),
+                    style = RusuhBrandTextStyles.note.body(),
+                    color = RusuhColors.BrandMuted,
+                )
+                Text(
+                    text = stringResource(Res.string.detail_validation_retry),
+                    style = RusuhBrandTextStyles.note.body().copy(fontWeight = FontWeight.SemiBold),
+                    color = RusuhColors.BrandPrimary,
+                    modifier = Modifier.clickable { onRetry() },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ValidationSuccess(text: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier =
+                Modifier
+                    .size(RusuhSpacing.xl)
+                    .background(RusuhColors.BrandSuccess, CircleShape)
+                    .clearAndSetSemantics { },
+        ) {
+            Text(text = "✓", style = RusuhBrandTextStyles.eyebrow.body(), color = Color.White)
+        }
+        Text(
+            text = text,
+            style = RusuhBrandTextStyles.note.body().copy(fontWeight = FontWeight.SemiBold),
+            color = RusuhColors.BrandSuccess,
+        )
     }
 }
 
@@ -152,7 +254,6 @@ internal fun FieldNote(text: String) {
     Text(text = text, style = RusuhBrandTextStyles.note.body(), color = RusuhColors.BrandMuted)
 }
 
-/** Danger message with the red "!" badge (Figma error row). */
 @Composable
 private fun FieldError(text: String) {
     Row(
@@ -168,7 +269,6 @@ private fun FieldError(text: String) {
                     .background(RusuhColors.BrandDanger, CircleShape)
                     .clearAndSetSemantics { },
         ) {
-            // "!" is a symbol glyph, not user-visible copy.
             Text(text = "!", style = RusuhBrandTextStyles.eyebrow.body(), color = Color.White)
         }
         Text(

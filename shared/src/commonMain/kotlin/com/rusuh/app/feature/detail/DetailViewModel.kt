@@ -4,12 +4,22 @@ import com.rusuh.app.data.repository.newIdempotencyKey
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.AttendeeValidation
 import com.rusuh.app.domain.model.BookingResult
+import com.rusuh.app.domain.model.isRejected
 import com.rusuh.app.domain.model.isValid
+import com.rusuh.app.domain.model.validateAttendeeLocally
 import com.rusuh.app.domain.usecase.CreateBookingUseCase
 import com.rusuh.app.domain.usecase.GetDetailUseCase
 import com.rusuh.app.domain.usecase.ValidateAttendeeUseCase
 import com.rusuh.app.mvi.MviViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.cancellation.CancellationException
+
+/** Debounce delay for NIK validation in milliseconds. Named for test virtual time. */
+const val NIK_VALIDATION_DEBOUNCE_MS = 600L
 
 /**
  * MVI ViewModel for the Detail Ticket page.
@@ -17,6 +27,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * Talks to the data layer through use cases only. The countdown is recomputed on every
  * [DetailIntent.Tick] as `expiresAt - serverClock.now` (never the device clock); the host decides
  * how often to tick.
+ *
+ * NIK validation happens inline: after the user stops typing for [NIK_VALIDATION_DEBOUNCE_MS],
+ * a local check runs (format, duplicate). If it passes, the server validation API is called.
+ * The result is shown inline and a valid token is cached for the booking request.
  *
  * @param eventId the event this order is for.
  * @param serverClock server-time source (fake in tests). TODO(FR-17-M1 #82): synced clock.
@@ -32,27 +46,31 @@ class DetailViewModel(
     @Suppress("CyclomaticComplexMethod")
     override suspend fun reduce(intent: DetailIntent) {
         when (intent) {
-            // Load once per ViewModel: re-entering the route must not reset the form or the window.
             DetailIntent.Load -> if (!loadStarted) load()
             DetailIntent.Retry -> if (currentState.phase is DetailPhase.Failed) load()
             DetailIntent.Back -> sendEffect(DetailEffect.NavigateBack)
             DetailIntent.GoHome -> sendEffect(DetailEffect.NavigateHome)
             DetailIntent.QueueAgain -> sendEffect(DetailEffect.NavigateToQueue(eventId))
-            // TODO(FR-APP account settings): open the email change flow.
             DetailIntent.ChangeEmail -> Unit
             DetailIntent.Tick -> tick()
             DetailIntent.Proceed -> proceed()
             is DetailIntent.IncrementCategory -> changeQuantity(intent.categoryId, +1)
             is DetailIntent.DecrementCategory -> changeQuantity(intent.categoryId, -1)
-            is DetailIntent.AttendeeNameChanged -> editForm { _, form -> form.withName(intent.index, intent.name) }
-            is DetailIntent.AttendeeNikChanged -> editForm { _, form -> form.withNik(intent.index, intent.nik) }
+            is DetailIntent.AttendeeNameChanged -> onAttendeeChanged(intent.index, name = intent.name)
+            is DetailIntent.AttendeeNikChanged -> onAttendeeChanged(intent.index, nik = intent.nik)
+            is DetailIntent.RetryValidation -> retryValidation(intent.index)
         }
     }
 
     private var loadStarted = false
 
-    /** Idempotency key for the current booking attempt; regenerated on each new attempt. */
     private var idempotencyKey: String = newIdempotencyKey()
+
+    private val validationJobs = mutableMapOf<Int, Job>()
+
+    private val validatedAttendees = mutableMapOf<Int, CachedValidation>()
+
+    private val proceedMutex = Mutex()
 
     @Suppress("SwallowedException")
     private suspend fun load() {
@@ -66,7 +84,6 @@ class DetailViewModel(
                 copy(
                     phase =
                         when {
-                            // No categories, or the queue reserved no units: nothing can be bought.
                             content.categories.isEmpty() || content.maxTickets <= 0 -> DetailPhase.Empty
                             remaining <= 0 -> DetailPhase.Expired
                             else -> DetailPhase.Ready
@@ -81,10 +98,8 @@ class DetailViewModel(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (
-            // Intentionally broad: any repository/network failure maps to the error state.
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {
-            // The error screen is the single signal for a failed load (no extra snackbar).
             setState { copy(phase = DetailPhase.Failed(DetailError.LoadFailed)) }
         }
     }
@@ -95,10 +110,10 @@ class DetailViewModel(
         if (remaining <= 0) expire() else setState { copy(remainingSeconds = remaining) }
     }
 
-    /** Window elapsed: drop the selection, attendee data (PII), and validated tokens, then show the expired sheet. */
     private fun expire() {
-        // Clear validated attendees to prevent stale tokens from being reused if the user queues again.
-        validatedAttendees = mutableListOf()
+        validationJobs.values.forEach { it.cancel() }
+        validationJobs.clear()
+        validatedAttendees.clear()
         setState {
             copy(
                 phase = DetailPhase.Expired,
@@ -123,7 +138,162 @@ class DetailViewModel(
         }
     }
 
-    /** Applies [edit] to the form; ignored unless the page is ready and not submitting. */
+    @Suppress("ReturnCount")
+    private fun onAttendeeChanged(
+        index: Int,
+        name: String? = null,
+        nik: String? = null,
+    ) {
+        val state = currentState
+        val content = state.detail
+        if (state.phase != DetailPhase.Ready || content == null || state.isSubmitting) return
+
+        val oldAttendee = state.form.attendees.getOrNull(index) ?: return
+        val newName = name ?: oldAttendee.name
+        val newNik = nik?.filter(::isAsciiDigit)?.take(NIK_LENGTH) ?: oldAttendee.nik
+
+        if (hasCachedValidation(index, newName, newNik, oldAttendee.categoryId)) {
+            applyFromCache(index, newName, newNik)
+            return
+        }
+
+        invalidateAndUpdate(index, name, nik)
+        scheduleValidation(index)
+    }
+
+    private fun hasCachedValidation(
+        index: Int,
+        name: String,
+        nik: String,
+        categoryId: String,
+    ): Boolean {
+        val cachedKey = CacheKey(name.trim(), nik, categoryId)
+        val cached = validatedAttendees[index]
+        return cached != null && cached.key == cachedKey && cached.token.isNotEmpty()
+    }
+
+    private fun applyFromCache(
+        index: Int,
+        name: String,
+        nik: String,
+    ) {
+        setState {
+            copy(
+                form =
+                    form.withName(index, name)
+                        .withNik(index, nik)
+                        .withValidationStatus(index, AttendeeValidationStatus.Valid),
+            )
+        }
+    }
+
+    private fun invalidateAndUpdate(
+        index: Int,
+        name: String?,
+        nik: String?,
+    ) {
+        validationJobs[index]?.cancel()
+        validatedAttendees.remove(index)
+
+        setState {
+            copy(
+                form =
+                    when {
+                        name != null -> form.withName(index, name)
+                        else -> form.withNik(index, nik ?: "")
+                    },
+            )
+        }
+    }
+
+    private fun scheduleValidation(index: Int) {
+        validationJobs[index]?.cancel()
+        validationJobs[index] =
+            viewModelScope.launch {
+                delay(NIK_VALIDATION_DEBOUNCE_MS)
+                runValidationForAttendee(index)
+            }
+    }
+
+    @Suppress("ReturnCount")
+    private suspend fun runValidationForAttendee(index: Int) {
+        val state = currentState
+        if (state.phase != DetailPhase.Ready || state.isSubmitting) return
+
+        val attendee = state.form.attendees.getOrNull(index) ?: return
+        val earlierNiks = state.form.attendees.take(index).map { it.nik }
+        val localResult = validateAttendeeLocally(attendee.name, attendee.nik, earlierNiks)
+
+        if (!localResult.isValid) return
+
+        setState { copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Checking)) }
+
+        val result = callServerValidation(index, attendee, earlierNiks)
+        if (result != null && isAttendeeUnchanged(index, attendee)) {
+            applyValidationResult(index, attendee, result)
+        }
+    }
+
+    @Suppress("SwallowedException")
+    private suspend fun callServerValidation(
+        index: Int,
+        attendee: AttendeeForm,
+        earlierNiks: List<String>,
+    ): AttendeeValidation? {
+        return try {
+            validateAttendee(eventId, index, attendee.name.trim(), attendee.nik, earlierNiks)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            setState { copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Unavailable)) }
+            null
+        }
+    }
+
+    private fun isAttendeeUnchanged(
+        index: Int,
+        original: AttendeeForm,
+    ): Boolean {
+        val current = currentState.form.attendees.getOrNull(index)
+        return current?.nik == original.nik && current.name == original.name
+    }
+
+    private fun applyValidationResult(
+        index: Int,
+        attendee: AttendeeForm,
+        result: AttendeeValidation,
+    ) {
+        when {
+            result.isValid -> {
+                val token = (result as AttendeeValidation.Valid).validationToken
+                validatedAttendees[index] =
+                    CachedValidation(
+                        CacheKey(attendee.name.trim(), attendee.nik, attendee.categoryId),
+                        token,
+                    )
+                setState { copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Valid)) }
+            }
+            result.isRejected -> {
+                val reason = result.toRejectedReason() ?: RejectedReason.NIK_INVALID
+                setState {
+                    copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Rejected(reason)))
+                }
+            }
+            result is AttendeeValidation.AdmissionInvalid -> {
+                sendEffect(DetailEffect.NavigateToQueue(eventId))
+            }
+            else -> {
+                setState { copy(form = form.withValidationStatus(index, AttendeeValidationStatus.Unavailable)) }
+            }
+        }
+    }
+
+    private fun retryValidation(index: Int) {
+        scheduleValidation(index)
+    }
+
     private fun editForm(edit: (DetailContent, DetailFormState) -> DetailFormState) {
         val state = currentState
         val content = state.detail
@@ -133,22 +303,24 @@ class DetailViewModel(
 
     @Suppress("SwallowedException", "LongMethod", "CyclomaticComplexMethod")
     private suspend fun proceed() {
-        if (!canStartProceed()) return
-        setState { copy(isSubmitting = true) }
+        val canProceed =
+            proceedMutex.withLock {
+                if (!canStartProceed()) {
+                    false
+                } else {
+                    setState { copy(isSubmitting = true) }
+                    true
+                }
+            }
+        if (!canProceed) return
         try {
             executeProceedFlow()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (
-            // Intentionally broad: any repository/network failure maps to a transient error.
-            // Keep the same idempotency key for transient network failures so automatic retries
-            // with the same key are safe (the server de-duplicates them if the first succeeded).
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {
             if (isOrderActive()) {
-                // DO NOT regenerate idempotency key for network errors.
-                // The request may have succeeded server-side, and a retry with the same key
-                // will correctly detect the duplicate instead of creating a second booking.
                 sendEffect(DetailEffect.ShowError(DetailError.ServiceUnavailable))
             }
         } finally {
@@ -156,9 +328,10 @@ class DetailViewModel(
         }
     }
 
-    /** Checks preconditions for proceed; expires if time ran out. */
+    @Suppress("ReturnCount")
     private fun canStartProceed(): Boolean {
         val state = currentState
+        if (state.isSubmitting) return false
         val content = state.detail
         val ready = state.phase == DetailPhase.Ready && content != null && state.canProceed
         if (!ready) return false
@@ -167,51 +340,54 @@ class DetailViewModel(
         return hasTime
     }
 
-    /** Core proceed flow: validate attendees then create booking. */
     private suspend fun executeProceedFlow() {
         val form = currentState.form
-        // Validate each attendee with the server and collect validation tokens.
-        val validationResult = validateAllAttendees(form)
+
+        val validationResult = ensureAllAttendeesValidated(form)
         if (validationResult != null) {
             handleValidationError(validationResult)
             return
         }
-        // Re-check time between validations and booking, then create booking.
+
         if (isOrderActive()) {
             createBookingAndHandleResult(form)
         }
     }
 
-    /**
-     * Validates all attendees in the form sequentially.
-     * Returns null if all validations pass, or the first failed validation.
-     */
-    private suspend fun validateAllAttendees(form: DetailFormState): AttendeeValidation? {
+    private suspend fun ensureAllAttendeesValidated(form: DetailFormState): AttendeeValidation? {
         for (i in form.attendees.indices) {
-            val a = form.attendees[i]
+            val attendee = form.attendees[i]
+            val cacheKey = CacheKey(attendee.name.trim(), attendee.nik, attendee.categoryId)
+            val cached = validatedAttendees[i]
+
+            if (cached != null && cached.key == cacheKey && cached.token.isNotEmpty()) {
+                continue
+            }
+
             val earlierNiks = form.attendees.take(i).map { it.nik }
-            val validation = validateAttendee(eventId, i, a.name, a.nik, earlierNiks)
+            val validation = validateAttendee(eventId, i, attendee.name.trim(), attendee.nik, earlierNiks)
+
             if (!validation.isValid) {
                 return validation
             }
+
             val token = (validation as AttendeeValidation.Valid).validationToken
-            validatedAttendees += ValidatedAttendee(a.categoryId, a.name.trim(), a.nik, token)
+            validatedAttendees[i] = CachedValidation(cacheKey, token)
         }
         return null
     }
 
-    /** Collected validation tokens for the current booking attempt. */
-    private var validatedAttendees = mutableListOf<ValidatedAttendee>()
-
-    /** Creates a booking and handles the result. */
     private suspend fun createBookingAndHandleResult(form: DetailFormState) {
-        val bookingRequest = form.toBookingRequestWithTokens(eventId, validatedAttendees)
-        validatedAttendees = mutableListOf() // Reset for next attempt.
+        val tickets =
+            form.attendees.mapIndexed { i, a ->
+                val cached = checkNotNull(validatedAttendees[i]) { "Missing validation token for attendee $i" }
+                ValidatedAttendee(a.categoryId, a.name.trim(), a.nik, cached.token)
+            }
+        val bookingRequest = form.toBookingRequestWithTokens(eventId, tickets)
+
         val result = createBooking(bookingRequest, idempotencyKey)
 
         if (!isOrderActive()) {
-            // Window closed during the booking call. The booking may have succeeded server-side.
-            // TODO(FR-16-M1 #81): cancel the booking if it was created.
             return
         }
 
@@ -224,44 +400,36 @@ class DetailViewModel(
                 sendEffect(DetailEffect.NavigateToPayment(result.booking.bookingId))
             }
             is BookingResult.AccountHasActiveBooking -> {
-                // User has an active booking; offer resume via getActiveBookings (UI follow-up).
-                // Regenerate key: user must start a new attempt after resolving the active booking.
                 idempotencyKey = newIdempotencyKey()
                 sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
             }
             is BookingResult.CategorySoldOut -> {
-                // User must pick a different category, so a new attempt.
                 idempotencyKey = newIdempotencyKey()
                 sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
             }
             is BookingResult.AdmissionInvalid,
             is BookingResult.SessionExpired,
             -> {
-                // Back to the waiting room; no retry is possible, so regenerate for next time.
                 idempotencyKey = newIdempotencyKey()
                 sendEffect(DetailEffect.NavigateToQueue(eventId))
             }
-            // Transient errors where the SAME idempotency key should be used for retry:
-            // - NetworkError: the request may not have reached the server
-            // - ServiceUnavailable: server is temporarily overloaded
-            // - RateLimited: can retry after the cooldown with the same key
             is BookingResult.NetworkError,
             is BookingResult.ServiceUnavailable,
             is BookingResult.RateLimited,
             -> {
-                // Keep the same idempotency key for transient errors so retry is safe.
-                // If the original request succeeded server-side, the duplicate is detected.
                 sendEffect(DetailEffect.ShowError(DetailError.ServiceUnavailable))
             }
-            // Non-retryable errors that require user action (changing the form):
+            is BookingResult.AttendeeNotValidated -> {
+                validatedAttendees.clear()
+                idempotencyKey = newIdempotencyKey()
+                sendEffect(DetailEffect.ShowError(DetailError.NikRejected))
+            }
             is BookingResult.QuantityOverReservation,
-            is BookingResult.AttendeeNotValidated,
             is BookingResult.NikSeatTaken,
             is BookingResult.DuplicateNik,
             is BookingResult.BookingNotHeld,
             is BookingResult.ServerError,
             -> {
-                // Regenerate idempotency key: user must fix the issue and it's a new attempt.
                 idempotencyKey = newIdempotencyKey()
                 sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
             }
@@ -286,11 +454,18 @@ class DetailViewModel(
         setState { copy(isSubmitting = false) }
     }
 
-    /** Still Ready with time left; flips to Expired when the window closed during an await. */
     private fun isOrderActive(): Boolean {
         val ready = currentState.phase == DetailPhase.Ready
         val timeLeft = remainingSeconds(currentState.expiresAtMillis, serverClock.nowMillis()) > 0
         if (ready && !timeLeft) expire()
         return ready && timeLeft
+    }
+
+    private data class CacheKey(val name: String, val nik: String, val categoryId: String) {
+        override fun toString(): String = "CacheKey(categoryId=$categoryId, name=<redacted>, nik=<redacted>)"
+    }
+
+    private data class CachedValidation(val key: CacheKey, val token: String) {
+        override fun toString(): String = "CachedValidation(key=$key, token=<redacted>)"
     }
 }

@@ -30,7 +30,12 @@ class DetailScreenTest {
 
     private fun filled(vararg niks: String): DetailFormState {
         var form = DetailFormState().withQuantity("fest-b", niks.size, MAX_TICKETS_PER_ORDER)
-        niks.forEachIndexed { i, nik -> form = form.withName(i, "Name $i").withNik(i, nik) }
+        niks.forEachIndexed { i, nik ->
+            form =
+                form.withName(i, "Name $i")
+                    .withNik(i, nik)
+                    .withValidationStatus(i, AttendeeValidationStatus.Valid)
+        }
         return form
     }
 
