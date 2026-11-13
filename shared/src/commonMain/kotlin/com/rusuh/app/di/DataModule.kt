@@ -13,18 +13,18 @@ import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.PaymentApiService
 import com.rusuh.app.data.remote.QueueApiService
 import com.rusuh.app.data.remote.TicketApiService
-import com.rusuh.app.data.repository.RealAuthRepository
-import com.rusuh.app.data.repository.RealDetailRepository
-import com.rusuh.app.data.repository.RealDeviceRepository
-import com.rusuh.app.data.repository.RealHomeRepository
-import com.rusuh.app.data.repository.RealMyQueuesRepository
-import com.rusuh.app.data.repository.RealQueueRepository
-import com.rusuh.app.data.repository.RealTicketsRepository
+import com.rusuh.app.data.repository.AuthRepositoryImpl
+import com.rusuh.app.data.repository.DetailRepositoryImpl
+import com.rusuh.app.data.repository.DeviceRepositoryImpl
+import com.rusuh.app.data.repository.HomeRepositoryImpl
+import com.rusuh.app.data.repository.MyQueuesRepositoryImpl
+import com.rusuh.app.data.repository.QueueRepositoryImpl
 import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
 import com.rusuh.app.data.repository.StubPaymentRepository
 import com.rusuh.app.data.repository.StubQueueRepository
+import com.rusuh.app.data.repository.TicketsRepositoryImpl
 import com.rusuh.app.data.storage.InMemoryTokenStore
 import com.rusuh.app.data.stub.StubClock
 import com.rusuh.app.data.stub.StubEngine
@@ -87,7 +87,7 @@ fun commonDataModule(): Module =
         single { AuthGeneration() }
         single<SessionObserver> { SessionManagerObserver(get(), get()) }
         single<DeviceRepository> {
-            RealDeviceRepository(
+            DeviceRepositoryImpl(
                 api = get(),
                 tokens = get(),
                 secureStore = get(),
@@ -126,20 +126,20 @@ fun liveDataModule(
     module {
         single { SessionManager(tokenStore = get(), events = get()) } onClose { it?.close() }
         single<SessionStateProvider> { get<SessionManager>() }
-        single<HomeRepository> { RealHomeRepository(get(), get(), get()) }
-        single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }
+        single<HomeRepository> { HomeRepositoryImpl(get(), get(), get()) }
+        single<QueueRepository> { QueueRepositoryImpl(get(), get(), get(), get(), get(), get(), get()) }
         single<WaitingRoomRepository> { get<QueueRepository>() }
-        single<MyQueuesRepository> { RealMyQueuesRepository(get(), get(), get(), get(), get()) }
+        single<MyQueuesRepository> { MyQueuesRepositoryImpl(get(), get(), get(), get(), get()) }
         single<AuthRepository> {
-            RealAuthRepository(
+            AuthRepositoryImpl(
                 api = get(),
                 devices = get(),
                 session = get(),
                 refresher = get(),
             )
         }
-        single<TicketsRepository> { RealTicketsRepository(get(), get(), get(), get()) }
-        single<DetailRepository> { RealDetailRepository(get(), get()) }
+        single<TicketsRepository> { TicketsRepositoryImpl(get(), get(), get(), get()) }
+        single<DetailRepository> { DetailRepositoryImpl(get(), get()) }
         single<PaymentRepository> {
             stubOrFail("PaymentRepository", allowStubFallback, warn) {
                 StubPaymentRepository(StubClock.ticking())

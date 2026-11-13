@@ -18,12 +18,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class RealTicketsRepositoryTest {
+class TicketsRepositoryImplTest {
     private fun repository(
         backend: FakeBackend,
         language: AppLanguage = AppLanguage.Indonesian,
         now: Long = FIXTURE_NOW_MILLIS,
-    ) = RealTicketsRepository(
+    ) = TicketsRepositoryImpl(
         TicketApiService(backend.api),
         TicketsCache(FakeAppPreferences()),
         { language },

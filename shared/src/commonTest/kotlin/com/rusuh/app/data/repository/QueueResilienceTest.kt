@@ -15,7 +15,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Draw outcomes, transient failures, claim edge cases and the unsynced clock of [RealQueueRepository]. */
+/** Draw outcomes, transient failures, claim edge cases and the unsynced clock of [QueueRepositoryImpl]. */
 class QueueResilienceTest {
     private val joinLine = "POST /queue/$EVT/join"
     private val frontierLine = "GET /queue/$EVT/frontier"

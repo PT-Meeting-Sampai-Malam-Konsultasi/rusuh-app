@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
  *
  * The payment routes are not yet deployed on the live staging backend (404), so implementations
  * are either [com.rusuh.app.data.repository.StubPaymentRepository] for stub mode or
- * [com.rusuh.app.data.repository.RealPaymentRepository] for real/mock mode.
+ * [com.rusuh.app.data.repository.PaymentRepositoryImpl] for real/mock mode.
  */
 interface PaymentRepository {
     /**

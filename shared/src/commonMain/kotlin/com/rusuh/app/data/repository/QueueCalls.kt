@@ -53,7 +53,7 @@ internal sealed interface ClaimStep {
 }
 
 /**
- * The queue-related HTTP calls of [RealQueueRepository] with their error policy: what each status means (device
+ * The queue-related HTTP calls of [QueueRepositoryImpl] with their error policy: what each status means (device
  * re-registration on a rejected join, `MISSED` vs `QUEUE_CLOSED`, sign-in required on a claim), and which failures
  * throw [DomainException]. Holds no polling state.
  */

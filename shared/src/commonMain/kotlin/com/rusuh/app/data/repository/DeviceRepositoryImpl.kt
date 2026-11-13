@@ -28,7 +28,7 @@ import kotlin.concurrent.Volatile
  * yet (the first call after launch); injectable for tests.
  */
 @Suppress("LongParameterList") // the collaborators of one use case; each is a separate seam
-class RealDeviceRepository(
+class DeviceRepositoryImpl(
     private val api: DeviceApiService,
     private val tokens: TokenStore,
     private val secureStore: SecureStore,

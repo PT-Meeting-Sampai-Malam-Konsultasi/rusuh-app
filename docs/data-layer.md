@@ -215,15 +215,15 @@ Release builds always use `Production` + `Real` over HTTPS.
   replaces the shared `HttpClient` with one on the in-process `StubEngine` (closed with Koin), so the three named
   `ApiClient`s and any ApiService built on them run with zero network, and the `ServerClock` is the demo's ticking
   `StubClock`, so countdowns run.
-- Real repositories (`data/repository`): `RealHomeRepository` (`GET /core/events`), `RealQueueRepository` (behind both
+- Repository implementations (`data/repository`): `HomeRepositoryImpl` (`GET /core/events`), `QueueRepositoryImpl` (behind both
   `WaitingRoomRepository` and `QueueRepository`: join, frontier polling at the ADR-0003 cadence, claim, leave),
-  `RealMyQueuesRepository`, `RealDeviceRepository` (`POST /queue/devices`, the install id lives in the `SecureStore`),
-  `RealTicketsRepository` (`GET /core/tickets`, `GET /core/tickets/{ticketId}`). They
+  `MyQueuesRepositoryImpl`, `DeviceRepositoryImpl` (`POST /queue/devices`, the install id lives in the `SecureStore`),
+  `TicketsRepositoryImpl` (`GET /core/tickets`, `GET /core/tickets/{ticketId}`). They
   are built on `EventApiService`, `QueueApiService`, `DeviceApiService` and `TicketApiService` (`data/remote`), which use the `Api` and
   `Queue` clients (`/devices` and `/queue/*` belong to the queue service). Failed calls surface as `DomainException`
   (carrying the `DomainResult`), `SignInRequiredException` for a guest claim. `QueuePacing` makes the waits and the
   jitter injectable, so tests run in virtual time.
-- `RealTicketsRepository`: fetches the signed-in user's tickets from `GET /core/tickets`, groups flat tickets by
+- `TicketsRepositoryImpl`: fetches the signed-in user's tickets from `GET /core/tickets`, groups flat tickets by
   `bookingId` into orders, and enriches them with event facts from `GET /core/events/{eventId}` (cached per event in
   `TicketsCache` so the e-ticket page does not refetch). A 401 is handled by the session layer (refresh or session
   expired). shortcut: The Ticket schema does not include order number (`orderCode`), total, payment method, paid-at
@@ -233,7 +233,7 @@ Release builds always use `Production` + `Real` over HTTPS.
   only one left: the payment routes (`/core/payments/...`) are NOT deployed on the live staging backend (they return
   404), so it uses stub data. The constant `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`) lists `PaymentRepository`;
   flipping to the real repository is a one-line change once the routes go live (replace the `stubOrFail` binding with
-  `RealPaymentRepository(get())` and remove from the list). The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES`
+  `PaymentRepositoryImpl(get())` and remove from the list). The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES`
   (default `true`) controls the fallback; set it to `false`, or pass `liveDataModule(allowStubFallback = false)`,
   for the strict behaviour: resolving a repository without a real implementation throws
   `RealRepositoryNotAvailableException`.
@@ -304,7 +304,7 @@ Contract: the Apidog project "Rusuh Booking Tiket API" is the single reference (
 the live behaviour).
 
 ```
-AuthApiService --ApiResult--> RealAuthRepository --DomainResult--> use cases --> SignInViewModel / AccountViewModel
+AuthApiService --ApiResult--> AuthRepositoryImpl --DomainResult--> use cases --> SignInViewModel / AccountViewModel
                                    |  tokens
                                SessionManager --> TokenStore (refresh: SecureStore, access: memory) + SessionEvents
 ```

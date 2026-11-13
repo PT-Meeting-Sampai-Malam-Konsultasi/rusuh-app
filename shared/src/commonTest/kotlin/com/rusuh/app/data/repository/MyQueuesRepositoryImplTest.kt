@@ -15,7 +15,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class RealMyQueuesRepositoryTest {
+class MyQueuesRepositoryImplTest {
     private suspend fun QueueHarness.joined(vararg ids: String) {
         ids.forEach { id ->
             tokens.setQueueToken(id, "token-$id")
@@ -291,7 +291,7 @@ class RealMyQueuesRepositoryTest {
             val queues = h.myQueues.getMyQueues()
 
             assertEquals(ids, queues.map { it.eventId })
-            assertTrue(peak in 2..RealMyQueuesRepository.DEFAULT_PARALLEL, "peak parallel reads: $peak")
+            assertTrue(peak in 2..MyQueuesRepositoryImpl.DEFAULT_PARALLEL, "peak parallel reads: $peak")
         }
 
     @Test

@@ -35,7 +35,7 @@ import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // one class per repository, like the other repository tests
-class RealAuthRepositoryTest {
+class AuthRepositoryImplTest {
     private val otp = "POST /auth/otp"
     private val verify = "POST /auth/otp/verify"
     private val logout = "POST /auth/logout"
@@ -612,7 +612,7 @@ class RealAuthRepositoryTest {
             h.seedSession(access = null, refresh = "refresh-1")
             var refreshCalls = 0
             val repository =
-                RealAuthRepository(
+                AuthRepositoryImpl(
                     AuthApiService(h.backend.api),
                     h.devices,
                     h.session,

@@ -1,5 +1,7 @@
 package com.rusuh.app.feature.eticket
 
+import kotlinx.datetime.LocalDate
+
 private const val MILLIS_PER_MINUTE = 60_000L
 private const val MILLIS_PER_DAY = 86_400_000L
 private const val MINUTES_PER_HOUR = 60
@@ -93,14 +95,6 @@ internal fun boldRange(
 
 /** (month 1..12, day of month) for [daysSinceEpoch] in the proleptic Gregorian calendar. */
 private fun monthAndDay(daysSinceEpoch: Long): Pair<Int, Int> {
-    // Howard Hinnant's civil-from-days.
-    val z = daysSinceEpoch + 719_468
-    val era = z.floorDiv(146_097L)
-    val dayOfEra = z - era * 146_097
-    val yearOfEra = (dayOfEra - dayOfEra / 1_460 + dayOfEra / 36_524 - dayOfEra / 146_096) / 365
-    val dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
-    val mp = (5 * dayOfYear + 2) / 153
-    val day = (dayOfYear - (153 * mp + 2) / 5 + 1).toInt()
-    val month = (if (mp < 10) mp + 3 else mp - 9).toInt()
-    return month to day
+    val date = LocalDate.fromEpochDays(daysSinceEpoch.toInt())
+    return date.monthNumber to date.dayOfMonth
 }

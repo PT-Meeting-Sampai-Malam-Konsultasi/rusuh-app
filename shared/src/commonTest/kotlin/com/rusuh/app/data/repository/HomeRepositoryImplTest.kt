@@ -17,12 +17,12 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-class RealHomeRepositoryTest {
+class HomeRepositoryImplTest {
     private fun repository(
         backend: FakeBackend,
         language: AppLanguage = AppLanguage.Indonesian,
         now: Long = 0L,
-    ) = RealHomeRepository(EventApiService(backend.api), { language }, TestServerClock(now))
+    ) = HomeRepositoryImpl(EventApiService(backend.api), { language }, TestServerClock(now))
 
     private fun backendWith(vararg replies: Reply) = FakeBackend().also { it.on("GET /core/events", *replies) }
 
@@ -128,7 +128,7 @@ class RealHomeRepositoryTest {
             val body = """{"items": [${EVENT_FIXTURES.first()}]}"""
             // An unsynced clock counts from a small arbitrary start: reading it would give a ~20,000 day countdown.
             val unsynced =
-                RealHomeRepository(EventApiService(backendWith(Reply.ok(body)).api), {
+                HomeRepositoryImpl(EventApiService(backendWith(Reply.ok(body)).api), {
                     AppLanguage.Indonesian
                 }, TestServerClock(5_000L, synced = false))
 
