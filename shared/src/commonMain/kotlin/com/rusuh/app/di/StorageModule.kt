@@ -4,6 +4,7 @@ import com.rusuh.app.data.cache.AuthCache
 import com.rusuh.app.data.cache.DeviceCache
 import com.rusuh.app.data.cache.HomeCache
 import com.rusuh.app.data.cache.QueueCache
+import com.rusuh.app.data.cache.TicketsCache
 import com.rusuh.app.data.storage.SecureTokenStore
 import com.rusuh.app.data.storage.TokenStore
 import com.rusuh.app.domain.repository.DisplayNameStore
@@ -16,5 +17,6 @@ val storageModule =
         single { HomeCache(get()) }
         single { QueueCache(get()) }
         single { DeviceCache(get()) }
+        single { TicketsCache(get()) }
         single<DisplayNameStore> { AuthCache(get()) }
     }

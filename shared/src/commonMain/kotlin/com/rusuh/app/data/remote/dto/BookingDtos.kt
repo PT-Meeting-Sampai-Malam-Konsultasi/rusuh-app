@@ -113,22 +113,6 @@ data class AttendeeDto(
     @SerialName("nikMasked") val nikMasked: String = "",
 )
 
-@Serializable
-data class TicketDto(
-    @SerialName("ticketId") val ticketId: String = "",
-    @SerialName("ticketCode") val ticketCode: String = "",
-    @SerialName("bookingId") val bookingId: String = "",
-    @SerialName("eventId") val eventId: String = "",
-    @SerialName("categoryId") val categoryId: String = "",
-    @SerialName("categoryName") val categoryName: String = "",
-    @SerialName("seating") val seating: String = "",
-    @SerialName("entryGate") val entryGate: String? = null,
-    @SerialName("holderName") val holderName: String = "",
-    @SerialName("nikMasked") val nikMasked: String = "",
-    @SerialName("qrPayload") val qrPayload: String = "",
-    @SerialName("issuedAt") val issuedAt: String = "",
-)
-
 // --- GET /bookings/active ---
 
 @Serializable
