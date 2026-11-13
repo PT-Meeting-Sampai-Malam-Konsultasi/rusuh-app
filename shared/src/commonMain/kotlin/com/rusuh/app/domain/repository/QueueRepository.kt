@@ -5,6 +5,12 @@ import com.rusuh.app.feature.waitingroom.domain.repository.WaitingRoomRepository
 
 /** Queue actions beyond observing the place ([WaitingRoomRepository.observePlace], which also joins). */
 interface QueueRepository : WaitingRoomRepository {
+    suspend fun claim(
+        eventId: String,
+        turnExpiresAtEpochMillis: Long,
+        serverNowEpochMillis: Long,
+    ): QueueClaimOutcome
+
     /** Re-claims a previously admitted order after an app restart. */
     suspend fun resumeAdmission(eventId: String): Boolean = false
 
@@ -14,3 +20,5 @@ interface QueueRepository : WaitingRoomRepository {
      */
     suspend fun leave(eventId: String): DomainResult<Unit>
 }
+
+enum class QueueClaimOutcome { Admitted, BackToWaiting, Missed, Closed }

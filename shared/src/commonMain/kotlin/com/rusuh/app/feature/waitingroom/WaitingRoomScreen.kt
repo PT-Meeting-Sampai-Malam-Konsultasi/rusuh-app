@@ -38,6 +38,7 @@ import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.action_retry
 import rusuh_app.shared.generated.resources.waiting_back_description
+import rusuh_app.shared.generated.resources.waiting_claiming
 import rusuh_app.shared.generated.resources.waiting_empty_body
 import rusuh_app.shared.generated.resources.waiting_empty_title
 import rusuh_app.shared.generated.resources.waiting_error_title
@@ -222,7 +223,11 @@ private fun YourTurnContent(
         shadow = RusuhColors.Blue,
     )
     Spacer(Modifier.height(RusuhSpacing.xxl))
-    PrimaryButton(text = stringResource(Res.string.waiting_turn_cta), onClick = onEnter)
+    PrimaryButton(
+        text = stringResource(if (phase.claiming) Res.string.waiting_claiming else Res.string.waiting_turn_cta),
+        onClick = onEnter,
+        enabled = !phase.claiming,
+    )
     Spacer(Modifier.height(RusuhSpacing.xl))
     TurnTimer(seconds = phase.secondsLeft)
     Spacer(Modifier.height(RusuhSpacing.xl))

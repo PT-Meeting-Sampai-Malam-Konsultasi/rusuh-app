@@ -84,8 +84,10 @@
     <string name="waiting_turn_lead">Number %1$s, come on in.</string>
     <string name="waiting_turn_title">Your turn!</string>
     <string name="waiting_turn_cta">Choose tickets now</string>
+    <string name="waiting_claiming">Claiming</string>
+    <string name="waiting_no_stock">Tickets are temporarily full. You are back in the queue.</string>
     <string name="waiting_turn_timer_label">to enter</string>
-    <string name="waiting_turn_hint">We'll move you in automatically. After that: 5 min to choose, 10 min to pay.</string>
+    <string name="waiting_turn_hint">We'll claim automatically while this screen is open. Choose tickets now to enter earlier. After entering: 5 minutes to pick tickets, 10 minutes to pay.</string>
     <string name="waiting_missed_lead">Your 60 seconds to enter ran out.</string>
     <string name="waiting_missed_title">Turn missed.</string>
     <string name="waiting_missed_body">We've passed your place to the next number. Tickets are still available — queue again for a new number.</string>
@@ -99,7 +101,7 @@
     <string name="waiting_note_safe_title">Your place is safe</string>
     <string name="waiting_note_safe_body">Refresh or close the page — your number stays the same.</string>
     <string name="waiting_note_turn_title">60 seconds to enter</string>
-    <string name="waiting_note_turn_body">When it's your turn, we take you to ticket selection automatically.</string>
+    <string name="waiting_note_turn_body">When it's your turn, we move you in automatically at the end of the 60 seconds while this screen is open, or press the button to enter sooner.</string>
     <string name="waiting_note_nowait_title">No waiting for nothing</string>
     <string name="waiting_note_nowait_body">If tickets sell out, the queue closes at once and we tell you.</string>
     <string name="waiting_note_app">In the app, we notify you when your turn is close.</string>

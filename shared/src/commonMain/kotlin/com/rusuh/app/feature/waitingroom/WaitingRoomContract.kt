@@ -31,6 +31,10 @@ sealed interface WaitingRoomIntent : MviIntent {
     /** Recompute countdowns from the last snapshot; sent about once a second by the host. */
     data object Tick : WaitingRoomIntent
 
+    data object ScreenActive : WaitingRoomIntent
+
+    data object ScreenInactive : WaitingRoomIntent
+
     data object Back : WaitingRoomIntent
 
     /** "Choose tickets now" on the your-turn phase. */
@@ -67,6 +71,8 @@ sealed interface WaitingRoomEffect : MviEffect {
 
     /** Updates stopped after a place was already shown; the last place stays on screen. */
     data object ShowRefreshError : WaitingRoomEffect
+
+    data object ShowNoStock : WaitingRoomEffect
 }
 
 /** Maps a screen [WaitingRoomAction] onto the matching [WaitingRoomIntent]. */

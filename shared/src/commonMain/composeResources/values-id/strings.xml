@@ -84,8 +84,10 @@
     <string name="waiting_turn_lead">Nomor %1$s, silakan masuk.</string>
     <string name="waiting_turn_title">Giliran Anda!</string>
     <string name="waiting_turn_cta">Pilih tiket sekarang</string>
+    <string name="waiting_claiming">Sedang masuk</string>
+    <string name="waiting_no_stock">Tiket sementara penuh. Anda kembali ke antrean.</string>
     <string name="waiting_turn_timer_label">untuk masuk</string>
-    <string name="waiting_turn_hint">Kami pindahkan Anda otomatis. Setelah masuk: 5 menit pilih tiket, 10 menit bayar.</string>
+    <string name="waiting_turn_hint">Kami klaim otomatis selama layar ini terbuka. Pilih tiket sekarang untuk masuk lebih awal. Setelah masuk: 5 menit memilih tiket, 10 menit membayar.</string>
     <string name="waiting_missed_lead">Waktu 60 detik untuk masuk sudah habis.</string>
     <string name="waiting_missed_title">Giliran terlewat.</string>
     <string name="waiting_missed_body">Tempat Anda kami berikan ke nomor berikutnya. Tiket masih tersedia — antre lagi untuk mendapat nomor baru.</string>
@@ -99,7 +101,7 @@
     <string name="waiting_note_safe_title">Posisi Anda aman</string>
     <string name="waiting_note_safe_body">Refresh atau tutup halaman, nomor Anda tetap sama.</string>
     <string name="waiting_note_turn_title">60 detik untuk masuk</string>
-    <string name="waiting_note_turn_body">Saat giliran tiba, kami arahkan Anda otomatis ke pemilihan tiket.</string>
+    <string name="waiting_note_turn_body">Saat giliran tiba, kami masukkan Anda otomatis di akhir 60 detik selama layar ini terbuka, atau tekan tombol untuk masuk lebih awal.</string>
     <string name="waiting_note_nowait_title">Tidak menunggu sia-sia</string>
     <string name="waiting_note_nowait_body">Kalau tiket habis, antrian langsung ditutup dan Anda diberi tahu.</string>
     <string name="waiting_note_app">Di aplikasi, kami kirim notifikasi saat giliran Anda dekat.</string>

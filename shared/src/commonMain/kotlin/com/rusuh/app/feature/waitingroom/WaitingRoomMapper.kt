@@ -5,6 +5,7 @@ import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
 import com.rusuh.app.feature.waitingroom.domain.model.QueueState
 import com.rusuh.app.ui.components.QueuePhase
 import com.rusuh.app.ui.components.QueuePositionUi
+import com.rusuh.app.ui.components.QueueProgressUi
 
 private const val MILLIS_PER_SECOND = 1_000L
 
@@ -55,6 +56,11 @@ internal fun QueuePlace.toPhase(elapsedMillis: Long = 0L): WaitingRoomPhase? =
                     phase = QueuePhase.Waiting,
                     estimatedWaitMinutes = etaMinutes(),
                     ratePerMinute = ratePerMinute,
+                    progress =
+                        servedAtJoin?.let { start ->
+                            val joined = start.coerceAtMost(seq).coerceAtMost(served)
+                            QueueProgressUi(joined, served.coerceAtMost(seq).coerceAtLeast(joined), seq)
+                        },
                 ),
             )
         QueueState.Paused -> WaitingRoomPhase.Paused(position(), pauseReason.toUi())

@@ -1,18 +1,22 @@
 package com.rusuh.app.feature.waitingroom
 
-import com.rusuh.app.data.network.session.SessionStateProvider
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.SignInRequiredException
+import com.rusuh.app.domain.repository.QueueClaimOutcome
+import com.rusuh.app.domain.usecase.ClaimQueueUseCase
 import com.rusuh.app.domain.usecase.LeaveQueueUseCase
 import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
 import com.rusuh.app.feature.waitingroom.domain.model.QueueState
 import com.rusuh.app.feature.waitingroom.domain.usecase.ObserveQueuePlaceUseCase
 import com.rusuh.app.mvi.MviViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
 import kotlin.time.TimeSource
+
+const val AUTO_CLAIM_LEAD_MILLIS = 5_000L
 
 /**
  * MVI ViewModel for the Waiting Room of one event.
@@ -33,20 +37,23 @@ import kotlin.time.TimeSource
  * belongs to the device).
  *
  * @param monotonicMillis monotonic milliseconds; injectable so tests can fake time.
- * @param sessionState provides the signed-in state for auto-advance at turn.
+ * @param monotonicMillis monotonic milliseconds; injectable so tests can fake time.
  */
 class WaitingRoomViewModel(
     private val eventId: String,
     private val observeQueuePlace: ObserveQueuePlaceUseCase,
     private val leaveQueue: LeaveQueueUseCase,
     private val monotonicMillis: () -> Long = defaultMonotonicMillis(),
-    private val sessionState: SessionStateProvider? = null,
+    private val claimQueue: ClaimQueueUseCase? = null,
 ) : MviViewModel<WaitingRoomState, WaitingRoomIntent, WaitingRoomEffect>(WaitingRoomState()) {
     private var observeJob: Job? = null
+    private var autoClaimJob: Job? = null
     private var lastPlace: QueuePlace? = null
     private var receivedAtMillis: Long = 0L
     private var backSent = false
     private var navigatedToDetail = false
+    private var screenActive = false
+    private var claimInFlight = false
 
     override suspend fun reduce(intent: WaitingRoomIntent) {
         when (intent) {
@@ -55,15 +62,24 @@ class WaitingRoomViewModel(
             WaitingRoomIntent.QueueAgain -> startObserving(keepPlace = false)
             WaitingRoomIntent.Retry -> startObserving(keepPlace = true)
             WaitingRoomIntent.Tick -> tick()
+            WaitingRoomIntent.ScreenActive -> {
+                screenActive = true
+                scheduleAutoClaim()
+            }
+            WaitingRoomIntent.ScreenInactive -> {
+                screenActive = false
+                autoClaimJob?.cancel()
+                autoClaimJob = null
+            }
             WaitingRoomIntent.Back -> sendBackOnce()
-            WaitingRoomIntent.ChooseTicketsNow -> navigateToDetail()
+            WaitingRoomIntent.ChooseTicketsNow -> claim()
             WaitingRoomIntent.BrowseOtherEvents -> sendEffect(WaitingRoomEffect.NavigateToEvents)
             WaitingRoomIntent.LeaveQueue -> leave()
             WaitingRoomIntent.NotifyMe -> Unit
         }
     }
 
-    /** Navigate to the Detail screen (manual path via "Choose tickets now"). */
+    /** Navigate to the Detail screen after admission. */
     private fun navigateToDetail() {
         if (navigatedToDetail) return
         navigatedToDetail = true
@@ -93,7 +109,57 @@ class WaitingRoomViewModel(
         if (!currentState.hasCountdown) return
         val elapsed = monotonicMillis() - receivedAtMillis
         val mapped = place.toUiState(elapsed)
-        setState { copy(ui = mapped) }
+        val turn = (mapped as? WaitingRoomUiState.Active)?.phase as? WaitingRoomPhase.YourTurn
+        if (turn?.secondsLeft == 0 && !claimInFlight) {
+            setState { copy(ui = place.copy(state = QueueState.Missed).toUiState(elapsed)) }
+            return
+        }
+        val claiming =
+            ((currentState.ui as? WaitingRoomUiState.Active)?.phase as? WaitingRoomPhase.YourTurn)?.claiming == true
+        setState {
+            copy(
+                ui =
+                    if (claiming && turn != null) {
+                        (mapped as WaitingRoomUiState.Active).copy(phase = turn.copy(claiming = true))
+                    } else {
+                        mapped
+                    },
+            )
+        }
+    }
+
+    @Suppress("CyclomaticComplexMethod", "ReturnCount", "TooGenericExceptionCaught", "InstanceOfCheckForException")
+    private suspend fun claim() {
+        val place = lastPlace ?: return
+        val expiresAt = place.turnExpiresAtEpochMillis ?: return
+        val turn = (currentState.ui as? WaitingRoomUiState.Active)?.phase as? WaitingRoomPhase.YourTurn ?: return
+        if (claimInFlight || turn.claiming || turn.secondsLeft <= 0) return
+        if (!screenActive) return
+        claimInFlight = true
+        val active = place.toUiState() as? WaitingRoomUiState.Active ?: return
+        setState { copy(ui = active.copy(phase = turn.copy(claiming = true))) }
+        try {
+            val serverNow = place.serverNowEpochMillis + (monotonicMillis() - receivedAtMillis).coerceAtLeast(0L)
+            when (claimQueue?.invoke(eventId, expiresAt, serverNow) ?: QueueClaimOutcome.Admitted) {
+                QueueClaimOutcome.Admitted -> navigateToDetail()
+                QueueClaimOutcome.BackToWaiting -> {
+                    setState { copy(ui = place.copy(state = QueueState.Open).toUiState()) }
+                    sendEffect(WaitingRoomEffect.ShowNoStock)
+                }
+                QueueClaimOutcome.Missed -> setState { copy(ui = place.copy(state = QueueState.Missed).toUiState()) }
+                QueueClaimOutcome.Closed -> setState { copy(ui = place.copy(state = QueueState.Closed).toUiState()) }
+            }
+        } catch (failure: Throwable) {
+            if (failure is kotlinx.coroutines.CancellationException) throw failure
+            if (failure is SignInRequiredException) {
+                sendEffect(WaitingRoomEffect.ReSignIn(eventId))
+            } else {
+                sendEffect(WaitingRoomEffect.ShowRefreshError)
+            }
+            setState { copy(ui = place.toUiState((monotonicMillis() - receivedAtMillis).coerceAtLeast(0L))) }
+        } finally {
+            claimInFlight = false
+        }
     }
 
     /**
@@ -129,12 +195,22 @@ class WaitingRoomViewModel(
         val mapped = place.toUiState()
 
         setState { copy(ui = mapped) }
+        if (place.state == QueueState.Turn && screenActive) scheduleAutoClaim()
+    }
 
-        // Auto-advance: signed-in user at the turn goes straight to Detail.
-        val isSignedIn = sessionState?.isSignedIn?.value ?: true
-        if (isSignedIn && place.state == QueueState.Turn) {
-            navigateToDetail()
-        }
+    @Suppress("ReturnCount")
+    private fun scheduleAutoClaim() {
+        autoClaimJob?.cancel()
+        val place = lastPlace ?: return
+        if (!screenActive || place.state != QueueState.Turn) return
+        val expiresAt = place.turnExpiresAtEpochMillis ?: return
+        val serverNow = place.serverNowEpochMillis + (monotonicMillis() - receivedAtMillis).coerceAtLeast(0L)
+        val waitMillis = (expiresAt - serverNow - AUTO_CLAIM_LEAD_MILLIS).coerceAtLeast(0L)
+        autoClaimJob =
+            viewModelScope.launch {
+                delay(waitMillis)
+                if (screenActive) claim()
+            }
     }
 
     private fun onStreamFailed(cause: Throwable) {
