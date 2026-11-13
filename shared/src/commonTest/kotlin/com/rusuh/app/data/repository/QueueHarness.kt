@@ -65,7 +65,7 @@ class QueueHarness(
 
     val queue =
         RealQueueRepository(
-            queueApi = QueueApiService(backend.api),
+            queueApiService = QueueApiService(backend.api),
             eventApi = EventApiService(backend.api),
             devices = devices,
             tokens = tokens,

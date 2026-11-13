@@ -13,7 +13,7 @@ import io.ktor.http.encodeURLPathPart
  * per-event queue token is passed per call where the contract asks for it.
  */
 class QueueApiService(
-    private val api: ApiClient,
+    internal val api: ApiClient,
 ) {
     /** Idempotent per device: returns the existing place or takes the next number. */
     suspend fun join(eventId: String): ApiResult<QueuePlaceDto> = api.post(path(eventId, JOIN))

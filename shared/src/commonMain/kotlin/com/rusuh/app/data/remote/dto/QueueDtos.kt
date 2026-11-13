@@ -49,3 +49,13 @@ data class AdmissionDto(
 data class JoinQueueRequestDto(
     @SerialName("takeOver") val takeOver: Boolean = false,
 )
+
+/** `turn` event payload from the SSE stream. */
+@Serializable
+data class QueueTurnDto(
+    @SerialName("event") val event: String = "",
+    @SerialName("seq") val seq: Int = 0,
+    @SerialName("served") val served: Int = 0,
+    @SerialName("turnExpiresAt") val turnExpiresAt: String? = null,
+    @SerialName("serverNow") val serverNow: String? = null,
+)

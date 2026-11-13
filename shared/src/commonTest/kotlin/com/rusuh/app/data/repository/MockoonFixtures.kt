@@ -63,18 +63,22 @@ fun placeJson(
 }
 
 /** `GET /queue/{evt}/frontier` at the fixture time. [opensAt] is Unix seconds. */
+@Suppress("LongParameterList") // Test fixture builder with sensible defaults
 fun frontierJson(
     served: Int,
     state: String = "open",
     reason: String? = null,
     rate: Int = 300,
     opensAt: Long? = null,
+    streamFrom: Int = 0,
 ): String {
     val reasonPart = reason?.let { """, "reason": "$it"""" }.orEmpty()
     val opensPart = opensAt?.let { """, "opensAt": $it""" }.orEmpty()
-    return """{"event": "evt_1", "state": "$state", "served": $served, "sellable": 3120, "reserved": 1800, """ +
-        """"held": 640, "ratePerMin": $rate, "rateLow": ${rate * 4 / 5}, "rateHigh": ${rate * 6 / 5}, """ +
-        """"rateSource": "observed", "streamFrom": 2000, "ts": ${FIXTURE_NOW_MILLIS / 1_000L}$reasonPart$opensPart}"""
+    val base = """{"event": "evt_1", "state": "$state", "served": $served, "sellable": 3120, """
+    val reserved = """"reserved": 1800, "held": 640, "ratePerMin": $rate, """
+    val rates = """"rateLow": ${rate * 4 / 5}, "rateHigh": ${rate * 6 / 5}, "rateSource": "observed", """
+    val stream = """"streamFrom": $streamFrom, "ts": ${FIXTURE_NOW_MILLIS / 1_000L}$reasonPart$opensPart}"""
+    return base + reserved + rates + stream
 }
 
 const val ADMISSION_JSON =

@@ -258,7 +258,19 @@ Release builds always use `Production` + `Real` over HTTPS.
   `PaymentRepository`: the payment routes are not deployed on live staging (404). `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
 - Mockoon (`workspace-local/mockoon`) simulates a moving queue: the frontier is SEQUENTIAL (served 100, 130, ..., two
   paused polls, then `served >= seq`), claim answers 409 `NOT_YET` once and then 200. Restart it to replay the sequence.
-- TODO(FR-04-M4 #30): the last 2,000 places also get SSE (ADR-0015); only polling is implemented.
+- SSE streaming (`data/repository/QueueStream.kt`, ADR-0015): when the frontier's `streamFrom > 0` and the user's
+  position `<= streamFrom`, the repository opens an SSE stream (`GET /queue/{eventId}/stream`) for sub-second updates
+  while polling continues as the source of truth. Streaming uses `bodyAsChannel` on a prepared request (not Ktor's SSE
+  plugin, which has inconsistent Darwin support). The stream emits `frontier` (same schema) and `turn` (your turn)
+  events parsed by `SseParser`. Fallback rules:
+  - 2 failed connect attempts → fall back to polling, retry stream after 60 s (`SSE_RETRY_DELAY_MILLIS`).
+  - No first event within 5 s (`SSE_FIRST_EVENT_TIMEOUT_MILLIS`) → fall back.
+  - 30 s silence (`SSE_SILENCE_TIMEOUT_MILLIS`) → fall back.
+  - 409 `TOO_FAR` → stop stream attempts permanently for this session.
+  - 503 `STREAM_FULL` with `Retry-After` → back off, retry after the header value (capped at 5 min).
+  - 410 `QUEUE_CLOSED/MISSED/EXPIRED` and 401 → handled by polling.
+  Timing constants live in `QueuePacing`. The stream auto-reconnects with `Last-Event-ID` when the server sends an `id`
+  field. Cancelling the `observePlace` flow closes the stream.
 
 ### Stub payloads and the test harness (`data/stub`)
 

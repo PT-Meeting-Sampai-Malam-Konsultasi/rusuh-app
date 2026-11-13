@@ -88,6 +88,13 @@ class QueuePacing(
         private const val MAX_BACKOFF_SHIFT = 6
         private const val MILLIS_PER_SECOND = 1_000L
 
+        // SSE stream timings (ADR-0015)
+        const val SSE_FIRST_EVENT_TIMEOUT_MILLIS = 5_000L
+        const val SSE_SILENCE_TIMEOUT_MILLIS = 30_000L
+        const val SSE_RETRY_DELAY_MILLIS = 60_000L
+        const val SSE_DEFAULT_RETRY_MILLIS = 3_000L
+        const val SSE_MAX_CONNECT_FAILURES = 2
+
         private fun monotonicMillis(): () -> Long {
             val origin = TimeSource.Monotonic.markNow()
             return { origin.elapsedNow().inWholeMilliseconds }

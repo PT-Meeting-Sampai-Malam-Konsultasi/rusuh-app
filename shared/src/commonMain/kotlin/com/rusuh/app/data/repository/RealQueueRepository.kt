@@ -2,11 +2,13 @@ package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.cache.QueueCache
 import com.rusuh.app.data.clock.parseRfc3339Millis
+import com.rusuh.app.data.network.ApiClient
 import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
 import com.rusuh.app.data.remote.dto.EventDto
 import com.rusuh.app.data.remote.dto.FrontierDto
+import com.rusuh.app.data.remote.dto.QueueTurnDto
 import com.rusuh.app.data.remote.mapper.QueueWire
 import com.rusuh.app.data.remote.mapper.localMoment
 import com.rusuh.app.data.remote.mapper.opensAtMillis
@@ -27,10 +29,14 @@ import com.rusuh.app.domain.repository.QueueRepository
 import com.rusuh.app.feature.waitingroom.domain.model.QueueEventInfo
 import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
 import com.rusuh.app.feature.waitingroom.domain.model.QueueState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 
 /**
  * The real queue: [observePlace] joins (idempotent) and then polls the public frontier at the ADR-0003 cadence until
@@ -45,18 +51,17 @@ import kotlinx.coroutines.flow.flow
  *   Detail); a 410
  *   `MISSED`/`EXPIRED` or running out of the window emits [QueueState.Missed]; a 401 with code `UNAUTHORIZED` fails the
  *   flow with [SignInRequiredException] (a guest cannot claim), any other 401 registers the device again once.
+ * - Near the front (position <= streamFrom), opens an SSE stream for real-time updates (ADR-0015). Polling is the
+ *   fallback and source of truth; the stream is closed on cancellation or when position goes back above streamFrom.
  * - Transient failures (network, 408, 429, 5xx) inside the loop are retried with capped exponential backoff that
  *   honours `Retry-After`; the flow fails with [DomainException] after 5 failures in a row, or at once on a failure
  *   that waiting cannot fix (401/403/404 where they are not meaningful). The Waiting Room keeps the last place and
  *   offers a retry.
  * - All times come from the [ServerClock], never the device clock.
- *
- * TODO(FR-04-M4 #30): the last 2,000 places also open the SSE stream (`streamFrom` of the frontier, ADR-0015);
- * polling stays the source of truth.
  */
 @Suppress("LongParameterList") // the collaborators of one use case; each is a separate seam
 class RealQueueRepository(
-    queueApi: QueueApiService,
+    private val queueApiService: QueueApiService,
     eventApi: EventApiService,
     devices: DeviceRepository,
     private val tokens: TokenStore,
@@ -64,8 +69,9 @@ class RealQueueRepository(
     private val serverClock: ServerClock,
     private val localeProvider: LocaleProvider,
     private val pacing: QueuePacing = QueuePacing(),
+    private val json: Json = ApiClient.defaultJson,
 ) : QueueRepository {
-    private val calls = QueueCalls(queueApi, eventApi, devices, tokens, cache)
+    private val calls = QueueCalls(queueApiService, eventApi, devices, tokens, cache)
 
     override fun observePlace(eventId: String): Flow<QueuePlace> =
         if (eventId.isBlank()) {
@@ -92,6 +98,7 @@ class RealQueueRepository(
         if (serverClock.isSynced) serverClock.nowMillis() else frontier.tsMillis() ?: 0L
 
     /** One `observePlace` collection: the state of a single join-and-poll run. */
+    @Suppress("TooManyFunctions")
     private inner class Poller(
         private val eventId: String,
         private val out: FlowCollector<QueuePlace>,
@@ -100,9 +107,17 @@ class RealQueueRepository(
         private var info = QueueEventInfo(title = eventId)
         private var seq: Int? = null
         private var position: Int? = null
+        private var streamFrom: Int? = null
         private var opensAtFromPlace: Long? = null
         private var drawJitterDone = false
         private var failures = 0
+        private var lastFrontier: FrontierDto? = null
+
+        // SSE state
+        private var streamConnectFailures = 0
+        private var nextStreamRetryAt: Long = 0L
+        private var lastEventId: String? = null
+        private var serverRetryMillis: Long = QueuePacing.SSE_DEFAULT_RETRY_MILLIS
 
         suspend fun run() {
             val joined = calls.join(eventId)
@@ -112,8 +127,155 @@ class RealQueueRepository(
             event?.let { info = it.toQueueEventInfo(localeProvider.language()) }
             var finished = false
             while (!finished) {
-                finished = step(resilient { calls.frontier(eventId) })
-                if (!finished) pacing.delay(pacing.pollDelayMillis(position))
+                val frontier = resilient { calls.frontier(eventId) }
+                lastFrontier = frontier
+                streamFrom = frontier.streamFrom
+                finished = step(frontier)
+                if (!finished) {
+                    if (shouldStream(frontier)) {
+                        finished = runStream(frontier)
+                    } else {
+                        pacing.delay(pacing.pollDelayMillis(position))
+                    }
+                }
+            }
+        }
+
+        @Suppress("ReturnCount") // early returns simplify the logic
+        private fun shouldStream(frontier: FrontierDto): Boolean {
+            val sf = frontier.streamFrom ?: return false
+            val pos = position ?: return false
+            val isNearFront = sf > 0 && pos <= sf
+            val canRetry = pacing.nowMillis() >= nextStreamRetryAt
+            val notTooManyFailures = streamConnectFailures < QueuePacing.SSE_MAX_CONNECT_FAILURES
+            val isOpenOrPaused = frontier.state == QueueWire.OPEN || frontier.state == QueueWire.PAUSED
+            return isNearFront && canRetry && notTooManyFailures && isOpenOrPaused
+        }
+
+        private suspend fun runStream(initialFrontier: FrontierDto): Boolean {
+            val queueToken = tokens.getQueueToken(eventId) ?: return false
+            val params =
+                QueueStreamParams(
+                    api = queueApiService.api,
+                    eventId = eventId,
+                    queueToken = queueToken,
+                    deviceToken = tokens.getDeviceToken(),
+                    lastEventId = lastEventId,
+                    json = json,
+                )
+            return when (val outcome = openQueueStream(params)) {
+                is StreamOutcome.Healthy -> consumeStream(outcome.events, initialFrontier)
+                StreamOutcome.TooFar -> {
+                    streamConnectFailures = QueuePacing.SSE_MAX_CONNECT_FAILURES
+                    false
+                }
+                is StreamOutcome.Closed -> handleStreamClosed(outcome.code, initialFrontier)
+                is StreamOutcome.StreamFull -> {
+                    val retryAfter =
+                        outcome.retryAfterSeconds?.times(1000L) ?: QueuePacing.SSE_RETRY_DELAY_MILLIS
+                    nextStreamRetryAt = pacing.nowMillis() + retryAfter
+                    false
+                }
+                StreamOutcome.Unauthorized -> {
+                    streamConnectFailures++
+                    false
+                }
+                is StreamOutcome.Failed -> {
+                    streamConnectFailures++
+                    if (streamConnectFailures >= QueuePacing.SSE_MAX_CONNECT_FAILURES) {
+                        nextStreamRetryAt = pacing.nowMillis() + QueuePacing.SSE_RETRY_DELAY_MILLIS
+                    }
+                    false
+                }
+            }
+        }
+
+        @Suppress("CyclomaticComplexMethod", "ThrowsCount", "ReturnCount", "UnusedParameter")
+        private suspend fun consumeStream(
+            events: Flow<QueueStreamEvent>,
+            @Suppress("UNUSED_PARAMETER") initialFrontier: FrontierDto,
+        ): Boolean {
+            var lastActivityAt = pacing.nowMillis()
+            var firstEventReceived = false
+            var finished = false
+            try {
+                withTimeout(QueuePacing.SSE_FIRST_EVENT_TIMEOUT_MILLIS) {
+                    events.collect { event ->
+                        if (!firstEventReceived) {
+                            firstEventReceived = true
+                            streamConnectFailures = 0
+                        }
+                        lastActivityAt = pacing.nowMillis()
+                        finished = handleStreamEvent(event)
+                        if (finished) throw StreamFinished
+                        val pos = position
+                        val sf = streamFrom ?: 0
+                        if (pos != null && pos > sf) throw FallbackToPolling
+                        if (pacing.nowMillis() - lastActivityAt > QueuePacing.SSE_SILENCE_TIMEOUT_MILLIS) {
+                            throw SilenceTimeout
+                        }
+                    }
+                }
+            } catch (_: StreamFinished) {
+                return true
+            } catch (_: FallbackToPolling) {
+                return false
+            } catch (_: SilenceTimeout) {
+                onStreamFailure()
+                return false
+            } catch (_: TimeoutCancellationException) {
+                onStreamFailure()
+                return false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                nextStreamRetryAt = pacing.nowMillis() + serverRetryMillis
+                return false
+            }
+            return finished
+        }
+
+        private suspend fun handleStreamEvent(event: QueueStreamEvent): Boolean =
+            when (event) {
+                is QueueStreamEvent.Frontier -> {
+                    lastEventId = event.dto.ts?.toString()
+                    event.dto.streamFrom?.let { streamFrom = it }
+                    handleStreamFrontier(event.dto)
+                }
+                is QueueStreamEvent.Turn -> handleStreamTurn(event.dto)
+                QueueStreamEvent.Heartbeat -> false
+            }
+
+        private fun onStreamFailure() {
+            streamConnectFailures++
+            if (streamConnectFailures >= QueuePacing.SSE_MAX_CONNECT_FAILURES) {
+                nextStreamRetryAt = pacing.nowMillis() + QueuePacing.SSE_RETRY_DELAY_MILLIS
+            }
+        }
+
+        private suspend fun handleStreamFrontier(frontier: FrontierDto): Boolean {
+            lastFrontier = frontier
+            return step(frontier)
+        }
+
+        private suspend fun handleStreamTurn(turn: QueueTurnDto): Boolean {
+            val frontier = lastFrontier ?: return false
+            val turnExpiresAt =
+                turn.turnExpiresAt?.let(::parseRfc3339Millis) ?: (serverNow(frontier) + TURN_WINDOW_MILLIS)
+            val turnPlace =
+                place(QueueState.Turn, frontier).copy(turnExpiresAtEpochMillis = turnExpiresAt)
+            out.emit(turnPlace)
+            return claim(frontier)
+        }
+
+        private suspend fun handleStreamClosed(
+            code: ErrorCode,
+            frontier: FrontierDto,
+        ): Boolean {
+            return when (code) {
+                ErrorCode.QUEUE_CLOSED -> end(QueueState.Closed, frontier)
+                ErrorCode.MISSED, ErrorCode.EXPIRED -> end(QueueState.Missed, frontier)
+                else -> end(QueueState.Closed, frontier)
             }
         }
 
@@ -274,6 +436,12 @@ class RealQueueRepository(
                 .copy(opensAtEpochMillis = opensAt, opensAtLabel = label.orEmpty(), ratePerMinute = null)
         }
     }
+
+    private object StreamFinished : Throwable()
+
+    private object FallbackToPolling : Throwable()
+
+    private object SilenceTimeout : Throwable()
 
     private companion object {
         const val TURN_WINDOW_MILLIS = 60_000L

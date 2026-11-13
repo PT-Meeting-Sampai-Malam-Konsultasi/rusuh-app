@@ -461,7 +461,7 @@ class RealQueueRepositoryTest {
             var waitWasCancelled = false
             val queue =
                 RealQueueRepository(
-                    queueApi = QueueApiService(h.backend.api),
+                    queueApiService = QueueApiService(h.backend.api),
                     eventApi = EventApiService(h.backend.api),
                     devices = h.devices,
                     tokens = h.tokens,
