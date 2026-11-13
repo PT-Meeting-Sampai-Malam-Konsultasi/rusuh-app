@@ -1,8 +1,10 @@
 package com.rusuh.app.data.repository
 
 import com.rusuh.app.data.cache.QueueCache
+import com.rusuh.app.data.clock.parseStringDateMillis
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.LocaleProvider
+import com.rusuh.app.data.remote.BookingApiService
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.QueueApiService
 import com.rusuh.app.data.remote.dto.EventDto
@@ -11,9 +13,11 @@ import com.rusuh.app.data.remote.dto.QueuePlaceDto
 import com.rusuh.app.data.remote.mapper.QueueWire
 import com.rusuh.app.data.remote.mapper.toDateVenueLine
 import com.rusuh.app.data.storage.TokenStore
+import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.MyQueue
 import com.rusuh.app.domain.model.MyQueuePhase
+import com.rusuh.app.domain.model.OrderInProgress
 import com.rusuh.app.domain.repository.MyQueuesRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -31,14 +35,43 @@ import kotlinx.coroutines.sync.withPermit
  * this load (it stays stored). The load throws [DomainException] only when EVERY entry failed with an error other than
  * a 404, so one bad entry never blanks the tab.
  */
+@Suppress("LongParameterList")
 class MyQueuesRepositoryImpl(
     private val queueApi: QueueApiService,
     private val eventApi: EventApiService,
     private val tokens: TokenStore,
     private val cache: QueueCache,
     private val localeProvider: LocaleProvider,
+    private val bookingApi: BookingApiService,
+    private val serverClock: ServerClock,
     private val maxParallel: Int = DEFAULT_PARALLEL,
 ) : MyQueuesRepository {
+    override suspend fun getOrdersInProgress(): List<OrderInProgress> {
+        val orders = mutableListOf<OrderInProgress>()
+        val response = bookingApi.getActiveBookings()
+        val active = (response as? ApiResult.Success)?.data
+        val serverNow =
+            active?.serverNow?.let(::parseStringDateMillis)
+                ?: active?.items?.firstNotNullOfOrNull { parseStringDateMillis(it.serverNow) }
+                ?: serverClock.nowMillis().takeIf { serverClock.isSynced }
+        val admission = cache.getAdmission()
+        if (admission != null && admission.expiresAtEpochMillis != null) {
+            val remaining = serverNow?.let { admission.expiresAtEpochMillis - it }
+            if (remaining == null || remaining > 0) {
+                orders += OrderInProgress(admission.eventId, remainingMillis = remaining)
+            }
+        }
+        if (active != null) {
+            active.items.filter { it.status.equals("HELD", ignoreCase = true) }.forEach { booking ->
+                val expiresAt = booking.expiresAt?.let(::parseStringDateMillis) ?: return@forEach
+                val now = parseStringDateMillis(booking.serverNow) ?: serverNow ?: return@forEach
+                val remaining = expiresAt - now
+                if (remaining > 0) orders += OrderInProgress(booking.eventId, booking.bookingId, remaining)
+            }
+        }
+        return orders
+    }
+
     /** What happened to one entry. */
     private sealed interface Entry {
         data class Item(val queue: MyQueue) : Entry

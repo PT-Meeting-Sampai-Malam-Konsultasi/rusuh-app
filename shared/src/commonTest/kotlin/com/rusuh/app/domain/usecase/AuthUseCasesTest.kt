@@ -4,6 +4,7 @@ import com.rusuh.app.data.cache.AuthCache
 import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.domain.model.UserLocale
+import com.rusuh.app.feature.auth.FakeAccountEmails
 import com.rusuh.app.feature.auth.FakeAuthRepository
 import com.rusuh.app.feature.auth.FakeDisplayNames
 import com.rusuh.app.feature.auth.TEST_EMAIL
@@ -36,7 +37,7 @@ class AuthUseCasesTest {
     fun verifyOtpPassesTheRepositoryAnswerThroughWhenNothingSignedOut() =
         runTest {
             val repository = FakeAuthRepository()
-            val outcome = VerifyOtpUseCase(repository, AuthGeneration())("ch_1", "123456")
+            val outcome = VerifyOtpUseCase(repository, AuthGeneration(), FakeAccountEmails())("ch_1", "123456")
 
             assertEquals(VerifyOtpOutcome.Completed(DomainResult.Success(session())), outcome)
             assertEquals(0, repository.logouts)
@@ -52,7 +53,7 @@ class AuthUseCasesTest {
                 gate.await()
                 DomainResult.Success(session())
             }
-            val outcome = async { VerifyOtpUseCase(repository, generation)("ch_1", "123456") }
+            val outcome = async { VerifyOtpUseCase(repository, generation, FakeAccountEmails())("ch_1", "123456") }
             runCurrent()
 
             generation.bump()
@@ -72,7 +73,7 @@ class AuthUseCasesTest {
                 gate.await()
                 DomainResult.NetworkError
             }
-            val outcome = async { VerifyOtpUseCase(repository, generation)("ch_1", "123456") }
+            val outcome = async { VerifyOtpUseCase(repository, generation, FakeAccountEmails())("ch_1", "123456") }
             runCurrent()
             generation.bump()
             gate.complete(Unit)
@@ -88,7 +89,7 @@ class AuthUseCasesTest {
             val generation = AuthGeneration()
             val names = FakeDisplayNames().also { it.set(TEST_USER.userId, "Sari Wulandari") }
 
-            val result = SignOutUseCase(repository, generation, names)()
+            val result = SignOutUseCase(repository, generation, names, FakeAccountEmails())()
 
             assertEquals(DomainResult.Success(Unit), result)
             assertEquals(1, generation.current())
@@ -112,7 +113,7 @@ class AuthUseCasesTest {
                     override suspend fun clear() = error("storage failed")
                 }
 
-            SignOutUseCase(repository, AuthGeneration(), failing)()
+            SignOutUseCase(repository, AuthGeneration(), failing, FakeAccountEmails())()
 
             assertEquals(1, repository.logouts)
         }
@@ -165,5 +166,30 @@ class AuthUseCasesTest {
 
             assertNull(cache.get("usr_1"))
             assertEquals(emptySet(), prefs.entries.keys)
+        }
+}
+
+class AccountEmailUseCasesTest {
+    @Test
+    fun aVerifiedSignInSavesTheAccountEmail() =
+        runTest {
+            val repository = FakeAuthRepository()
+            val emails = FakeAccountEmails()
+
+            VerifyOtpUseCase(repository, AuthGeneration(), emails)("ch_1", "123456")
+
+            assertEquals(TEST_EMAIL, emails.stored)
+            assertEquals(TEST_USER.userId, emails.userId)
+        }
+
+    @Test
+    fun signOutClearsTheSavedEmail() =
+        runTest {
+            val emails = FakeAccountEmails().apply { stored = TEST_EMAIL }
+
+            SignOutUseCase(FakeAuthRepository(), AuthGeneration(), FakeDisplayNames(), emails)()
+
+            assertEquals(1, emails.clears)
+            assertEquals(null, emails.stored)
         }
 }

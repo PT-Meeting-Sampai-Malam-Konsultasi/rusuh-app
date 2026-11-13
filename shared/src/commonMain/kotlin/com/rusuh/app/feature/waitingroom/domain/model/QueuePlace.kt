@@ -61,6 +61,7 @@ data class QueuePlace(
     val state: QueueState,
     val seq: Int,
     val served: Int,
+    val servedAtJoin: Int? = null,
     val serverNowEpochMillis: Long,
     val opensAtEpochMillis: Long? = null,
     val opensAtLabel: String = "",

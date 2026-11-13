@@ -77,7 +77,7 @@ KoinIosKt.doInitKoin(
 
 The iOS workflow (`ios-build.yml`) builds both schemes:
 
-1. **Staging**: archived via Fastlane (`build_unsigned` lane), uploaded as artifact
+1. **Staging**: archived via Fastlane (`build_unsigned` lane), uploaded as artifact on pushes to main and release/** only
 2. **Production**: simulator build via Fastlane (`build_production_simulator` lane) for verification
 
 ## Comparison with Android

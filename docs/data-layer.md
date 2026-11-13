@@ -186,6 +186,14 @@ In tests, resolve clients on a mock engine by overriding the `HttpClient`, see `
 
 ### Live API (staging) notes
 
+### Resuming an order from My Queues
+
+My Queues reads `QueueCache` admission facts and `GET /core/bookings/active` together with queue entries. Only an
+unexpired stored admission or a HELD booking is exposed as resumable. The admission token remains in `TokenStore`;
+attendee names and NIKs are never cached. Continue booking calls the idempotent queue claim again only for the stored
+event, refreshing its token before opening Detail. Continue payment opens the existing Payment route by booking ID.
+The UI counts down from server-provided expiry and server time; it drops expired resume rows locally.
+
 All services share `https://api.rusuh-tiket.web.id/v1`: core routes use `/core/...` (public event list and detail;
 categories, tickets and bookings require auth), auth uses `/auth/...`, and queue uses `/queue/...`. Verified live
 queue routes include `/queue/devices` and `/queue/{eventId}/join|me|frontier|claim|stream`; queue currently returns
@@ -240,15 +248,20 @@ Release builds always use `Production` + `Real` over HTTPS.
 - Queue polling resilience: a transient failure inside the wait (network, 408, 429, 5xx) is retried with capped
   exponential backoff (2, 4, 8, 16, 30 s, `QueuePacing.backoffMillis`) that honours `Retry-After` (capped at 2 min); the
   flow fails after 5 failures in a row, or at once on a failure waiting cannot fix (401/403/404). Any success resets the
-  count. The claim retries inside its 60 s window on the monotonic clock; a wait that would pass the window is cut to it
-  and one last attempt follows before the place counts as missed. A claim 401 with problem code `UNAUTHORIZED` is
+  count. When the frontier reaches a place, the flow emits `Turn` with the server `turnExpiresAt` and keeps polling;
+  it never claims automatically. A user press calls `QueueRepository.claim`, which retries `NOT_YET` and `FULL` inside
+  the remaining 60 s window on the monotonic clock. Transient offline failures retry until the deadline, followed by
+  one final claim attempt. A claim 401 with problem code `UNAUTHORIZED` is
   "sign in required" (`SignInRequiredException`, `WaitingRoomErrorKind.SignInRequired`; `TODO(AUTH-00 #77)`), any other
   401 registers the device again once. After the pre-sale draw the number comes from `/me`: 410 ends the run, a 404 or a
   missing `seq` means "not drawn yet" (asked again at the next poll), and the random 0-30 s wait happens once.
 - Claimed admission: the token goes to the `TokenStore`; its non-secret details (`slotId`, `maxTickets`, `expiresAt`)
   go to `QueueCache` as `AdmissionInfo` for the Detail screen. The Waiting Room keeps its own 60 s YourTurn countdown
-  (the admission's longer order window is Detail's business), so the turn is not re-emitted after the claim. Leaving
+  (the admission's longer order window is Detail's business). Leaving
   the queue clears the queue token and, when it belongs to that event, the admission token and details.
+- Waiting Room progress: the join response's `served` value is cached per event and exposed as `servedAtJoin`; if absent,
+  the first frontier supplies it. Waiting renders the served share as a solid blue track fill, clamped between empty
+  and full. Paused keeps the track hidden.
 - Server time: `ServerClock.isSynced` is false until the first response carrying `serverNow`; then the clock counts from
   an arbitrary start. Unsynced, the queue uses the frontier's own `ts`, Home shows no countdown, and the device-token
   expiry is judged against the device wall clock with a one day margin (`wallClockMillis`, used for nothing else).

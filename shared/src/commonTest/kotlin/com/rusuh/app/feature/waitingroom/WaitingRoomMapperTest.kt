@@ -51,6 +51,16 @@ class WaitingRoomMapperTest {
     }
 
     @Test
+    fun openMapsProgressFromServedAtJoin() {
+        val queue =
+            assertIs<WaitingRoomPhase.Waiting>(
+                place(QueueState.Open, seq = 100, served = 50) { it.copy(servedAtJoin = 10) }.toPhase(),
+            ).queue
+        assertEquals(40f / 90f, queue.progress?.fraction)
+        assertEquals(50, queue.progress?.nowServing)
+    }
+
+    @Test
     fun openWithoutRateHasNoEta() {
         val queue = assertIs<WaitingRoomPhase.Waiting>(place(QueueState.Open).toPhase()).queue
         assertEquals(null, queue.estimatedWaitMinutes)

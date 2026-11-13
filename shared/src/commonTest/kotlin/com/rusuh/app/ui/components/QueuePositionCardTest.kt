@@ -35,7 +35,7 @@ class QueuePositionCardTest {
         assertEquals(0.5f, QueueProgressUi(servedAtJoin = 0, nowServing = 50, myNumber = 100).fraction)
         assertEquals(0f, QueueProgressUi(servedAtJoin = 10, nowServing = 10, myNumber = 100).fraction)
         assertEquals(1f, QueueProgressUi(servedAtJoin = 10, nowServing = 100, myNumber = 100).fraction)
-        assertEquals(1f, QueueProgressUi(servedAtJoin = 100, nowServing = 100, myNumber = 100).fraction)
+        assertEquals(0f, QueueProgressUi(servedAtJoin = 100, nowServing = 100, myNumber = 100).fraction)
     }
 
     @Test

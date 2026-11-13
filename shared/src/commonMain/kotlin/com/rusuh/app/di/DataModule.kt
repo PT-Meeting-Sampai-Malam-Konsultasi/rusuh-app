@@ -129,7 +129,7 @@ fun liveDataModule(
         single<HomeRepository> { HomeRepositoryImpl(get(), get(), get()) }
         single<QueueRepository> { QueueRepositoryImpl(get(), get(), get(), get(), get(), get(), get()) }
         single<WaitingRoomRepository> { get<QueueRepository>() }
-        single<MyQueuesRepository> { MyQueuesRepositoryImpl(get(), get(), get(), get(), get()) }
+        single<MyQueuesRepository> { MyQueuesRepositoryImpl(get(), get(), get(), get(), get(), get(), get()) }
         single<AuthRepository> {
             AuthRepositoryImpl(
                 api = get(),
@@ -139,7 +139,7 @@ fun liveDataModule(
             )
         }
         single<TicketsRepository> { TicketsRepositoryImpl(get(), get(), get(), get()) }
-        single<DetailRepository> { DetailRepositoryImpl(get(), get()) }
+        single<DetailRepository> { DetailRepositoryImpl(get(), get(), get(), get(), get()) }
         single<PaymentRepository> {
             stubOrFail("PaymentRepository", allowStubFallback, warn) {
                 StubPaymentRepository(StubClock.ticking())

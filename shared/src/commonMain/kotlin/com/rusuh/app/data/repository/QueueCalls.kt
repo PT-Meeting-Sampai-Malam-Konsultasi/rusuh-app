@@ -81,6 +81,7 @@ internal class QueueCalls(
         if (joined.state != QueueWire.CLOSED && joined.queueToken.isNotBlank()) {
             tokens.setQueueToken(eventId, joined.queueToken)
             cache.addJoinedEvent(eventId)
+            joined.served?.let { cache.setServedAtJoin(eventId, it) }
         }
         return joined
     }
