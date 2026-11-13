@@ -101,7 +101,7 @@
     <string name="waiting_note_safe_title">Posisi Anda aman</string>
     <string name="waiting_note_safe_body">Refresh atau tutup halaman, nomor Anda tetap sama.</string>
     <string name="waiting_note_turn_title">60 detik untuk masuk</string>
-    <string name="waiting_note_turn_body">Saat giliran tiba, tekan tombol untuk masuk ke pemilihan tiket.</string>
+    <string name="waiting_note_turn_body">Saat giliran tiba, kami masukkan Anda otomatis di akhir 60 detik selama layar ini terbuka, atau tekan tombol untuk masuk lebih awal.</string>
     <string name="waiting_note_nowait_title">Tidak menunggu sia-sia</string>
     <string name="waiting_note_nowait_body">Kalau tiket habis, antrian langsung ditutup dan Anda diberi tahu.</string>
     <string name="waiting_note_app">Di aplikasi, kami kirim notifikasi saat giliran Anda dekat.</string>

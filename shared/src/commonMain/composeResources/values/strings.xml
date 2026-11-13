@@ -101,7 +101,7 @@
     <string name="waiting_note_safe_title">Your place is safe</string>
     <string name="waiting_note_safe_body">Refresh or close the page — your number stays the same.</string>
     <string name="waiting_note_turn_title">60 seconds to enter</string>
-    <string name="waiting_note_turn_body">When it's your turn, press the button to enter ticket selection.</string>
+    <string name="waiting_note_turn_body">When it's your turn, we move you in automatically at the end of the 60 seconds while this screen is open, or press the button to enter sooner.</string>
     <string name="waiting_note_nowait_title">No waiting for nothing</string>
     <string name="waiting_note_nowait_body">If tickets sell out, the queue closes at once and we tell you.</string>
     <string name="waiting_note_app">In the app, we notify you when your turn is close.</string>
