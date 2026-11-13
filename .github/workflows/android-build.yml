@@ -2,13 +2,6 @@ name: Android Build
 on:
   push: { branches: [main] }
   pull_request: { branches: [main] }
-  workflow_dispatch:
-    inputs:
-      flavor:
-        description: 'Flavor to distribute to Firebase: staging (live staging API) or production (production API)'
-        type: choice
-        options: [staging, production]
-        default: staging
 concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
@@ -37,84 +30,3 @@ jobs:
         with:
           name: app-debug-apk
           path: androidApp/build/outputs/apk/*/debug/*.apk
-
-  # Sends a build to Firebase App Distribution: the staging flavor (live staging API) on every push to main, or the
-  # staging or production flavor on manual dispatch. Never a mock or stub build. Runs on pushes to main and on manual
-  # dispatch. It does nothing until the repo secrets exist, so it can never
-  # break CI. Setup and key rotation: docs/firebase-distribution.md.
-  distribute:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      HAS_FIREBASE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' && (vars.FIREBASE_APP_ID != '' || secrets.FIREBASE_APP_ID != '') }}
-    steps:
-      - name: Skip when Firebase secrets are missing
-        if: env.HAS_FIREBASE != 'true'
-        run: echo "FIREBASE_SERVICE_ACCOUNT_JSON (secret) or FIREBASE_APP_ID (variable or secret) is not set, skipping distribution."
-      - uses: actions/checkout@v4
-        if: env.HAS_FIREBASE == 'true'
-      - uses: actions/setup-java@v4
-        if: env.HAS_FIREBASE == 'true'
-        with: { distribution: temurin, java-version: '17' }
-      - uses: gradle/actions/setup-gradle@v4
-        if: env.HAS_FIREBASE == 'true'
-      - name: Write google-services.json if available
-        if: env.HAS_FIREBASE == 'true'
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            umask 077
-            printf '%s' "$GOOGLE_SERVICES_JSON" > androidApp/google-services.json
-          fi
-      - name: Pick the flavor (staging or production only)
-        if: env.HAS_FIREBASE == 'true'
-        env:
-          FLAVOR_INPUT: ${{ github.event.inputs.flavor }}
-        run: |
-          FLAVOR="${FLAVOR_INPUT:-staging}"
-          case "$FLAVOR" in
-            staging) echo "GRADLE_FLAVOR_ARGS=-PmockApi=false" >> "$GITHUB_ENV"; echo "FLAVOR_LABEL=Staging" >> "$GITHUB_ENV"; echo "FLAVOR_TASK=Staging" >> "$GITHUB_ENV" ;;
-            production) echo "GRADLE_FLAVOR_ARGS=" >> "$GITHUB_ENV"; echo "FLAVOR_LABEL=Production" >> "$GITHUB_ENV"; echo "FLAVOR_TASK=Production" >> "$GITHUB_ENV" ;;
-            *) echo "Only the staging and production flavors can be distributed, got '$FLAVOR'." >&2; exit 1 ;;
-          esac
-          echo "FLAVOR=$FLAVOR" >> "$GITHUB_ENV"
-      - name: Build the APK (debug)
-        if: env.HAS_FIREBASE == 'true'
-        run: ./gradlew :androidApp:assemble${FLAVOR_TASK}Debug $GRADLE_FLAVOR_ARGS -PversionCode=${{ github.run_number }} --stacktrace
-      - name: Guard, no mock or stub build goes to Firebase
-        if: env.HAS_FIREBASE == 'true'
-        run: |
-          CFG="$(find androidApp/build/generated -path "*/${FLAVOR}/debug/*" -name BuildConfig.java | head -n 1)"
-          test -n "$CFG" || { echo "BuildConfig for ${FLAVOR} debug not found." >&2; exit 1; }
-          grep -E "ENVIRONMENT = \"${FLAVOR_LABEL}\"" "$CFG" >/dev/null || { echo "ENVIRONMENT is not ${FLAVOR_LABEL}." >&2; exit 1; }
-          if grep -E 'MOCK_API_OVERRIDE = "true"' "$CFG" >/dev/null; then echo "Mock API build must not be distributed." >&2; exit 1; fi
-          if grep -E 'BACKEND_MODE = "Stub"' "$CFG" >/dev/null; then echo "Stub backend build must not be distributed." >&2; exit 1; fi
-          echo "OK: ${FLAVOR_LABEL} build, no mock, no stub."
-      - name: Upload to Firebase App Distribution
-        if: env.HAS_FIREBASE == 'true'
-        env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-          FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID || secrets.FIREBASE_APP_ID }}
-          FIREBASE_GROUPS: ${{ vars.FIREBASE_TESTER_GROUPS || 'rusuh-devs' }}
-          MERGE_FROM: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          FIREBASE_APP_ID="$(printf '%s' "$FIREBASE_APP_ID" | tr -d '[:space:]')"
-          CREDS="$RUNNER_TEMP/firebase-service-account.json"
-          trap 'rm -f "$CREDS"' EXIT
-          umask 077
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$CREDS"
-          export GOOGLE_APPLICATION_CREDENTIALS="$CREDS"
-          APK="$(ls androidApp/build/outputs/apk/${FLAVOR}/debug/*.apk | head -n 1)"
-          SUBJECT="$(git log -1 --pretty=%s)"
-          case "$SUBJECT" in
-            "Merge pull request"*) SUBJECT="$(git log -1 --pretty=%b | sed -n '/./{p;q;}')" ;;
-          esac
-          COMMIT_LINE="${SUBJECT:-$(git log -1 --pretty=%s)} ($(git log -1 --pretty=%h))"
-          NOTES="$(printf '[%s] merge from: %s\nlast commit: %s' "$FLAVOR_LABEL" "$MERGE_FROM" "$COMMIT_LINE")"
-          npx --yes firebase-tools@13 appdistribution:distribute "$APK" \
-            --app "$FIREBASE_APP_ID" \
-            --groups "$FIREBASE_GROUPS" \
-            --release-notes "$NOTES"
