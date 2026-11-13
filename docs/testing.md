@@ -1,4 +1,18 @@
-# UI testing
+# Testing
+
+## Coverage
+
+Kover collects coverage for `:shared` and `:androidApp`. Run the tests and generate the XML report:
+
+```sh
+./gradlew :shared:allTests :androidApp:testStagingDebugUnitTest koverXmlReport
+```
+
+The report is written to `build/reports/kover/report.xml` (JaCoCo XML format). HTML is at `build/reports/kover/html/`.
+
+Current line coverage: ~47% (8106 lines covered out of 17384).
+
+SonarCloud reads the coverage from the Kover XML report during CI. The `sonar.yml` workflow runs tests, generates the report, and uploads to SonarCloud when `SONAR_TOKEN` is configured.
 
 ## Run tests
 
