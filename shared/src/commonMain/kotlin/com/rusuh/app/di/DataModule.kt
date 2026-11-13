@@ -100,7 +100,7 @@ fun dataModule(
         // Auth is served by the core (api) host, like the refresh call of the session layer.
         single { AuthApiService(get(ApiClientQualifier.Api)) }
         // Booking API (categories, attendee validation, booking create/get/cancel).
-        single { BookingApiService(get(ApiClientQualifier.Api)) }
+        single { BookingApiService(get(ApiClientQualifier.Api), get()) }
         // Auth state layer (both modes): the sign-out counter and the read-only session view the screens use.
         single { AuthGeneration() }
         single<SessionObserver> { SessionManagerObserver(get(), get()) }
@@ -152,7 +152,7 @@ fun dataModule(
                     )
                 }
                 single<TicketsRepository> { notYetReal("TicketsRepository") { StubTicketsRepository() } }
-                single<DetailRepository> { RealDetailRepository(get()) }
+                single<DetailRepository> { RealDetailRepository(get(), get()) }
             }
         }
     }
