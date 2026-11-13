@@ -3,6 +3,7 @@
 package com.rusuh.app.feature.detail
 
 import androidx.compose.runtime.Immutable
+import com.rusuh.app.domain.model.AttendeeValidation
 import com.rusuh.app.domain.model.NikRules
 import com.rusuh.app.domain.model.isValid
 import com.rusuh.app.domain.model.validateAttendeeLocally
@@ -119,6 +120,9 @@ sealed interface DetailIntent : MviIntent {
 
     data class AttendeeNikChanged(val index: Int, val nik: String) : DetailIntent
 
+    /** Retry failed validation for an attendee. */
+    data class RetryValidation(val index: Int) : DetailIntent
+
     /** The countdown ticked: recompute remaining time from the server clock. */
     data object Tick : DetailIntent
 }
@@ -128,6 +132,7 @@ sealed interface DetailIntent : MviIntent {
  *
  * @param id stable ticket identity, unique within the order; UI state is keyed by it.
  * @param categoryId the category this ticket belongs to; the booking pairs the holder with it.
+ * @param validationStatus inline validation status for this attendee's NIK/name.
  */
 @Immutable
 data class AttendeeForm(
@@ -135,7 +140,42 @@ data class AttendeeForm(
     val categoryId: String = "",
     val name: String = "",
     val nik: String = "",
+    val validationStatus: AttendeeValidationStatus = AttendeeValidationStatus.None,
 )
+
+/** Inline validation status shown under each attendee field. */
+sealed interface AttendeeValidationStatus {
+    /** No validation attempt yet (field empty or being typed). */
+    data object None : AttendeeValidationStatus
+
+    /** Server validation in progress. */
+    data object Checking : AttendeeValidationStatus
+
+    /** Server validation passed. Token is stored separately in the ViewModel. */
+    data object Valid : AttendeeValidationStatus
+
+    /** Server rejected the NIK (invalid format, seat taken, or duplicate). */
+    data class Rejected(val reason: RejectedReason) : AttendeeValidationStatus
+
+    /** Server call failed (network/503); user can retry. */
+    data object Unavailable : AttendeeValidationStatus
+}
+
+/** Reason why the server rejected an attendee's NIK. */
+enum class RejectedReason {
+    NIK_INVALID,
+    SEAT_TAKEN,
+    DUPLICATE,
+}
+
+/** Maps server validation result to the UI rejection reason. */
+internal fun AttendeeValidation.toRejectedReason(): RejectedReason? =
+    when (this) {
+        is AttendeeValidation.NikInvalid -> RejectedReason.NIK_INVALID
+        is AttendeeValidation.NikSeatTaken -> RejectedReason.SEAT_TAKEN
+        is AttendeeValidation.ServerDuplicateNik -> RejectedReason.DUPLICATE
+        else -> null
+    }
 
 /**
  * Form state: quantities per category plus one [AttendeeForm] per ticket. "Tiket N" is the
@@ -200,13 +240,22 @@ internal fun DetailFormState.withQuantity(
 internal fun DetailFormState.withName(
     index: Int,
     name: String,
-): DetailFormState = updateAttendee(index) { it.copy(name = name) }
+): DetailFormState = updateAttendee(index) { it.copy(name = name, validationStatus = AttendeeValidationStatus.None) }
 
-/** Keeps digits only, capped at [NIK_LENGTH]. */
+/** Keeps digits only, capped at [NIK_LENGTH]. Resets validation status. */
 internal fun DetailFormState.withNik(
     index: Int,
     raw: String,
-): DetailFormState = updateAttendee(index) { it.copy(nik = raw.filter(::isAsciiDigit).take(NIK_LENGTH)) }
+): DetailFormState =
+    updateAttendee(index) {
+        it.copy(nik = raw.filter(::isAsciiDigit).take(NIK_LENGTH), validationStatus = AttendeeValidationStatus.None)
+    }
+
+/** Updates the validation status of an attendee without touching name/nik. */
+internal fun DetailFormState.withValidationStatus(
+    index: Int,
+    status: AttendeeValidationStatus,
+): DetailFormState = updateAttendee(index) { it.copy(validationStatus = status) }
 
 private fun DetailFormState.updateAttendee(
     index: Int,
@@ -230,7 +279,7 @@ internal fun DetailFormState.duplicateOf(index: Int): Int? {
 
 /**
  * Whether "Lanjut bayar" is enabled: 1..cap tickets, no selected category sold out, every attendee
- * named, NIK valid and unique.
+ * named, NIK valid and unique, and either already validated by the server or currently checking.
  */
 internal fun canProceed(
     form: DetailFormState,
@@ -242,7 +291,11 @@ internal fun canProceed(
         form.attendees.size == form.totalTickets &&
         form.attendees.indices.all { i ->
             val a = form.attendees[i]
-            validateAttendeeLocally(a.name, a.nik, form.attendees.take(i).map { it.nik }).isValid
+            val locallyValid = validateAttendeeLocally(a.name, a.nik, form.attendees.take(i).map { it.nik }).isValid
+            val serverOk =
+                a.validationStatus is AttendeeValidationStatus.Valid ||
+                    a.validationStatus is AttendeeValidationStatus.Checking
+            locallyValid && serverOk
         }
 
 /** Running subtotal of selected categories in whole rupiah. */

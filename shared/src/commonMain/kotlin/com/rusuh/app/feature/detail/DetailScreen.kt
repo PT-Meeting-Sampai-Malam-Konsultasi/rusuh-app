@@ -275,9 +275,11 @@ private fun DetailContentBody(
                         categoryName = detail.categories.firstOrNull { it.id == attendee.categoryId }?.name.orEmpty(),
                         attendee = attendee,
                         duplicateOf = form.duplicateOf(index),
+                        validationStatus = attendee.validationStatus,
                         isLast = index == form.attendees.lastIndex,
                         onNameChange = { dispatch(DetailIntent.AttendeeNameChanged(index, it)) },
                         onNikChange = { dispatch(DetailIntent.AttendeeNikChanged(index, it)) },
+                        onRetryValidation = { dispatch(DetailIntent.RetryValidation(index)) },
                     )
                 }
             }

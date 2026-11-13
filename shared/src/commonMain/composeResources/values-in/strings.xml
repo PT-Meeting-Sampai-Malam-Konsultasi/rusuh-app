@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Indonesian translation (values-in folder for Android resource resolution).
-  Android's Locale.getLanguage() returns "in" (legacy ISO 639-1 code) for Indonesian, so CMP Resources
-  looks for values-in/. Keep this file IDENTICAL to values-id/strings.xml;
+  Indonesian translation (values-id folder for iOS resource resolution).
+  iOS's NSLocale.languageCode returns "id" for Indonesian, so CMP Resources
+  looks for values-id/. Keep this file IDENTICAL to values-in/strings.xml;
   a unit test (LanguageStringParityTest) fails if they drift.
   EN base is in values/strings.xml. Keep keys in sync with the EN base.
 -->
@@ -412,6 +412,15 @@
     <!-- HTTP status class fallbacks (when no specific ErrorCode is available). -->
     <string name="error_http_client">Permintaan tidak bisa diproses. Periksa datanya lalu coba lagi.</string>
     <string name="error_http_server">Terjadi kesalahan di sistem kami. Coba lagi sebentar.</string>
+
+    <!-- Detail inline NIK validation status -->
+    <string name="detail_validation_checking">Memeriksa NIK…</string>
+    <string name="detail_validation_valid">NIK terverifikasi</string>
+    <string name="detail_validation_nik_invalid">NIK tidak valid. Periksa 16 digit.</string>
+    <string name="detail_validation_seat_taken">NIK ini sudah memiliki tiket maksimum untuk acara ini.</string>
+    <string name="detail_validation_duplicate">NIK ini sudah dipakai tiket lain di pesanan ini.</string>
+    <string name="detail_validation_unavailable">Verifikasi tidak tersedia.</string>
+    <string name="detail_validation_retry">Coba lagi</string>
 
     <!-- Payment screen -->
     <string name="payment_title">Pembayaran</string>

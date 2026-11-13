@@ -417,6 +417,15 @@
     <string name="error_http_client">The request couldn't be processed. Check the details and try again.</string>
     <string name="error_http_server">Something went wrong on our end. Try again in a moment.</string>
 
+    <!-- Detail inline NIK validation status -->
+    <string name="detail_validation_checking">Checking NIK…</string>
+    <string name="detail_validation_valid">NIK verified</string>
+    <string name="detail_validation_nik_invalid">NIK not valid. Check the 16 digits.</string>
+    <string name="detail_validation_seat_taken">This NIK already has the maximum tickets for this event.</string>
+    <string name="detail_validation_duplicate">This NIK is already used by another ticket in this order.</string>
+    <string name="detail_validation_unavailable">Verification unavailable.</string>
+    <string name="detail_validation_retry">Retry</string>
+
     <!-- Payment screen -->
     <string name="payment_title">Payment</string>
     <string name="payment_loading">Verifying your order…</string>

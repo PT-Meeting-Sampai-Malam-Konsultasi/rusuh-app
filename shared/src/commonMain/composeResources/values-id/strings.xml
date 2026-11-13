@@ -413,6 +413,15 @@
     <string name="error_http_client">Permintaan tidak bisa diproses. Periksa datanya lalu coba lagi.</string>
     <string name="error_http_server">Terjadi kesalahan di sistem kami. Coba lagi sebentar.</string>
 
+    <!-- Detail inline NIK validation status -->
+    <string name="detail_validation_checking">Memeriksa NIK…</string>
+    <string name="detail_validation_valid">NIK terverifikasi</string>
+    <string name="detail_validation_nik_invalid">NIK tidak valid. Periksa 16 digit.</string>
+    <string name="detail_validation_seat_taken">NIK ini sudah memiliki tiket maksimum untuk acara ini.</string>
+    <string name="detail_validation_duplicate">NIK ini sudah dipakai tiket lain di pesanan ini.</string>
+    <string name="detail_validation_unavailable">Verifikasi tidak tersedia.</string>
+    <string name="detail_validation_retry">Coba lagi</string>
+
     <!-- Payment screen -->
     <string name="payment_title">Pembayaran</string>
     <string name="payment_loading">Memverifikasi pesanan Anda…</string>

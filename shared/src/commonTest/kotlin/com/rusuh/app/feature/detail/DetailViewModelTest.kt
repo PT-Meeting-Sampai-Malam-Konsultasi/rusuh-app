@@ -22,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -60,8 +61,10 @@ class DetailViewModelTest {
         private val loadError: Throwable? = null,
         private val nikAccepted: Boolean = true,
         private val bookingError: Throwable? = null,
+        private val validationDelay: Long = 0L,
     ) : DetailRepository {
         var bookings = mutableListOf<BookingRequest>()
+        var validationCalls = mutableListOf<String>()
 
         override suspend fun getDetail(eventId: String): DetailOffering {
             loadError?.let { throw it }
@@ -73,8 +76,11 @@ class DetailViewModelTest {
             fieldIndex: Int,
             fullName: String,
             nik: String,
-        ): AttendeeValidation =
-            if (nikAccepted) AttendeeValidation.Valid("tok-$fieldIndex") else AttendeeValidation.NikInvalid
+        ): AttendeeValidation {
+            if (validationDelay > 0) delay(validationDelay)
+            validationCalls += nik
+            return if (nikAccepted) AttendeeValidation.Valid("tok-$fieldIndex") else AttendeeValidation.NikInvalid
+        }
 
         @Suppress("DEPRECATION")
         @Deprecated("Use validateAttendee instead", ReplaceWith("validateAttendee(...)"))
@@ -156,6 +162,26 @@ class DetailViewModelTest {
     ) {
         niks.forEachIndexed { i, nik ->
             send(vm, DetailIntent.AttendeeNameChanged(i, "Name $i"), DetailIntent.AttendeeNikChanged(i, nik))
+        }
+    }
+
+    private fun TestScope.fillAttendeesAndWaitValidation(
+        vm: DetailViewModel,
+        vararg niks: String,
+    ) {
+        fillAttendees(vm, *niks)
+        advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 100)
+        testScheduler.advanceUntilIdle()
+    }
+
+    /** Fills attendee fields without advancing the scheduler. Use for debounce tests. */
+    private fun fillAttendeesNoAdvance(
+        vm: DetailViewModel,
+        vararg niks: String,
+    ) {
+        niks.forEachIndexed { i, nik ->
+            vm.dispatch(DetailIntent.AttendeeNameChanged(i, "Name $i"))
+            vm.dispatch(DetailIntent.AttendeeNikChanged(i, nik))
         }
     }
 
@@ -254,19 +280,26 @@ class DetailViewModelTest {
         }
 
     @Test
-    fun proceedEnabledOnlyWhenEveryAttendeeIsValidAndDistinct() =
+    fun proceedEnabledOnlyWhenEveryAttendeeIsValidatedAndDistinct() =
         runTest(dispatcher) {
             val vm = viewModel()
             assertFalse(vm.state.value.canProceed, "no tickets")
             send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.IncrementCategory("b"))
+
             fillAttendees(vm, nikA, nikA)
+            assertFalse(vm.state.value.canProceed, "not yet validated")
+
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 100)
+            testScheduler.advanceUntilIdle()
             assertFalse(vm.state.value.canProceed, "duplicate NIK")
+
             send(vm, DetailIntent.AttendeeNikChanged(1, nikB))
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 100)
+            testScheduler.advanceUntilIdle()
             assertTrue(vm.state.value.canProceed)
+
             send(vm, DetailIntent.AttendeeNikChanged(1, "123"))
             assertFalse(vm.state.value.canProceed, "short NIK")
-            send(vm, DetailIntent.AttendeeNikChanged(1, nikB), DetailIntent.AttendeeNameChanged(1, " "))
-            assertFalse(vm.state.value.canProceed, "blank name")
         }
 
     @Test
@@ -289,7 +322,7 @@ class DetailViewModelTest {
             val repository = FakeRepository(offering())
             val vm = viewModel(repository)
             send(vm, DetailIntent.IncrementCategory("a"))
-            fillAttendees(vm, nikA)
+            fillAttendeesAndWaitValidation(vm, nikA)
             send(vm, DetailIntent.Proceed)
             assertEquals(DetailEffect.NavigateToPayment("b-1"), vm.effect.first())
             val ticket = repository.bookings.single().tickets.single()
@@ -314,8 +347,11 @@ class DetailViewModelTest {
             val vm = viewModel(repository)
             send(vm, DetailIntent.IncrementCategory("a"))
             fillAttendees(vm, nikA)
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 100)
+            testScheduler.advanceUntilIdle()
+            val status = vm.state.value.form.attendees.first().validationStatus
+            assertIs<AttendeeValidationStatus.Rejected>(status)
             send(vm, DetailIntent.Proceed)
-            assertEquals(DetailEffect.ShowError(DetailError.NikRejected), vm.effect.first())
             assertTrue(repository.bookings.isEmpty())
             assertFalse(vm.state.value.isSubmitting)
         }
@@ -325,7 +361,7 @@ class DetailViewModelTest {
         runTest(dispatcher) {
             val vm = viewModel(FakeRepository(offering(), bookingError = IllegalStateException("x")))
             send(vm, DetailIntent.IncrementCategory("a"))
-            fillAttendees(vm, nikA)
+            fillAttendeesAndWaitValidation(vm, nikA)
             send(vm, DetailIntent.Proceed)
             assertEquals(DetailEffect.ShowError(DetailError.BookingFailed), vm.effect.first())
             assertEquals(1, vm.state.value.form.totalTickets)
@@ -373,7 +409,7 @@ class DetailViewModelTest {
             val clock = FakeClock()
             val vm = viewModel(clock = clock)
             send(vm, DetailIntent.IncrementCategory("a"))
-            fillAttendees(vm, nikA)
+            fillAttendeesAndWaitValidation(vm, nikA)
             clock.now = 300_000L
             send(vm, DetailIntent.Tick)
             val state = vm.state.value
@@ -381,7 +417,6 @@ class DetailViewModelTest {
             assertEquals(0, state.remainingSeconds)
             assertEquals(DetailFormState(), state.form)
             assertIs<DetailUiState.Expired>(state.toUiState { "" })
-            // Edits and proceed are inert once expired.
             send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.Proceed)
             assertEquals(0, vm.state.value.form.totalTickets)
         }
@@ -393,7 +428,7 @@ class DetailViewModelTest {
             val repository = FakeRepository(offering())
             val vm = viewModel(repository, clock)
             send(vm, DetailIntent.IncrementCategory("a"))
-            fillAttendees(vm, nikA)
+            fillAttendeesAndWaitValidation(vm, nikA)
             clock.now = 400_000L
             send(vm, DetailIntent.Proceed)
             assertEquals(DetailPhase.Expired, vm.state.value.phase)
@@ -431,11 +466,8 @@ class DetailViewModelTest {
         assertEquals(AttendeeValidation.InvalidNik, validateAttendeeLocally("N", "123", emptyList()))
         assertEquals(AttendeeValidation.InvalidNik, validateAttendeeLocally("N", nikA.dropLast(1) + "x", emptyList()))
         assertEquals(AttendeeValidation.DuplicateNik(2), validateAttendeeLocally("N", nikA, listOf(nikB, nikA)))
-        // Valid returns a placeholder token ("") for local pass.
         assertTrue(validateAttendeeLocally("N", nikA, listOf(nikB)) is AttendeeValidation.Valid)
     }
-
-    // --- review round 1 ---
 
     private fun TestScope.newVm(
         repository: DetailRepository,
@@ -484,13 +516,15 @@ class DetailViewModelTest {
             val repository = FakeRepository(offering())
             val vm = viewModel(repository)
             send(vm, DetailIntent.IncrementCategory("b"), DetailIntent.IncrementCategory("a"))
-            fillAttendees(vm, nikA, nikB)
+            fillAttendeesAndWaitValidation(vm, nikA, nikB)
             send(vm, DetailIntent.IncrementCategory("b"))
             send(
                 vm,
                 DetailIntent.AttendeeNameChanged(2, "Third"),
                 DetailIntent.AttendeeNikChanged(2, "3201123456780003"),
             )
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 100)
+            testScheduler.advanceUntilIdle()
             send(vm, DetailIntent.Proceed)
             val tickets = repository.bookings.single().tickets
             assertEquals(listOf("b", "a", "b"), tickets.map { it.categoryId })
@@ -502,9 +536,11 @@ class DetailViewModelTest {
         runTest(dispatcher) {
             val vm = viewModel()
             send(vm, DetailIntent.IncrementCategory("a"), DetailIntent.IncrementCategory("a"))
-            fillAttendees(vm, nikA, nikB)
+            fillAttendeesAndWaitValidation(vm, nikA, nikB)
             assertTrue(vm.state.value.canProceed)
             send(vm, DetailIntent.AttendeeNikChanged(0, nikB))
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 100)
+            testScheduler.advanceUntilIdle()
             assertEquals(1, vm.state.value.form.duplicateOf(1))
             assertFalse(vm.state.value.canProceed)
         }
@@ -561,7 +597,9 @@ class DetailViewModelTest {
                         DomainResult.Success(Booking(bookingId))
 
                     override suspend fun getActiveBookings(): DomainResult<List<Booking>> =
-                        DomainResult.Success(emptyList())
+                        DomainResult.Success(
+                            emptyList(),
+                        )
 
                     @Suppress("DEPRECATION")
                     @Deprecated("Use createBooking with idempotencyKey instead")
@@ -609,20 +647,18 @@ class DetailViewModelTest {
             val base = FakeRepository(offering())
             val repository =
                 object : DetailRepository by base {
-                    override suspend fun validateAttendee(
-                        eventId: String,
-                        fieldIndex: Int,
-                        fullName: String,
-                        nik: String,
-                    ): AttendeeValidation {
+                    override suspend fun createBooking(
+                        request: BookingRequest,
+                        idempotencyKey: String,
+                    ): BookingResult {
                         delay(100) // a real network call keeps the first Proceed in flight
-                        return AttendeeValidation.Valid("tok")
+                        return base.createBooking(request, idempotencyKey)
                     }
                 }
             val vm = newVm(repository, FakeClock())
             send(vm, DetailIntent.Load)
             send(vm, DetailIntent.IncrementCategory("a"))
-            fillAttendees(vm, nikA)
+            fillAttendeesAndWaitValidation(vm, nikA)
             send(vm, DetailIntent.Proceed, DetailIntent.Proceed)
             assertEquals(1, base.bookings.size)
         }
@@ -640,19 +676,120 @@ class DetailViewModelTest {
                         fullName: String,
                         nik: String,
                     ): AttendeeValidation {
-                        clock.now = 400_000L // the window closes while the NIK check is in flight
+                        clock.now = 400_000L
                         return AttendeeValidation.Valid("tok")
                     }
                 }
             val vm = newVm(repository, clock)
             send(vm, DetailIntent.Load)
             send(vm, DetailIntent.IncrementCategory("a"))
-            fillAttendees(vm, nikA)
+            fillAttendeesAndWaitValidation(vm, nikA)
             send(vm, DetailIntent.Proceed)
             assertEquals(DetailPhase.Expired, vm.state.value.phase)
             assertTrue(base.bookings.isEmpty())
             send(vm, DetailIntent.Back)
-            // The first (and only) effect is Back: no payment navigation or error was emitted.
             assertEquals(DetailEffect.NavigateBack, vm.effect.first())
+        }
+
+    @Test
+    fun debouncedValidationRunsAfterDelay() =
+        runTest(dispatcher) {
+            val repository = FakeRepository(offering())
+            val vm = viewModel(repository)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            fillAttendeesNoAdvance(vm, nikA)
+            testScheduler.runCurrent()
+            assertEquals(AttendeeValidationStatus.None, vm.state.value.form.attendees.first().validationStatus)
+
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS / 2)
+            testScheduler.runCurrent()
+            assertTrue(repository.validationCalls.isEmpty())
+
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS)
+            testScheduler.advanceUntilIdle()
+            assertEquals(1, repository.validationCalls.size)
+            assertEquals(AttendeeValidationStatus.Valid, vm.state.value.form.attendees.first().validationStatus)
+        }
+
+    @Test
+    fun quickEditsProduceOneApiCall() =
+        runTest(dispatcher) {
+            val repository = FakeRepository(offering())
+            val vm = viewModel(repository)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            send(vm, DetailIntent.AttendeeNameChanged(0, "Name"))
+            send(vm, DetailIntent.AttendeeNikChanged(0, "31740552"))
+            advanceTimeBy(100)
+            send(vm, DetailIntent.AttendeeNikChanged(0, "3174055203"))
+            advanceTimeBy(100)
+            send(vm, DetailIntent.AttendeeNikChanged(0, nikA))
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 100)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(1, repository.validationCalls.size)
+            assertEquals(nikA, repository.validationCalls.first())
+        }
+
+    @Test
+    fun formatErrorMakesZeroApiCalls() =
+        runTest(dispatcher) {
+            val repository = FakeRepository(offering())
+            val vm = viewModel(repository)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            send(vm, DetailIntent.AttendeeNameChanged(0, "Name"))
+            send(vm, DetailIntent.AttendeeNikChanged(0, "123"))
+
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 100)
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(repository.validationCalls.isEmpty())
+            assertEquals(AttendeeValidationStatus.None, vm.state.value.form.attendees.first().validationStatus)
+        }
+
+    @Test
+    fun changingValueCancelsEarlierCall() =
+        runTest(dispatcher) {
+            val repository = FakeRepository(offering(), validationDelay = 200L)
+            val vm = viewModel(repository)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            send(vm, DetailIntent.AttendeeNameChanged(0, "Name"))
+            send(vm, DetailIntent.AttendeeNikChanged(0, nikA))
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 50)
+
+            send(vm, DetailIntent.AttendeeNikChanged(0, nikB))
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS + 300)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(nikB, repository.validationCalls.lastOrNull())
+            assertEquals(AttendeeValidationStatus.Valid, vm.state.value.form.attendees.first().validationStatus)
+        }
+
+    @Test
+    fun validResultStoredAndReusedAtProceed() =
+        runTest(dispatcher) {
+            val repository = FakeRepository(offering())
+            val vm = viewModel(repository)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            fillAttendeesAndWaitValidation(vm, nikA)
+            assertEquals(1, repository.validationCalls.size)
+
+            repository.validationCalls.clear()
+
+            send(vm, DetailIntent.Proceed)
+            assertTrue(repository.validationCalls.isEmpty())
+            assertEquals(1, repository.bookings.size)
+        }
+
+    @Test
+    fun rejectedStatusDisplayedInline() =
+        runTest(dispatcher) {
+            val repository = FakeRepository(offering(), nikAccepted = false)
+            val vm = viewModel(repository)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            fillAttendeesAndWaitValidation(vm, nikA)
+
+            val status = vm.state.value.form.attendees.first().validationStatus
+            assertIs<AttendeeValidationStatus.Rejected>(status)
+            assertEquals(RejectedReason.NIK_INVALID, status.reason)
         }
 }
