@@ -1,5 +1,7 @@
 package com.rusuh.app.feature.eticket
 
+import com.rusuh.app.analytics.AnalyticsEvents
+import com.rusuh.app.analytics.AnalyticsTracker
 import com.rusuh.app.mvi.MviViewModel
 
 /**
@@ -11,7 +13,10 @@ class ETicketViewModel(
     private val orderId: String,
     private val getETicket: GetETicketUseCase,
     private val calendarLauncher: CalendarLauncher,
+    private val tracker: AnalyticsTracker? = null,
 ) : MviViewModel<ETicketState, ETicketIntent, ETicketEffect>(ETicketState()) {
+    private var viewTicketSent = false
+
     override suspend fun reduce(intent: ETicketIntent) {
         when (intent) {
             ETicketIntent.Load, ETicketIntent.Retry -> load()
@@ -30,13 +35,21 @@ class ETicketViewModel(
                 else -> null
             }
         setState { copy(ui = ui, order = order) }
+
+        if (order != null && !viewTicketSent) {
+            viewTicketSent = true
+            tracker?.viewTicket(orderId, order.tickets.size)
+        }
     }
 
     private suspend fun addToCalendar() {
         val order = state.value.order ?: return
         val event = order.toCalendarEvent()
         when (calendarLauncher.launch(event)) {
-            CalendarLaunchResult.Success -> sendEffect(ETicketEffect.LaunchCalendar(event))
+            CalendarLaunchResult.Success -> {
+                tracker?.ticketAddCalendar(orderId, AnalyticsEvents.VIA_DEVICE)
+                sendEffect(ETicketEffect.LaunchCalendar(event))
+            }
             CalendarLaunchResult.NoCalendarApp -> sendEffect(ETicketEffect.NoCalendarApp)
         }
     }

@@ -23,7 +23,7 @@ class AnalyticsTrackerTest {
         runTest {
             val f = fixture()
             val items = listOf(ItemData("evt_1", "Concert", "Konser", price = 350_000))
-            f.tracker.viewItemList(listOf("evt_1"), items)
+            f.tracker.viewItemList(items)
 
             assertEquals(1, f.analytics.events.size)
             val (name, params) = f.analytics.events[0]
@@ -37,7 +37,7 @@ class AnalyticsTrackerTest {
         runTest {
             val f = fixture()
             val item = ItemData("evt_1", "Concert", "Konser", price = 350_000)
-            f.tracker.selectItem("evt_1", item)
+            f.tracker.selectItem(item)
 
             assertEquals(1, f.analytics.events.size)
             val (name, params) = f.analytics.events[0]

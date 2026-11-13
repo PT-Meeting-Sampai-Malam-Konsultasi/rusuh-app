@@ -9,6 +9,7 @@ import com.rusuh.app.data.storage.AppPreferences
  * The store remembers purchased order codes to prevent duplicate purchase events (Firebase
  * does not de-duplicate on Android).
  */
+@Suppress("TooManyFunctions")
 class AnalyticsTracker(
     private val analytics: Analytics,
     private val localeProvider: LocaleProvider,
@@ -32,10 +33,7 @@ class AnalyticsTracker(
 
     private fun lang(): String = localeProvider.language().tag
 
-    fun viewItemList(
-        eventIds: List<String>,
-        items: List<ItemData>,
-    ) {
+    fun viewItemList(items: List<ItemData>) {
         analytics.log(
             AnalyticsEvents.VIEW_ITEM_LIST,
             mapOf(
@@ -46,10 +44,7 @@ class AnalyticsTracker(
         )
     }
 
-    fun selectItem(
-        eventId: String,
-        item: ItemData,
-    ) {
+    fun selectItem(item: ItemData) {
         analytics.log(
             AnalyticsEvents.SELECT_ITEM,
             mapOf(
