@@ -58,8 +58,8 @@ val appModule =
             val language = get<LocaleProvider>()
             RequestOtpUseCase(get()) { UserLocale.fromWire(language.language().tag) }
         }
-        factory { VerifyOtpUseCase(get(), get()) }
-        factory { SignOutUseCase(get(), get(), get()) }
+        factory { VerifyOtpUseCase(get(), get(), get()) }
+        factory { SignOutUseCase(get(), get(), get(), get()) }
         factory { GetProfileUseCase(get(), get()) }
         factory { SaveDisplayNameUseCase(get(), get()) }
         factory { ObserveSessionUseCase(get()) }
