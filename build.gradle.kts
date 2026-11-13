@@ -41,6 +41,7 @@ kover {
                     "*UseCase*",
                     "*Repository*",
                     "*ApiService*",
+                    "*PaymentReturnLink*",
                     "com.rusuh.app.data.repository.*",
                     "com.rusuh.app.domain.usecase.*",
                 )
