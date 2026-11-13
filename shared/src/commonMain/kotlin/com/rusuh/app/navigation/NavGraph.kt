@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -76,6 +77,7 @@ import com.rusuh.app.ui.components.RusuhBottomBar
 import com.rusuh.app.ui.components.RusuhTab
 import com.rusuh.app.ui.theme.RusuhColors
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
@@ -347,6 +349,7 @@ fun RusuhNavGraph(navController: NavHostController) {
  * [RusuhBottomBar] with its own tab selected (the per-tab-screen Scaffold
  * pattern); tab taps route through [onTabSelected].
  */
+@Suppress("LongMethod", "TooGenericExceptionCaught")
 private fun NavGraphBuilder.topLevelTabs(
     navController: NavHostController,
     sessionState: SessionStateProvider,
@@ -375,10 +378,31 @@ private fun NavGraphBuilder.topLevelTabs(
     }
 
     composable(Screen.Queues.route) {
+        val scope = rememberCoroutineScope()
+        val queueRepository = koinInject<com.rusuh.app.domain.repository.QueueRepository>()
+        val queuesViewModel = koinInject<MyQueuesViewModel>()
         MyQueuesRoute(
-            viewModel = koinInject<MyQueuesViewModel>(),
+            viewModel = queuesViewModel,
             // Entry gate: queue entry requires sign-in (AUTH-00-M8 #154).
             onOpenWaitingRoom = { eventId -> navController.navigateToQueueWithGate(eventId, sessionState) },
+            onContinueBooking = { eventId ->
+                scope.launch {
+                    try {
+                        if (queueRepository.resumeAdmission(eventId)) {
+                            navController.navigate(Screen.Detail.routeFor(eventId))
+                        } else {
+                            queuesViewModel.dispatch(com.rusuh.app.feature.queues.MyQueuesIntent.ResumeExpired)
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (
+                        @Suppress("SwallowedException") failure: Exception,
+                    ) {
+                        queuesViewModel.dispatch(com.rusuh.app.feature.queues.MyQueuesIntent.Refresh)
+                    }
+                }
+            },
+            onContinuePayment = { bookingId -> navController.navigate(Screen.Payment.routeFor(bookingId)) },
             onSwitchTab = onTabSelected,
             onBrowseEvents = { navController.switchTab(RusuhTab.Event) },
         )

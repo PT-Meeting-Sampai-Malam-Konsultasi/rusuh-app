@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.rusuh.app.domain.model.OrderInProgress
 import com.rusuh.app.ui.components.QueueListItem
 import com.rusuh.app.ui.components.QueueListItemUi
 import com.rusuh.app.ui.components.RusuhBottomBar
@@ -49,6 +50,8 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.action_retry
+import rusuh_app.shared.generated.resources.continue_booking
+import rusuh_app.shared.generated.resources.continue_payment
 import rusuh_app.shared.generated.resources.my_queues_count
 import rusuh_app.shared.generated.resources.my_queues_empty_action
 import rusuh_app.shared.generated.resources.my_queues_empty_body
@@ -56,6 +59,7 @@ import rusuh_app.shared.generated.resources.my_queues_empty_title
 import rusuh_app.shared.generated.resources.my_queues_error_title
 import rusuh_app.shared.generated.resources.my_queues_loading_description
 import rusuh_app.shared.generated.resources.my_queues_title
+import rusuh_app.shared.generated.resources.order_time_remaining
 
 /**
  * UI-level render state for the My Queues (Antrian) screen.
@@ -71,7 +75,10 @@ sealed interface MyQueuesUiState {
     data object Loading : MyQueuesUiState
 
     /** Loaded: one or more active queues to display. */
-    data class Content(val queues: List<QueueListItemUi>) : MyQueuesUiState
+    data class Content(
+        val queues: List<QueueListItemUi>,
+        val orders: List<OrderInProgress> = emptyList(),
+    ) : MyQueuesUiState
 
     /** The user is not in any queue right now. */
     data object Empty : MyQueuesUiState
@@ -138,7 +145,7 @@ fun MyQueuesScreen(
                 MyQueuesUiState.Empty -> EmptyState(onBrowseEvents = actions.onBrowseEvents)
                 is MyQueuesUiState.Error -> ErrorState(message = state.message, onRetry = actions.onRetry)
                 is MyQueuesUiState.Content ->
-                    QueueList(queues = state.queues, onOpenWaitingRoom = actions.onOpenWaitingRoom)
+                    QueueList(queues = state.queues, orders = state.orders, actions = actions)
             }
         }
     }
@@ -159,6 +166,7 @@ fun MyQueuesScreen(
  */
 data class MyQueuesActions(
     val onOpenWaitingRoom: (String) -> Unit = {},
+    val onContinueOrder: (OrderInProgress) -> Unit = {},
     val onTabSelected: (RusuhTab) -> Unit = {},
     val onBrowseEvents: () -> Unit = {},
     val onRetry: () -> Unit = {},
@@ -167,7 +175,8 @@ data class MyQueuesActions(
 @Composable
 private fun QueueList(
     queues: List<QueueListItemUi>,
-    onOpenWaitingRoom: (String) -> Unit,
+    orders: List<OrderInProgress>,
+    actions: MyQueuesActions,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -175,9 +184,43 @@ private fun QueueList(
         verticalArrangement = Arrangement.spacedBy(RusuhSpacing.lg),
     ) {
         item(key = "heading") { PageHeading(queueCount = queues.size) }
-        items(items = queues, key = { it.eventId }) { queue ->
-            QueueListItem(data = queue, onClick = onOpenWaitingRoom)
+        items(items = orders, key = { "order-${it.bookingId ?: it.eventId}" }) { order ->
+            ResumeOrderCard(order, actions.onContinueOrder)
         }
+        items(items = queues, key = { it.eventId }) { queue ->
+            QueueListItem(data = queue, onClick = actions.onOpenWaitingRoom)
+        }
+    }
+}
+
+@Composable
+private fun ResumeOrderCard(
+    order: OrderInProgress,
+    onContinue: (OrderInProgress) -> Unit,
+) {
+    val action =
+        if (order.bookingId == null) {
+            stringResource(
+                Res.string.continue_booking,
+            )
+        } else {
+            stringResource(Res.string.continue_payment)
+        }
+    Column(
+        modifier =
+            Modifier.fillMaxWidth().background(RusuhBrandColors.Card, RusuhShapes.small)
+                .border(BorderStroke(RusuhBrandMetrics.borderWidth, RusuhBrandColors.Ink), RusuhShapes.small)
+                .padding(RusuhSpacing.xl),
+        verticalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
+    ) {
+        Text(action, style = MaterialTheme.typography.titleMedium, color = RusuhBrandColors.Ink)
+        order.remainingMillis?.let { millis ->
+            Text(
+                stringResource(Res.string.order_time_remaining, (millis / 1000).toInt()),
+                color = RusuhBrandColors.Ink2,
+            )
+        }
+        Button(onClick = { onContinue(order) }) { Text(action) }
     }
 }
 
