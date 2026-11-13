@@ -461,7 +461,11 @@ class DetailViewModel(
         return ready && timeLeft
     }
 
-    private data class CacheKey(val name: String, val nik: String, val categoryId: String)
+    private data class CacheKey(val name: String, val nik: String, val categoryId: String) {
+        override fun toString(): String = "CacheKey(categoryId=$categoryId, name=<redacted>, nik=<redacted>)"
+    }
 
-    private data class CachedValidation(val key: CacheKey, val token: String)
+    private data class CachedValidation(val key: CacheKey, val token: String) {
+        override fun toString(): String = "CachedValidation(key=$key, token=<redacted>)"
+    }
 }

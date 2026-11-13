@@ -712,6 +712,23 @@ class DetailViewModelTest {
         }
 
     @Test
+    fun expiryCancelsAPendingValidation() =
+        runTest(dispatcher) {
+            val clock = FakeClock()
+            val repository = FakeRepository(offering())
+            val vm = viewModel(repository, clock)
+            send(vm, DetailIntent.IncrementCategory("a"))
+            fillAttendeesNoAdvance(vm, nikA)
+            testScheduler.runCurrent()
+            clock.now = 400_000L
+            send(vm, DetailIntent.Tick)
+            assertEquals(DetailPhase.Expired, vm.state.value.phase)
+            advanceTimeBy(NIK_VALIDATION_DEBOUNCE_MS * 2)
+            testScheduler.advanceUntilIdle()
+            assertTrue(repository.validationCalls.isEmpty())
+        }
+
+    @Test
     fun quickEditsProduceOneApiCall() =
         runTest(dispatcher) {
             val repository = FakeRepository(offering())

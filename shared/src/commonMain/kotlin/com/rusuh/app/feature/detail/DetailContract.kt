@@ -141,7 +141,10 @@ data class AttendeeForm(
     val name: String = "",
     val nik: String = "",
     val validationStatus: AttendeeValidationStatus = AttendeeValidationStatus.None,
-)
+) {
+    override fun toString(): String =
+        "AttendeeForm(id=$id, categoryId=$categoryId, name=<redacted>, nik=<redacted>, status=$validationStatus)"
+}
 
 /** Inline validation status shown under each attendee field. */
 sealed interface AttendeeValidationStatus {
