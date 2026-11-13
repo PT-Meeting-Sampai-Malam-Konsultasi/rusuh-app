@@ -1,26 +1,76 @@
 package com.rusuh.app.feature.payment
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.rusuh.app.ui.PlatformBackHandler
+import com.rusuh.app.ui.theme.RusuhBrandTextStyles
+import com.rusuh.app.ui.theme.RusuhColors
+import com.rusuh.app.ui.theme.body
+import com.rusuh.app.ui.theme.display
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
+import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.action_back
+import rusuh_app.shared.generated.resources.payment_close
+import rusuh_app.shared.generated.resources.payment_external_missing
+import rusuh_app.shared.generated.resources.payment_leave_body
+import rusuh_app.shared.generated.resources.payment_leave_title
+import rusuh_app.shared.generated.resources.payment_open_in_browser
+import rusuh_app.shared.generated.resources.payment_retry
+import rusuh_app.shared.generated.resources.payment_title
+import rusuh_app.shared.generated.resources.payment_web_error
 import kotlin.time.Duration.Companion.seconds
 
 /**
  * Route-level composable for the Payment screen that wires the ViewModel to the stateless screen.
  */
 @Composable
+@Suppress("CyclomaticComplexMethod")
 fun PaymentRoute(
     viewModel: PaymentViewModel,
-    launcher: PaymentPageLauncher,
+    bookingId: String,
     onBack: () -> Unit,
     onNavigateToTickets: () -> Unit,
     onNavigateToHome: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
+    var snapUrl by remember { mutableStateOf<String?>(null) }
+    var showLeaveDialog by remember { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf(false) }
+    var notice by remember { mutableStateOf(false) }
+    var webLoading by remember { mutableStateOf(true) }
+    val openInBrowser = rememberPaymentBrowserLauncher { notice = true }
+
+    PlatformBackHandler(enabled = snapUrl != null) {
+        showLeaveDialog = true
+    }
+
+    LaunchedEffect(state.ui) {
+        if (state.ui is PaymentUiState.Expired) snapUrl = null
+    }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.dispatch(PaymentIntent.Resumed)
@@ -46,7 +96,8 @@ fun PaymentRoute(
             when (effect) {
                 PaymentEffect.NavigateBack -> onBack()
                 is PaymentEffect.LaunchSnap -> {
-                    launcher.launch(effect.url)
+                    snapUrl = effect.url
+                    loadError = false
                 }
                 is PaymentEffect.NavigateToETicket -> onNavigateToTickets()
                 PaymentEffect.NavigateToTickets -> onNavigateToTickets()
@@ -56,16 +107,103 @@ fun PaymentRoute(
         }
     }
 
-    PaymentScreen(
-        state = state,
-        onBack = { viewModel.dispatch(PaymentIntent.Back) },
-        onOpenSnap = { viewModel.dispatch(PaymentIntent.OpenSnap) },
-        onRetrySnap = { viewModel.dispatch(PaymentIntent.RetrySnap) },
-        onRetry = { viewModel.dispatch(PaymentIntent.Retry) },
-        onGoToTickets = { viewModel.dispatch(PaymentIntent.GoToTickets) },
-        onQueueAgain = { viewModel.dispatch(PaymentIntent.QueueAgain) },
-        onGoHome = { viewModel.dispatch(PaymentIntent.GoHome) },
-    )
+    if (snapUrl == null) {
+        PaymentScreen(
+            state = state,
+            onBack = { viewModel.dispatch(PaymentIntent.Back) },
+            onOpenSnap = { viewModel.dispatch(PaymentIntent.OpenSnap) },
+            onRetrySnap = { viewModel.dispatch(PaymentIntent.RetrySnap) },
+            onRetry = { viewModel.dispatch(PaymentIntent.Retry) },
+            onGoToTickets = { viewModel.dispatch(PaymentIntent.GoToTickets) },
+            onQueueAgain = { viewModel.dispatch(PaymentIntent.QueueAgain) },
+            onGoHome = { viewModel.dispatch(PaymentIntent.GoHome) },
+        )
+    } else {
+        Column(Modifier.fillMaxSize().background(RusuhColors.BrandPaper)) {
+            Row(
+                Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { showLeaveDialog = true }) { Text(stringResource(Res.string.action_back)) }
+                Text(
+                    stringResource(Res.string.payment_title),
+                    Modifier.weight(1f),
+                    style = RusuhBrandTextStyles.itemTitle.display(),
+                    color = RusuhColors.BrandInk,
+                )
+                if (webLoading && !loadError) CircularProgressIndicator(color = RusuhColors.BrandMagenta)
+                TextButton(onClick = {
+                    openInBrowser(snapUrl!!)
+                }) { Text(stringResource(Res.string.payment_open_in_browser)) }
+                TextButton(onClick = {
+                    snapUrl = null
+                    viewModel.dispatch(PaymentIntent.SnapClosed)
+                }) { Text(stringResource(Res.string.payment_close)) }
+            }
+            if (loadError) {
+                Column(
+                    Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(stringResource(Res.string.payment_web_error), style = RusuhBrandTextStyles.bodyMedium.body())
+                    TextButton(onClick = { loadError = false }) { Text(stringResource(Res.string.payment_retry)) }
+                    TextButton(onClick = {
+                        snapUrl = null
+                        viewModel.dispatch(PaymentIntent.SnapClosed)
+                    }) { Text(stringResource(Res.string.payment_close)) }
+                }
+            } else {
+                Box(Modifier.weight(1f)) {
+                    PaymentSnapWebView(
+                        url = snapUrl!!,
+                        bookingId = bookingId,
+                        modifier = Modifier.fillMaxSize(),
+                        onClose = {
+                            snapUrl = null
+                            viewModel.dispatch(PaymentIntent.SnapClosed)
+                        },
+                        onLoading = { webLoading = it },
+                        onLoadError = {
+                            loadError = true
+                            webLoading = false
+                        },
+                        onNotice = { notice = true },
+                    )
+                }
+            }
+        }
+        if (showLeaveDialog) {
+            AlertDialog(
+                onDismissRequest = { showLeaveDialog = false },
+                title = { Text(stringResource(Res.string.payment_leave_title)) },
+                text = { Text(stringResource(Res.string.payment_leave_body)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showLeaveDialog = false
+                        snapUrl = null
+                        viewModel.dispatch(PaymentIntent.SnapClosed)
+                    }) { Text(stringResource(Res.string.payment_close)) }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showLeaveDialog = false },
+                    ) { Text(stringResource(Res.string.action_back)) }
+                },
+            )
+        }
+        if (notice) {
+            AlertDialog(
+                onDismissRequest = { notice = false },
+                text = { Text(stringResource(Res.string.payment_external_missing)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = { notice = false },
+                    ) { Text(stringResource(Res.string.action_back)) }
+                },
+            )
+        }
+    }
 }
 
 /**

@@ -66,6 +66,9 @@ import rusuh_app.shared.generated.resources.detail_validation_nik_invalid
 import rusuh_app.shared.generated.resources.detail_validation_retry
 import rusuh_app.shared.generated.resources.detail_validation_seat_taken
 import rusuh_app.shared.generated.resources.detail_validation_unavailable
+import rusuh_app.shared.generated.resources.detail_validation_unavailable_network
+import rusuh_app.shared.generated.resources.detail_validation_unavailable_rate
+import rusuh_app.shared.generated.resources.detail_validation_unavailable_service
 import rusuh_app.shared.generated.resources.detail_validation_valid
 
 /**
@@ -198,13 +201,21 @@ private fun ValidationStatusRow(
                 }
             FieldError(message)
         }
-        AttendeeValidationStatus.Unavailable -> {
+        is AttendeeValidationStatus.Unavailable -> {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(RusuhSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = stringResource(Res.string.detail_validation_unavailable),
+                    text =
+                        stringResource(
+                            when (status.reason) {
+                                UnavailableReason.NETWORK -> Res.string.detail_validation_unavailable_network
+                                UnavailableReason.SERVICE -> Res.string.detail_validation_unavailable_service
+                                UnavailableReason.TOO_MANY_ATTEMPTS -> Res.string.detail_validation_unavailable_rate
+                                UnavailableReason.SERVER -> Res.string.detail_validation_unavailable
+                            },
+                        ),
                     style = RusuhBrandTextStyles.note.body(),
                     color = RusuhColors.BrandMuted,
                 )

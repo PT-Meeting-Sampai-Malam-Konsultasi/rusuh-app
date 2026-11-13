@@ -59,6 +59,8 @@ sealed interface PaymentIntent : MviIntent {
 
     /** Go to Home after payment expired or cancelled. */
     data object GoHome : PaymentIntent
+
+    data object SnapClosed : PaymentIntent
 }
 
 /** Side effects emitted by the Payment ViewModel. */

@@ -41,7 +41,7 @@ import org.koin.dsl.module
 val appModule =
     module {
         // Home feature.
-        factory { HomeViewModel(get()) }
+        factory { HomeViewModel(get(), get()) }
 
         // Waiting Room.
         factory { ObserveQueuePlaceUseCase(get()) }
@@ -69,10 +69,10 @@ val appModule =
         factory { GetProfileUseCase(get(), get()) }
         factory { SaveDisplayNameUseCase(get(), get()) }
         factory { ObserveSessionUseCase(get()) }
-        factory { SignInViewModel(get(), get(), get(), get(), get(), get()) }
+        factory { SignInViewModel(get(), get(), get(), get(), get(), get(), get()) }
         factory { AccountViewModel(get(), get(), get(), get(), get(), get<CrashReporter>(), get<Boolean>()) }
         factory { GetETicketUseCase(get()) }
-        factory { (orderId: String) -> ETicketViewModel(orderId, get(), get()) }
+        factory { (orderId: String) -> ETicketViewModel(orderId, get(), get(), get()) }
 
         // Detail ticket page (the ServerClock is bound per backend mode in dataModules).
         factory { GetDetailUseCase(get()) }
@@ -89,7 +89,7 @@ val appModule =
         factory { LoadPaymentUseCase(get()) }
         factory { StartSnapPaymentUseCase(get()) }
         factory { ObservePaymentStatusUseCase(get()) }
-        factory { (bookingId: String) -> PaymentViewModel(bookingId, get(), get(), get()) }
+        factory { (bookingId: String) -> PaymentViewModel(bookingId, get(), get(), get(), tracker = get()) }
         factory { (bookingId: String) -> PaymentResultViewModel(bookingId, get(), get()) }
 
         // Analytics consent.

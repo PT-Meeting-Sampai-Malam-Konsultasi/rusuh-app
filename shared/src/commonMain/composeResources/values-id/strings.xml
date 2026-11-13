@@ -416,11 +416,15 @@
     <string name="detail_validation_nik_invalid">NIK tidak valid. Periksa 16 digit.</string>
     <string name="detail_validation_seat_taken">NIK ini sudah memiliki tiket maksimum untuk acara ini.</string>
     <string name="detail_validation_duplicate">NIK ini sudah dipakai tiket lain di pesanan ini.</string>
-    <string name="detail_validation_unavailable">Verifikasi tidak tersedia.</string>
+    <string name="detail_validation_unavailable">NIK belum bisa diperiksa saat ini.</string>
+    <string name="detail_validation_unavailable_network">Tidak ada koneksi internet. Periksa lalu coba lagi.</string>
+    <string name="detail_validation_unavailable_service">Layanan pemeriksaan identitas sedang gangguan. Coba lagi sebentar lagi.</string>
+    <string name="detail_validation_unavailable_rate">Terlalu banyak percobaan. Tunggu semenit lalu coba lagi.</string>
     <string name="detail_validation_retry">Coba lagi</string>
 
     <!-- Payment screen -->
     <string name="payment_title">Pembayaran</string>
+    <string name="payment_open_in_browser">Buka di browser</string>
     <string name="payment_loading">Memverifikasi pesanan Anda…</string>
     <string name="payment_timer_description">Sisa waktu %1$s</string>
     <string name="payment_pay_via_midtrans">Bayar lewat Midtrans</string>
@@ -465,6 +469,12 @@
     <string name="account_analytics_label">Analitik</string>
     <string name="account_analytics_enabled">Aktif</string>
     <string name="account_analytics_disabled">Nonaktif</string>
+    <string name="payment_leave_title">Tinggalkan halaman pembayaran?</string>
+    <string name="payment_leave_body">Pembayaran Anda mungkin masih diproses. Anda dapat kembali untuk memeriksa statusnya.</string>
+    <string name="payment_close">Tutup</string>
+    <string name="payment_retry">Coba lagi</string>
+    <string name="payment_web_error">Halaman ini tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi.</string>
+    <string name="payment_external_missing">Tidak ada aplikasi untuk membuka tautan pembayaran ini.</string>
     <string name="continue_booking">Lanjutkan pemesanan</string>
     <string name="continue_payment">Lanjutkan pembayaran</string>
     <string name="order_time_remaining">Sisa %1$d detik</string>

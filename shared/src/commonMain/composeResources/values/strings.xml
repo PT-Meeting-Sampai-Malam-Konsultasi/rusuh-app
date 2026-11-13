@@ -420,11 +420,15 @@
     <string name="detail_validation_nik_invalid">NIK not valid. Check the 16 digits.</string>
     <string name="detail_validation_seat_taken">This NIK already has the maximum tickets for this event.</string>
     <string name="detail_validation_duplicate">This NIK is already used by another ticket in this order.</string>
-    <string name="detail_validation_unavailable">Verification unavailable.</string>
+    <string name="detail_validation_unavailable">Could not check this NIK right now.</string>
+    <string name="detail_validation_unavailable_network">No internet connection. Check it and retry.</string>
+    <string name="detail_validation_unavailable_service">The ID check service is down right now. Retry in a moment.</string>
+    <string name="detail_validation_unavailable_rate">Too many attempts. Wait a minute, then retry.</string>
     <string name="detail_validation_retry">Retry</string>
 
     <!-- Payment screen -->
     <string name="payment_title">Payment</string>
+    <string name="payment_open_in_browser">Open in browser</string>
     <string name="payment_loading">Verifying your order…</string>
     <string name="payment_timer_description">Time left %1$s</string>
     <string name="payment_pay_via_midtrans">Pay via Midtrans</string>
@@ -469,6 +473,12 @@
     <string name="account_analytics_label">Analytics</string>
     <string name="account_analytics_enabled">Enabled</string>
     <string name="account_analytics_disabled">Disabled</string>
+    <string name="payment_leave_title">Leave the payment page?</string>
+    <string name="payment_leave_body">Your payment may still be processing. You can return to check its status.</string>
+    <string name="payment_close">Close</string>
+    <string name="payment_retry">Retry</string>
+    <string name="payment_web_error">This page could not be loaded. Check your connection and try again.</string>
+    <string name="payment_external_missing">No app is available to open this payment link.</string>
     <string name="continue_booking">Continue booking</string>
     <string name="continue_payment">Continue payment</string>
     <string name="order_time_remaining">%1$d seconds remaining</string>
