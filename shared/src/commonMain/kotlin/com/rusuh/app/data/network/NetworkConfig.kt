@@ -3,9 +3,9 @@ package com.rusuh.app.data.network
 import com.rusuh.app.di.BackendMode
 
 /**
- * The ONE place to flip between the local mock server and the real backend in a debug build.
- *
- * Debug Android can override [MOCK_API] with `-PmockApi=false` (or true). Otherwise edit [MOCK_API] and rebuild:
+ * The ONE place to flip between the local mock server and the real backend in a debug build. The default is the
+ * real backend; Android debug builds can switch to the mock with `-PmockApi=true`, iOS with `MOCK_API=true` in the
+ * scheme. Otherwise edit [MOCK_API] and rebuild:
  * - `true`: HTTP to the local Mockoon server (`workspace-local/mockoon`). Android emulator
  *   `http://10.0.2.2:3000`, iOS simulator `http://localhost:3000`; for a physical Android device run
  *   `adb reverse tcp:3000 tcp:3000` and point the app at `http://localhost:3000`.
@@ -19,10 +19,10 @@ import com.rusuh.app.di.BackendMode
  */
 object NetworkConfig {
     /**
-     * `true` = local Mockoon, `false` = the real host.
+     * `true` = local Mockoon, `false` (default) = the real host.
      * Debug builds of the staging flavor only; see the class documentation.
      */
-    const val MOCK_API: Boolean = true
+    const val MOCK_API: Boolean = false
 
     /** What the platform entry point starts the app with. */
     data class Startup(

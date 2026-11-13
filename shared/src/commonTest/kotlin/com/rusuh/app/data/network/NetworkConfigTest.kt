@@ -5,11 +5,18 @@ import com.rusuh.app.di.initKoin
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 class NetworkConfigTest {
     // ─────────────────────────────────────────────────────────────────────────
     // Staging flavor (allowDebugOptions = true)
     // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun theMockServerIsOffByDefault() {
+        assertFalse(NetworkConfig.MOCK_API)
+        assertEquals(AppEnvironment.Staging, NetworkConfig.startup(isDebug = true).environment)
+    }
 
     @Test
     fun stagingDebugWithMockApiTalksHttpToMockoon() {
