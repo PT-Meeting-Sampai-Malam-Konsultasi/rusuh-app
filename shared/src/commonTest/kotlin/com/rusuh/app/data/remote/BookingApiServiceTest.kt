@@ -99,6 +99,22 @@ class BookingApiServiceTest {
         }
 
     @Test
+    fun getCategoriesEncodesEventIdAsPathSegment() =
+        runTest {
+            var requestPath = ""
+            val tokens = InMemoryTokenStore().apply { setAdmissionToken("adm_test_token") }
+            val api =
+                apiClient { request ->
+                    requestPath = request.url.encodedPath
+                    respond(categoriesJson(), HttpStatusCode.OK, jsonHeaders)
+                }
+
+            BookingApiService(api, tokens).getCategories("event/one?two")
+
+            assertEquals("/v1/core/events/event%2Fone%3Ftwo/categories", requestPath)
+        }
+
+    @Test
     fun getCategoriesWithoutAdmissionTokenReturnsAdmissionInvalidError() =
         runTest {
             val tokens = InMemoryTokenStore() // No admission token set

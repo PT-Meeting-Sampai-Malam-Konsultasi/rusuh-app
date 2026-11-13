@@ -3,12 +3,14 @@ package com.rusuh.app.data.repository
 import com.rusuh.app.data.cache.TicketsCache
 import com.rusuh.app.data.network.AppLanguage
 import com.rusuh.app.data.remote.TicketApiService
+import com.rusuh.app.data.storage.AppPreferences
 import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.DomainResult
 import com.rusuh.app.feature.eticket.EventZone
 import com.rusuh.app.feature.eticket.Seating
 import com.rusuh.app.feature.tickets.PosterTone
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,9 +25,10 @@ class TicketsRepositoryImplTest {
         backend: FakeBackend,
         language: AppLanguage = AppLanguage.Indonesian,
         now: Long = FIXTURE_NOW_MILLIS,
+        cache: TicketsCache = TicketsCache(FakeAppPreferences()),
     ) = TicketsRepositoryImpl(
         TicketApiService(backend.api),
-        TicketsCache(FakeAppPreferences()),
+        cache,
         { language },
         TestServerClock(now),
     )
@@ -154,6 +157,27 @@ class TicketsRepositoryImplTest {
             val failure = assertFailsWith<DomainException> { repository(backend).getMyOrders() }
 
             assertEquals(DomainResult.NetworkError, failure.result)
+        }
+
+    @Test
+    fun getMyOrdersRethrowsCancellationFromEventFactsCache() =
+        runTest {
+            val preferences =
+                object : AppPreferences {
+                    override suspend fun get(key: String): String? = throw CancellationException("cancelled")
+
+                    override suspend fun set(
+                        key: String,
+                        value: String,
+                    ) = Unit
+
+                    override suspend fun remove(key: String) = Unit
+                }
+            val backend = backendWith("GET /core/tickets" to Reply.ok(TICKETS_JSON))
+
+            assertFailsWith<CancellationException> {
+                repository(backend, cache = TicketsCache(preferences)).getMyOrders()
+            }
         }
 
     @Test

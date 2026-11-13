@@ -2,6 +2,7 @@ package com.rusuh.app.data.remote.mapper
 
 import com.rusuh.app.data.network.AppLanguage
 import com.rusuh.app.ui.components.TimeZoneLabel
+import com.rusuh.app.util.groupThousands
 
 // Display formatting for event dates, prices and countdowns. The words live in the per-language tables below (the
 // data layer has no Compose resources); everything else is arithmetic on epoch millis, with no datetime library and
@@ -10,7 +11,6 @@ import com.rusuh.app.ui.components.TimeZoneLabel
 private const val MILLIS_PER_MINUTE = 60_000L
 private const val MINUTES_PER_HOUR = 60L
 private const val HOURS_PER_DAY = 24L
-private const val THOUSAND_DIGITS = 3
 private const val MINUTES_PER_DAY_CYCLE = 1_440L
 
 /** The words of one language used in event copy. */
@@ -76,12 +76,7 @@ internal fun LocalMoment.shortDateTimeWithZone(
 ): String = "${words.weekdays[weekday]}, ${dayMonth(words)} · ${time(words)} ${zone.name}"
 
 /** `Rp 450.000`: whole rupiah with a dot as thousands separator in both languages. */
-internal fun formatRupiah(amount: Long): String {
-    val digits = amount.coerceAtLeast(0L).toString()
-    val grouped =
-        digits.reversed().chunked(THOUSAND_DIGITS).joinToString(".").reversed()
-    return "Rp $grouped"
-}
+internal fun formatRupiah(amount: Long): String = "Rp ${amount.coerceAtLeast(0L).groupThousands()}"
 
 /**
  * "7 hari 14 jam lagi" style remaining time from [remainingMillis]: days and hours, hours and minutes, or minutes.

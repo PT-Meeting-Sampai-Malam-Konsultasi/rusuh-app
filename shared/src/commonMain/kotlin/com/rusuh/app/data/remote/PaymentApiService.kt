@@ -22,7 +22,8 @@ class PaymentApiService(
      * `GET /core/payments/{bookingId}`: payment page data (order summary, breakdown, countdown, Snap client key).
      * Requires a Bearer token.
      */
-    suspend fun getPayment(bookingId: String): ApiResult<PaymentViewDto> = api.get("$EP_PAYMENTS/$bookingId")
+    suspend fun getPayment(bookingId: String): ApiResult<PaymentViewDto> =
+        api.get("$EP_PAYMENTS/${pathSegment(bookingId)}")
 
     /**
      * `POST /core/payments/{bookingId}/snap`: create (or return) the Midtrans Snap transaction for the booking.
@@ -38,7 +39,7 @@ class PaymentApiService(
         idempotencyKey: String,
         method: String? = null,
     ): ApiResult<SnapTransactionDto> =
-        api.post("$EP_PAYMENTS/$bookingId/snap") {
+        api.post("$EP_PAYMENTS/${pathSegment(bookingId)}/snap") {
             idempotencyKey(idempotencyKey)
             if (method != null) {
                 jsonBody(StartSnapRequestDto(method = method))
@@ -50,7 +51,7 @@ class PaymentApiService(
      * Requires a Bearer token. Returns the booking and payment status; when final, includes `returnUrl`.
      */
     suspend fun getPaymentStatus(bookingId: String): ApiResult<PaymentStatusDto> =
-        api.get("$EP_PAYMENTS/$bookingId/status")
+        api.get("$EP_PAYMENTS/${pathSegment(bookingId)}/status")
 
     private companion object {
         const val EP_PAYMENTS = "/core/payments"

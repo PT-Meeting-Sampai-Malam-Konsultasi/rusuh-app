@@ -136,6 +136,7 @@ class EventCardTest {
         assertEquals("1.234.567", 1_234_567.formatThousands())
         assertEquals("999", 999.formatThousands())
         assertEquals("0", 0.formatThousands())
+        assertEquals("-123.456", (-123_456L).formatThousands())
     }
 
     @Test

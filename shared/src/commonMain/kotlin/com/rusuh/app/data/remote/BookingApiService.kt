@@ -36,7 +36,7 @@ class BookingApiService(
         val token =
             tokenStore.getAdmissionToken()
                 ?: return admissionMissingError()
-        return api.get("$EP_EVENTS/$eventId/categories") {
+        return api.get("$EP_EVENTS/${pathSegment(eventId)}/categories") {
             admissionToken(token)
         }
     }
@@ -52,7 +52,7 @@ class BookingApiService(
         val token =
             tokenStore.getAdmissionToken()
                 ?: return admissionMissingError()
-        return api.post("$EP_EVENTS/$eventId/attendees/validate") {
+        return api.post("$EP_EVENTS/${pathSegment(eventId)}/attendees/validate") {
             admissionToken(token)
             jsonBody(request)
         }
@@ -78,10 +78,11 @@ class BookingApiService(
     }
 
     /** `GET /core/bookings/{bookingId}`: booking status (source of truth for result screens). */
-    suspend fun getBooking(bookingId: String): ApiResult<BookingDto> = api.get("$EP_BOOKINGS/$bookingId")
+    suspend fun getBooking(bookingId: String): ApiResult<BookingDto> = api.get("$EP_BOOKINGS/${pathSegment(bookingId)}")
 
     /** `POST /core/bookings/{bookingId}/cancel`: cancel a held booking and release the tickets. */
-    suspend fun cancelBooking(bookingId: String): ApiResult<BookingDto> = api.post("$EP_BOOKINGS/$bookingId/cancel")
+    suspend fun cancelBooking(bookingId: String): ApiResult<BookingDto> =
+        api.post("$EP_BOOKINGS/${pathSegment(bookingId)}/cancel")
 
     /** `GET /core/bookings/active`: my active bookings (resume after app was closed). */
     suspend fun getActiveBookings(): ApiResult<ActiveBookingsResponseDto> = api.get("$EP_BOOKINGS/active")
