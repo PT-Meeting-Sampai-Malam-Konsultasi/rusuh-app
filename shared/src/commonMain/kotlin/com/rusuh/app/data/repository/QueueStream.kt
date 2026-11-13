@@ -21,6 +21,9 @@ sealed interface QueueStreamEvent {
     data class Turn(val dto: QueueTurnDto) : QueueStreamEvent
 
     data object Heartbeat : QueueStreamEvent
+
+    /** Server-suggested reconnect delay in milliseconds. */
+    data class RetryHint(val millis: Long) : QueueStreamEvent
 }
 
 /** Outcome of attempting to open or read the stream. */
@@ -106,7 +109,7 @@ private fun mapEvent(
                 else -> null
             }
         is SseEvent.Comment -> if (event.text == "hb") QueueStreamEvent.Heartbeat else null
-        is SseEvent.Retry -> null
+        is SseEvent.Retry -> QueueStreamEvent.RetryHint(event.millis)
     }
 
 private fun mapHttpError(error: SseConnection.HttpError): StreamOutcome {

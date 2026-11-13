@@ -31,10 +31,14 @@ import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
 import com.rusuh.app.feature.waitingroom.domain.model.QueueState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 
@@ -119,6 +123,10 @@ class RealQueueRepository(
         private var lastEventId: String? = null
         private var serverRetryMillis: Long = QueuePacing.SSE_DEFAULT_RETRY_MILLIS
 
+        // Claim guard: only one claim attempt at a time across both transports
+        private val claimMutex = Mutex()
+        private var claimStarted = false
+
         suspend fun run() {
             val joined = calls.join(eventId)
             seq = joined.seq
@@ -190,49 +198,92 @@ class RealQueueRepository(
             }
         }
 
-        @Suppress("CyclomaticComplexMethod", "ThrowsCount", "ReturnCount", "UnusedParameter")
+        @Suppress("CyclomaticComplexMethod", "ThrowsCount", "UnusedParameter")
         private suspend fun consumeStream(
             events: Flow<QueueStreamEvent>,
             @Suppress("UNUSED_PARAMETER") initialFrontier: FrontierDto,
         ): Boolean {
-            var lastActivityAt = pacing.nowMillis()
+            val activity = StreamActivity(pacing)
+            return try {
+                runStreamWithWatchdog(events, activity)
+            } catch (_: StreamFinished) {
+                true
+            } catch (_: FallbackToPolling) {
+                false
+            } catch (_: SilenceTimeout) {
+                onStreamFailure()
+                false
+            } catch (_: TimeoutCancellationException) {
+                onStreamFailure()
+                false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                nextStreamRetryAt = pacing.nowMillis() + serverRetryMillis
+                false
+            }
+        }
+
+        private suspend fun runStreamWithWatchdog(
+            events: Flow<QueueStreamEvent>,
+            activity: StreamActivity,
+        ): Boolean {
+            var finished = false
+            coroutineScope {
+                val watchdog =
+                    launch {
+                        while (true) {
+                            pacing.delay(WATCHDOG_CHECK_INTERVAL_MILLIS)
+                            if (activity.timeSinceLastEvent() > QueuePacing.SSE_SILENCE_TIMEOUT_MILLIS) {
+                                throw SilenceTimeout
+                            }
+                        }
+                    }
+                try {
+                    finished = collectStreamEvents(events, activity)
+                } finally {
+                    watchdog.cancel()
+                }
+            }
+            return finished
+        }
+
+        @Suppress("ThrowsCount")
+        private suspend fun collectStreamEvents(
+            events: Flow<QueueStreamEvent>,
+            activity: StreamActivity,
+        ): Boolean {
             var firstEventReceived = false
             var finished = false
             try {
                 withTimeout(QueuePacing.SSE_FIRST_EVENT_TIMEOUT_MILLIS) {
                     events.collect { event ->
+                        activity.touch()
                         if (!firstEventReceived) {
                             firstEventReceived = true
                             streamConnectFailures = 0
-                        }
-                        lastActivityAt = pacing.nowMillis()
-                        finished = handleStreamEvent(event)
-                        if (finished) throw StreamFinished
-                        val pos = position
-                        val sf = streamFrom ?: 0
-                        if (pos != null && pos > sf) throw FallbackToPolling
-                        if (pacing.nowMillis() - lastActivityAt > QueuePacing.SSE_SILENCE_TIMEOUT_MILLIS) {
-                            throw SilenceTimeout
+                            throw FirstEventReceived(event)
                         }
                     }
                 }
-            } catch (_: StreamFinished) {
-                return true
-            } catch (_: FallbackToPolling) {
-                return false
-            } catch (_: SilenceTimeout) {
-                onStreamFailure()
-                return false
-            } catch (_: TimeoutCancellationException) {
-                onStreamFailure()
-                return false
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                nextStreamRetryAt = pacing.nowMillis() + serverRetryMillis
-                return false
+            } catch (e: FirstEventReceived) {
+                finished = handleStreamEvent(e.event)
+                if (finished) throw StreamFinished
+                checkPositionFallback()
+            }
+            events.collect { event ->
+                activity.touch()
+                finished = handleStreamEvent(event)
+                if (finished) throw StreamFinished
+                checkPositionFallback()
             }
             return finished
+        }
+
+        private fun checkPositionFallback() {
+            val pos = position
+            val sf = streamFrom ?: 0
+            if (pos != null && pos > sf) throw FallbackToPolling
         }
 
         private suspend fun handleStreamEvent(event: QueueStreamEvent): Boolean =
@@ -244,6 +295,14 @@ class RealQueueRepository(
                 }
                 is QueueStreamEvent.Turn -> handleStreamTurn(event.dto)
                 QueueStreamEvent.Heartbeat -> false
+                is QueueStreamEvent.RetryHint -> {
+                    serverRetryMillis =
+                        event.millis.coerceIn(
+                            QueuePacing.SSE_DEFAULT_RETRY_MILLIS,
+                            QueuePacing.BACKOFF_CAP_MILLIS,
+                        )
+                    false
+                }
             }
 
         private fun onStreamFailure() {
@@ -258,8 +317,19 @@ class RealQueueRepository(
             return step(frontier)
         }
 
+        @Suppress("ReturnCount")
         private suspend fun handleStreamTurn(turn: QueueTurnDto): Boolean {
             val frontier = lastFrontier ?: return false
+            val acquired =
+                claimMutex.withLock {
+                    if (claimStarted) {
+                        false
+                    } else {
+                        claimStarted = true
+                        true
+                    }
+                }
+            if (!acquired) return false
             val turnExpiresAt =
                 turn.turnExpiresAt?.let(::parseRfc3339Millis) ?: (serverNow(frontier) + TURN_WINDOW_MILLIS)
             val turnPlace =
@@ -356,12 +426,21 @@ class RealQueueRepository(
         }
 
         /** The turn. Returns true when the run is over; false when the claim says to go back to waiting (NO_STOCK). */
-        private suspend fun onTurn(frontier: FrontierDto): Boolean =
-            when (val me = calls.me(eventId, lenient = true)) {
+        private suspend fun onTurn(frontier: FrontierDto): Boolean {
+            val acquired =
+                claimMutex.withLock {
+                    if (claimStarted) {
+                        false
+                    } else {
+                        claimStarted = true
+                        true
+                    }
+                }
+            if (!acquired) return false
+            return when (val me = calls.me(eventId, lenient = true)) {
                 MeResult.Missed -> end(QueueState.Missed, frontier)
                 MeResult.Closed -> end(QueueState.Closed, frontier)
                 is MeResult.Found, MeResult.NotFound, MeResult.Unavailable -> {
-                    // The 60 s window is only a display hint; the claim answers for itself.
                     val shown = (me as? MeResult.Found)?.place?.turnExpiresAt?.let(::parseRfc3339Millis)
                     val turn =
                         place(QueueState.Turn, frontier)
@@ -370,6 +449,7 @@ class RealQueueRepository(
                     claim(frontier)
                 }
             }
+        }
 
         /**
          * Claims inside the 60 s turn window, measured on the monotonic clock from the first attempt (so request time
@@ -443,8 +523,23 @@ class RealQueueRepository(
 
     private object SilenceTimeout : Throwable()
 
+    private class FirstEventReceived(val event: QueueStreamEvent) : Throwable()
+
+    /** Tracks last event time for the silence watchdog. */
+    private class StreamActivity(private val pacing: QueuePacing) {
+        private val lock = Mutex()
+        private var lastEventAt = pacing.nowMillis()
+
+        suspend fun touch() {
+            lock.withLock { lastEventAt = pacing.nowMillis() }
+        }
+
+        suspend fun timeSinceLastEvent(): Long = lock.withLock { pacing.nowMillis() - lastEventAt }
+    }
+
     private companion object {
         const val TURN_WINDOW_MILLIS = 60_000L
         const val ME_JITTER_MILLIS = 30_000L
+        const val WATCHDOG_CHECK_INTERVAL_MILLIS = 1_000L
     }
 }

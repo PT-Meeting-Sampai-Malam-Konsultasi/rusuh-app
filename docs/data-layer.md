@@ -265,12 +265,17 @@ Release builds always use `Production` + `Real` over HTTPS.
   events parsed by `SseParser`. Fallback rules:
   - 2 failed connect attempts → fall back to polling, retry stream after 60 s (`SSE_RETRY_DELAY_MILLIS`).
   - No first event within 5 s (`SSE_FIRST_EVENT_TIMEOUT_MILLIS`) → fall back.
-  - 30 s silence (`SSE_SILENCE_TIMEOUT_MILLIS`) → fall back.
+  - 30 s silence (`SSE_SILENCE_TIMEOUT_MILLIS`) → fall back (watchdog coroutine independent of collect).
   - 409 `TOO_FAR` → stop stream attempts permanently for this session.
   - 503 `STREAM_FULL` with `Retry-After` → back off, retry after the header value (capped at 5 min).
   - 410 `QUEUE_CLOSED/MISSED/EXPIRED` and 401 → handled by polling.
+  - Server `retry:` field → updates the reconnect delay (capped between 3 s and 30 s).
   Timing constants live in `QueuePacing`. The stream auto-reconnects with `Last-Event-ID` when the server sends an `id`
-  field. Cancelling the `observePlace` flow closes the stream.
+  field. Cancelling the `observePlace` flow closes the stream. A claim guard (`claimStarted` flag) ensures only one
+  claim attempt starts across both the stream and polling transports.
+- **To verify on iOS simulator**: whether `bodyAsChannel` delivers SSE lines incrementally on the Darwin engine or
+  buffers the entire response. Ktor's Darwin engine historically buffers; if so, streaming falls back to polling on
+  iOS and the experience is acceptable but not real-time. Test with a local SSE server before the release.
 
 ### Stub payloads and the test harness (`data/stub`)
 

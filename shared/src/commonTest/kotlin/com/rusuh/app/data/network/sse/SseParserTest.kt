@@ -187,4 +187,52 @@ class SseParserTest {
         assertEquals(null, msg.event)
         assertEquals(null, msg.id)
     }
+
+    @Test
+    fun handlesCarriageReturnAtEndOfLine() {
+        val events = mutableListOf<SseEvent>()
+        val parser = SseParser { events += it }
+
+        // Simulate lines arriving with \r already stripped (Ktor's readUTF8Line strips both \r\n and \n)
+        parser.feed("event: frontier")
+        parser.feed("data: {\"served\":100}")
+        parser.feed("")
+
+        val msg = events.single() as SseEvent.Message
+        assertEquals("frontier", msg.event)
+        assertEquals("{\"served\":100}", msg.data)
+    }
+
+    @Test
+    fun handlesEmptyCommentLine() {
+        val events = mutableListOf<SseEvent>()
+        val parser = SseParser { events += it }
+
+        parser.feed(":")
+
+        assertEquals(1, events.size)
+        assertEquals("", (events[0] as SseEvent.Comment).text)
+    }
+
+    @Test
+    fun handlesMultipleEventsInSequence() {
+        val events = mutableListOf<SseEvent>()
+        val parser = SseParser { events += it }
+
+        parser.feed("retry: 3000")
+        parser.feed("")
+        parser.feed(": hb")
+        parser.feed("event: frontier")
+        parser.feed("data: one")
+        parser.feed("")
+        parser.feed("event: turn")
+        parser.feed("data: two")
+        parser.feed("")
+
+        assertEquals(4, events.size)
+        assertEquals(3000L, (events[0] as SseEvent.Retry).millis)
+        assertEquals("hb", (events[1] as SseEvent.Comment).text)
+        assertEquals("frontier", (events[2] as SseEvent.Message).event)
+        assertEquals("turn", (events[3] as SseEvent.Message).event)
+    }
 }
