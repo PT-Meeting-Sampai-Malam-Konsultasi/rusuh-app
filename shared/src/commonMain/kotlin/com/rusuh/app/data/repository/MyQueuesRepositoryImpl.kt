@@ -36,7 +36,7 @@ import kotlinx.coroutines.sync.withPermit
  * this load (it stays stored). The load throws [DomainException] only when EVERY entry failed with an error other than
  * a 404, so one bad entry never blanks the tab.
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooManyFunctions")
 class MyQueuesRepositoryImpl(
     private val queueApi: QueueApiService,
     private val eventApi: EventApiService,
