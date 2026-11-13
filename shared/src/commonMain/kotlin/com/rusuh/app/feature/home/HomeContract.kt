@@ -42,16 +42,25 @@ enum class HomeLanguage(val code: String) {
 }
 
 /**
+ * Error types for the Home screen. The UI resolves these to localized strings via
+ * [stringResource]; ViewModels never produce user-visible text.
+ */
+sealed interface HomeError {
+    /** Generic load failure (network, timeout, unexpected error). */
+    data object LoadFailed : HomeError
+}
+
+/**
  * UI state for the Home screen.
  *
  * @property isLoading true while events are being (re)loaded.
  * @property events the currently loaded events; empty until loaded.
- * @property error a user-facing error message, or null when there is no error.
+ * @property error typed error, or null when there is no error. The screen resolves it to a localized string.
  */
 data class HomeState(
     val isLoading: Boolean = false,
     val events: List<HomeEventItem> = emptyList(),
-    val error: String? = null,
+    val error: HomeError? = null,
 ) : MviState
 
 /** User intents for the Home screen. */
@@ -82,6 +91,6 @@ sealed interface HomeEffect : MviEffect {
     /** Open the Waiting Room of the event with the given [id]; the Waiting Room joins the queue. */
     data class NavigateToQueue(val id: String) : HomeEffect
 
-    /** Show a transient error [message] (snackbar/toast). */
-    data class ShowError(val message: String) : HomeEffect
+    /** Show a transient error; the UI resolves [error] to a localized string. */
+    data class ShowError(val error: HomeError) : HomeEffect
 }
