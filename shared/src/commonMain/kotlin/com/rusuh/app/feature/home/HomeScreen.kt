@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package com.rusuh.app.feature.home
 
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -35,7 +38,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.rusuh.app.ui.components.ErrorState
 import com.rusuh.app.ui.components.EventCard
 import com.rusuh.app.ui.components.LoadingState
 import com.rusuh.app.ui.theme.RusuhColors
@@ -43,7 +45,10 @@ import com.rusuh.app.ui.theme.RusuhSpacing
 import com.rusuh.app.ui.theme.RusuhTheme
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
+import rusuh_app.shared.generated.resources.action_retry
 import rusuh_app.shared.generated.resources.home_empty_title
+import rusuh_app.shared.generated.resources.home_error_body
+import rusuh_app.shared.generated.resources.home_error_title
 import rusuh_app.shared.generated.resources.home_pull_to_refresh
 import rusuh_app.shared.generated.resources.home_section_all_events
 import rusuh_app.shared.generated.resources.home_section_all_events_count
@@ -89,11 +94,19 @@ fun HomeScreen(
     val currentOnOpenQueue by rememberUpdatedState(onOpenQueue)
 
     // One-time effects: navigate on tap, surface transient errors as a snackbar.
+    // The snackbar message is resolved here from the typed error.
+    val loadFailedMessage = stringResource(Res.string.home_error_title)
     LaunchedEffect(viewModel) {
         viewModel.effect.collect { effect ->
             when (effect) {
                 is HomeEffect.NavigateToQueue -> currentOnOpenQueue(effect.id)
-                is HomeEffect.ShowError -> snackbarHostState.showSnackbar(effect.message)
+                is HomeEffect.ShowError -> {
+                    val message =
+                        when (effect.error) {
+                            HomeError.LoadFailed -> loadFailedMessage
+                        }
+                    snackbarHostState.showSnackbar(message)
+                }
             }
         }
     }
@@ -167,7 +180,7 @@ private fun HomeContent(
                 LoadingState(modifier = Modifier.padding(RusuhSpacing.xl))
 
             state.error != null && state.events.isEmpty() ->
-                ErrorState(message = state.error, onRetry = actions.onRetry)
+                HomeErrorState(onRetry = actions.onRetry)
 
             else ->
                 PullToRefreshBox(
@@ -250,6 +263,47 @@ private fun SectionHeader(
 }
 
 /**
+ * Full-screen error state for the Home screen with localized strings.
+ *
+ * Shows the error title, body and a retry button. The strings are resolved
+ * here from the typed [HomeError] so the ViewModel never produces user-visible text.
+ */
+@Composable
+private fun HomeErrorState(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(RusuhSpacing.xl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(Res.string.home_error_title),
+            style = MaterialTheme.typography.headlineMedium,
+            color = RusuhColors.Ink,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = stringResource(Res.string.home_error_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = RusuhColors.Ink2,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = RusuhSpacing.sm),
+        )
+        Button(
+            onClick = onRetry,
+            modifier = Modifier.padding(top = RusuhSpacing.xl),
+        ) {
+            Text(text = stringResource(Res.string.action_retry))
+        }
+    }
+}
+
+/**
  * Shown inside the pull-to-refresh box when the loaded list is empty.
  *
  * Uses a vertically-scrollable column so [PullToRefreshBox] has a scroll
@@ -311,5 +365,5 @@ private fun HomeScreenEmptyPreview() {
 @Suppress("UnusedPrivateMember")
 @Composable
 private fun HomeScreenErrorPreview() {
-    RusuhTheme { HomeScreen(state = HomeState(error = "Failed to load events"), dispatch = {}) }
+    RusuhTheme { HomeScreen(state = HomeState(error = HomeError.LoadFailed), dispatch = {}) }
 }

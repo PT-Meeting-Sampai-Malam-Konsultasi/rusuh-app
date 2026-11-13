@@ -8,9 +8,11 @@ import org.koin.android.ext.koin.androidLogger
 class RusuhApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Mock or real host: NetworkConfig.MOCK_API in the shared module (debug only; release is always real).
+        // Flavor-aware initialization: staging allows mock/stub in debug, production is always Production + Real.
         initKoinForBuild(
             isDebug = BuildConfig.DEBUG,
+            allowDebugOptions = BuildConfig.ALLOW_DEBUG_OPTIONS,
+            environmentName = BuildConfig.ENVIRONMENT,
             backendModeName = BuildConfig.BACKEND_MODE,
             mockApiOverride = BuildConfig.MOCK_API_OVERRIDE.toBooleanStrictOrNull(),
         ) {

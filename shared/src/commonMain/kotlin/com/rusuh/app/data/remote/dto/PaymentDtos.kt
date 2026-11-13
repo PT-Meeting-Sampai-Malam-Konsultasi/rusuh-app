@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 /**
  * `GET /core/payments/{bookingId}` response: the payment summary shown while the hold is active.
  * Maps to [com.rusuh.app.domain.model.PaymentSummary].
+ *
+ * Reuses [AttendeeDto] and [PriceBreakdownDto] from BookingDtos.kt.
  */
 @Serializable
 data class PaymentViewDto(
@@ -25,36 +27,8 @@ data class PaymentViewDto(
     @SerialName("snapClientKey") val snapClientKey: String = "",
 )
 
-/** One attendee line in the payment summary: category + masked NIK. */
-@Serializable
-data class AttendeeDto(
-    @SerialName("categoryId") val categoryId: String = "",
-    @SerialName("categoryName") val categoryName: String = "",
-    @SerialName("fullName") val fullName: String = "",
-    @SerialName("nikMasked") val nikMasked: String = "",
-)
-
-/** Price breakdown from the booking, used in both booking and payment summaries. */
-@Serializable
-data class PriceBreakdownDto(
-    @SerialName("lines") val lines: List<PriceLineDto> = emptyList(),
-    @SerialName("ticketSubtotal") val ticketSubtotal: MoneyDto = MoneyDto(),
-    @SerialName("adminFee") val adminFee: MoneyDto = MoneyDto(),
-    @SerialName("tax") val tax: MoneyDto? = null,
-    @SerialName("total") val total: MoneyDto = MoneyDto(),
-)
-
-/** One line in the price breakdown: category × quantity. */
-@Serializable
-data class PriceLineDto(
-    @SerialName("categoryId") val categoryId: String = "",
-    @SerialName("name") val name: String = "",
-    @SerialName("quantity") val quantity: Int = 0,
-    @SerialName("unitPrice") val unitPrice: MoneyDto = MoneyDto(),
-    @SerialName("lineTotal") val lineTotal: MoneyDto = MoneyDto(),
-)
-
-// Note: MoneyDto is defined in EventDtos.kt and reused here.
+// Note: AttendeeDto, PriceBreakdownDto, PriceLineDto are defined in BookingDtos.kt
+// Note: MoneyDto is defined in EventDtos.kt
 
 /**
  * `POST /core/payments/{bookingId}/snap` response: the Midtrans Snap transaction details.

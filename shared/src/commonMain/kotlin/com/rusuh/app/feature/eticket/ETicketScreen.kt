@@ -52,15 +52,12 @@ import rusuh_app.shared.generated.resources.eticket_page_title
 
 /**
  * Callbacks the e-ticket page raises. All default to no-ops so previews can render the screen.
- *
- * @param onAddToCalendar null while "Tambah ke kalender" is not wired: the button is shown but does nothing.
  */
 data class ETicketActions(
     val onTabSelected: (RusuhTab) -> Unit = {},
     val onRetry: () -> Unit = {},
     val onBackToTickets: () -> Unit = {},
-    // TODO(FR-22 calendar slice): Android calendar intent / iOS EventKit; inert in the first PR.
-    val onAddToCalendar: (() -> Unit)? = null,
+    val onAddToCalendar: () -> Unit = {},
 )
 
 /**
@@ -72,11 +69,12 @@ fun ETicketRoute(
     viewModel: ETicketViewModel,
     onBack: () -> Unit,
     onTabSelected: (RusuhTab) -> Unit,
+    onNoCalendarApp: () -> Unit,
     modifier: Modifier = Modifier,
-    onAddToCalendar: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsState()
     val currentOnBack by rememberUpdatedState(onBack)
+    val currentOnNoCalendarApp by rememberUpdatedState(onNoCalendarApp)
 
     LaunchedEffect(viewModel) { viewModel.dispatch(ETicketIntent.Load) }
     DisposableEffect(viewModel) { onDispose { viewModel.clear() } }
@@ -84,6 +82,8 @@ fun ETicketRoute(
         viewModel.effect.collect { effect ->
             when (effect) {
                 ETicketEffect.NavigateBack -> currentOnBack()
+                is ETicketEffect.LaunchCalendar -> { /* Calendar was launched successfully; no navigation needed */ }
+                ETicketEffect.NoCalendarApp -> currentOnNoCalendarApp()
             }
         }
     }
@@ -95,7 +95,7 @@ fun ETicketRoute(
                 onTabSelected = onTabSelected,
                 onRetry = { viewModel.dispatch(ETicketIntent.Retry) },
                 onBackToTickets = { viewModel.dispatch(ETicketIntent.Back) },
-                onAddToCalendar = onAddToCalendar,
+                onAddToCalendar = { viewModel.dispatch(ETicketIntent.AddToCalendar) },
             ),
     )
 }
@@ -148,7 +148,7 @@ fun ETicketScreen(
 @Composable
 private fun ETicketContent(
     ui: ETicketUi,
-    onAddToCalendar: (() -> Unit)?,
+    onAddToCalendar: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

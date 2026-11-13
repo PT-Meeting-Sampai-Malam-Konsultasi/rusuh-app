@@ -102,27 +102,39 @@ ApiClient(baseUrl, client = HttpClient(MockEngine { respond(...) }) { configure(
 
 See `ApiClientTest` for success, 204, problem+json, 5xx, timeout, malformed body and cancellation examples.
 
-## Environments and hosts
+## Environments, flavors and hosts
 
-`AppEnvironment { Mock, Staging, Production }` picks the backend. The ONE switch between the local mock and the real
-host is `NetworkConfig.MOCK_API` (`data/network/NetworkConfig.kt`). Android debug builds can override it with
-`-PmockApi=true` or `-PmockApi=false`; an empty property uses the constant.
+`AppEnvironment { Mock, Staging, Production }` picks the backend. Android has two product flavors in the `environment`
+dimension:
 
-| Build | `MOCK_API = true` | `MOCK_API = false` |
-|---|---|---|
-| Debug | `Mock` + `BackendMode.Real`: HTTP to the local Mockoon | `Staging` + `BackendMode.Real`: HTTP to the real host |
-| Release | `Production` + `Real` (the flag is ignored) | `Production` + `Real` |
+| Flavor | `ENVIRONMENT` | `ALLOW_DEBUG_OPTIONS` | Launcher name |
+|--------|---------------|-----------------------|---------------|
+| `staging` | `"Staging"` | `true` | Rusuh Staging |
+| `production` | `"Production"` | `false` | Rusuh |
 
-Run modes: Stub `./gradlew :androidApp:assembleDebug -PbackendMode=Stub`; Mock `./gradlew :androidApp:assembleDebug -PmockApi=true`;
-Live staging `./gradlew :androidApp:assembleDebug -PmockApi=false`.
+Both flavors share the same `applicationId` (`com.rusuh.app.android`) and Firebase app.
 
-The platform entry points only say whether the build is debug and pass the optional debug-only backend mode override
-to `initKoinForBuild(isDebug, backendModeName)`, which asks `NetworkConfig.startup`: Android `RusuhApplication` passes
-`BuildConfig.DEBUG`, `BuildConfig.BACKEND_MODE` and the optional debug `MOCK_API_OVERRIDE`, iOS `iOSApp.swift` calls `KoinIosKt.doInitKoin(isDebug:backendModeName:)`
-inside `#if DEBUG` / `#else`. A release build can never select the mock or stub data: `startup` ignores the flag and
-the override unless `isDebug`, `NetworkConfigTest` covers every combination, and `./gradlew
-:androidApp:verifyReleaseNeverUsesMockApi` (part of `:androidApp:check`) checks the generated release `BuildConfig`
-(`DEBUG = false`, empty `BACKEND_MODE` and `MOCK_API_OVERRIDE`).
+The **staging** flavor in a **debug** build can switch between mock/stub/live:
+
+| Option | Command | Environment + mode |
+|--------|---------|-------------------|
+| Mock (Mockoon) | `./gradlew :androidApp:assembleStagingDebug -PmockApi=true` | `Mock` + `Real` |
+| Live staging | `./gradlew :androidApp:assembleStagingDebug -PmockApi=false` | `Staging` + `Real` |
+| Stub (offline) | `./gradlew :androidApp:assembleStagingDebug -PbackendMode=Stub` | uses `Stub` mode |
+
+The **production** flavor is **always** `Production` + `Real`, even in debug builds. The `-PmockApi` and `-PbackendMode`
+flags have no effect on production variants. Gradle guards verify this:
+- `verifyProductionFlavorHasNoDebugOptions`: checks `ALLOW_DEBUG_OPTIONS = false` and empty overrides in all production variants.
+- `verifyReleaseNeverUsesMockApi`: checks all release variants have `DEBUG = false` and empty overrides.
+
+Release builds (any flavor) always use `Production` + `Real`.
+
+The platform entry points pass the flavor's `BuildConfig` fields to `initKoinForBuild`:
+- Android `RusuhApplication` passes `DEBUG`, `ALLOW_DEBUG_OPTIONS`, `ENVIRONMENT`, `BACKEND_MODE` and `MOCK_API_OVERRIDE`.
+- iOS `iOSApp.swift` calls `KoinIosKt.doInitKoin(isDebug:backendModeName:)` inside `#if DEBUG` / `#else`. iOS has no
+  flavors yet (follow-up: xcconfig per environment); it behaves like the staging flavor (`allowDebugOptions = true`).
+
+`NetworkConfigTest` covers every flavor × build-type × override combination.
 
 `ApiConfig.forEnvironment(env)` returns three independently configured hosts: `baseUrl` (api), `queueBaseUrl`
 (`q.`) and `payBaseUrl` (`pay.`). Every URL is validated at construction (blank, malformed or non-http(s) throws
@@ -190,7 +202,7 @@ whether repositories talk to them. Three debug ways to run the app:
 | Mode | Environment + mode | Network | Repositories | Needs |
 |---|---|---|---|---|
 | Stub (offline demo) | `Stub` (`-PbackendMode=Stub`; iOS scheme `BACKEND_MODE=Stub`) | None; in-process `StubEngine` | Stub repositories | Nothing |
-| Mock (debug) | `Mock` + `Real` (`-PmockApi=true`; empty uses `MOCK_API`) | HTTP to Mockoon at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth; stub Detail and Tickets | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
+| Mock (debug) | `Mock` + `Real` (`-PmockApi=true`; empty uses `MOCK_API`) | HTTP to Mockoon at `platformMockBaseUrl` | Real Home, Waiting Room, My Queues, Device, Auth, Detail, Tickets | `mockoon-cli start --data rusuh-mock.json -X` (`workspace-local/mockoon`) |
 | Live staging (debug) | `Staging` + `Real` (`-PmockApi=false`) | HTTP to `https://api.rusuh-tiket.web.id/v1` | Same repositories as Mock | The staging backend |
 
 Release builds always use `Production` + `Real` over HTTPS.
@@ -204,18 +216,26 @@ Release builds always use `Production` + `Real` over HTTPS.
   `StubClock`, so countdowns run.
 - Real repositories (`data/repository`): `RealHomeRepository` (`GET /core/events`), `RealQueueRepository` (behind both
   `WaitingRoomRepository` and `QueueRepository`: join, frontier polling at the ADR-0003 cadence, claim, leave),
-  `RealMyQueuesRepository`, `RealDeviceRepository` (`POST /queue/devices`, the install id lives in the `SecureStore`). They
-  are built on `EventApiService`, `QueueApiService` and `DeviceApiService` (`data/remote`), which use the `Api` and
+  `RealMyQueuesRepository`, `RealDeviceRepository` (`POST /queue/devices`, the install id lives in the `SecureStore`),
+  `RealTicketsRepository` (`GET /core/tickets`, `GET /core/tickets/{ticketId}`). They
+  are built on `EventApiService`, `QueueApiService`, `DeviceApiService` and `TicketApiService` (`data/remote`), which use the `Api` and
   `Queue` clients (`/devices` and `/queue/*` belong to the queue service). Failed calls surface as `DomainException`
   (carrying the `DomainResult`), `SignInRequiredException` for a guest claim. `QueuePacing` makes the waits and the
   jitter injectable, so tests run in virtual time.
+- `RealTicketsRepository`: fetches the signed-in user's tickets from `GET /core/tickets`, groups flat tickets by
+  `bookingId` into orders, and enriches them with event facts from `GET /core/events/{eventId}` (cached per event in
+  `TicketsCache` so the e-ticket page does not refetch). A 401 is handled by the session layer (refresh or session
+  expired). shortcut: The Ticket schema does not include order number (`orderCode`), total, payment method, paid-at
+  time, or contact email; these fields are left blank/placeholder in the domain model. The UI degrades gracefully.
 - Temporary fallback (`shortcut:`): a repository without a real implementation resolves to its stub in `Real` mode and
-  logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)` once. Detail and Tickets are the
-  ones left. The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES` (`DataModule.kt`, default `true`) controls it;
-  set it to `false`, or pass `dataModule(mode, allowStubFallback = false)`, for the strict behaviour: resolving such a
-  repository throws `RealRepositoryNotAvailableException`. Remove the constant and fallback when Tickets
-  (TICKET-00-M4) and Detail (#80 #81 #82) land: a feature ticket then binds its real repository in place of that
-  repository's `notYetReal(...)` line.
+  logs `WARNING: <Repository> has no real implementation yet ... STUB (fake data)` once. `PaymentRepository` is the
+  only one left: the payment routes (`/core/payments/...`) are NOT deployed on the live staging backend (they return
+  404), so it uses stub data. The constant `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`) lists `PaymentRepository`;
+  flipping to the real repository is a one-line change once the routes go live (replace the `stubOrFail` binding with
+  `RealPaymentRepository(get())` and remove from the list). The constant `ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES`
+  (default `true`) controls the fallback; set it to `false`, or pass `dataModule(mode, allowStubFallback = false)`,
+  for the strict behaviour: resolving a repository without a real implementation throws
+  `RealRepositoryNotAvailableException`.
 - Queue polling resilience: a transient failure inside the wait (network, 408, 429, 5xx) is retried with capped
   exponential backoff (2, 4, 8, 16, 30 s, `QueuePacing.backoffMillis`) that honours `Retry-After` (capped at 2 min); the
   flow fails after 5 failures in a row, or at once on a failure waiting cannot fix (401/403/404). Any success resets the
@@ -233,9 +253,8 @@ Release builds always use `Production` + `Real` over HTTPS.
   expiry is judged against the device wall clock with a one day margin (`wallClockMillis`, used for nothing else).
 - My Queues reads entries in parallel (at most 4). An entry is dropped on 401/410/closed (and forgotten), left out but
   kept on 404 or a transient failure; the load fails only when every entry failed.
-- Release builds still show FAKE Detail and Tickets data through the fallback above (one WARNING each). The list is
-  `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`, checked against the bindings by `DataModuleTest`): currently
-  `TicketsRepository` and `DetailRepository`. `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
+- `REPOSITORIES_STILL_ON_STUBS` (`DataModule.kt`, checked against the bindings by `DataModuleTest`) contains
+  `PaymentRepository`: the payment routes are not deployed on live staging (404). `:androidApp:verifyReleaseNeverUsesMockApi` runs before `assembleRelease`.
 - Mockoon (`workspace-local/mockoon`) simulates a moving queue: the frontier is SEQUENTIAL (served 100, 130, ..., two
   paused polls, then `served >= seq`), claim answers 409 `NOT_YET` once and then 200. Restart it to replay the sequence.
 - TODO(FR-04-M4 #30): the last 2,000 places also get SSE (ADR-0015); only polling is implemented.
@@ -519,6 +538,17 @@ and `TokenRefresher` can be rebound to replace the call. Tests inject a fake lam
 `newIdempotencyKey()` returns a random UUID. Rule: one key per user attempt, the same key on every retry of that
 attempt, a new key only for a new user attempt. Never auto-retry a charging or creating POST with a different key: that
 is a second charge. Keep the key in the ViewModel/use case state for the attempt (not in the ApiService).
+
+**When to regenerate:**
+- New user attempt (fresh form submission, after fixing a validation error that requires user action).
+- Non-recoverable errors (admission expired, sold out) where the user must start over.
+
+**When to keep the same key:**
+- Transient errors (`NetworkError`, `ServiceUnavailable`, `RateLimited`): the original request may have succeeded
+  server-side, and the server de-duplicates by key. The user tapping "try again" after a timeout should use the
+  same key, not create a second booking.
+- The `DetailViewModel` keeps the key across network failures and only regenerates it for errors that require user
+  action (form changes, re-queueing).
 
 ### Server clock
 

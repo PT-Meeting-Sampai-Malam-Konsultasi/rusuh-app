@@ -7,15 +7,19 @@ import com.rusuh.app.data.platform.AttestationProvider
 import com.rusuh.app.data.platform.DevAttestationProvider
 import com.rusuh.app.data.platform.platformName
 import com.rusuh.app.data.remote.AuthApiService
+import com.rusuh.app.data.remote.BookingApiService
 import com.rusuh.app.data.remote.DeviceApiService
 import com.rusuh.app.data.remote.EventApiService
 import com.rusuh.app.data.remote.PaymentApiService
 import com.rusuh.app.data.remote.QueueApiService
+import com.rusuh.app.data.remote.TicketApiService
 import com.rusuh.app.data.repository.RealAuthRepository
+import com.rusuh.app.data.repository.RealDetailRepository
 import com.rusuh.app.data.repository.RealDeviceRepository
 import com.rusuh.app.data.repository.RealHomeRepository
 import com.rusuh.app.data.repository.RealMyQueuesRepository
 import com.rusuh.app.data.repository.RealQueueRepository
+import com.rusuh.app.data.repository.RealTicketsRepository
 import com.rusuh.app.data.repository.StubAuthRepository
 import com.rusuh.app.data.repository.StubDetailRepository
 import com.rusuh.app.data.repository.StubMyQueuesRepository
@@ -47,107 +51,127 @@ import org.koin.dsl.onClose
 /**
  * shortcut: TEMPORARY. While a repository has no real (network) implementation, [BackendMode.Real] resolves its
  * stub and logs a WARNING instead of crashing, so Staging and Release builds start. Home, the Waiting Room, My
- * Queues, the device identity and auth are real now; what is left is Tickets (TICKET-00-M4) and Detail (FR-15/16/17-M1
- * #80 #81 #82). Remove this constant, the fallback and its tests when those land. Set it to false (or pass
- * `allowStubFallback = false`) for the strict behaviour: [RealRepositoryNotAvailableException].
+ * Queues, the device identity, auth, Detail and Tickets are all real now; PaymentRepository remains on stub because
+ * the payment routes are NOT deployed on the live backend (404). Remove this constant, the fallback and its tests
+ * when the payment routes go live. Set it to false (or pass `allowStubFallback = false`) for the strict behaviour:
+ * [RealRepositoryNotAvailableException].
  */
 const val ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES = true
 
 /**
  * The repositories that still resolve to FAKE data in [BackendMode.Real] while the fallback is on, release builds
  * included (each logs one WARNING when first resolved). A release screen backed by one of them shows stub data: this
- * list is the signal, kept in sync with the `notYetReal(...)` bindings by `DataModuleTest` and quoted in
+ * list is the signal, kept in sync with the `stubOrFail(...)` bindings by `DataModuleTest` and quoted in
  * docs/data-layer.md. Shrink it as the real repositories land; remove the fallback when it is empty.
+ *
+ * PaymentRepository: the payment routes (`/core/payments/...`) are NOT deployed on the live staging backend (they
+ * return 404). The stub is documented; flipping to the real repository is a one-line change once the routes go live:
+ * replace `stubOrFail("PaymentRepository", ...)` with `RealPaymentRepository(get())` and remove from this list.
  */
-val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("TicketsRepository", "DetailRepository", "PaymentRepository")
+val REPOSITORIES_STILL_ON_STUBS: List<String> = listOf("PaymentRepository")
 
 /**
- * Binds every repository interface to its stub or its real implementation, per [mode].
+ * Binds every repository interface to its stub or its real implementation, per [mode]; every environment defaults to
+ * [BackendMode.Real] (see [BackendMode.defaultFor]), [BackendMode.Stub] is a debug-only opt-in.
+ *
+ * - [BackendMode.Stub]: stub repositories, and the shared [HttpClient] (from `coreModule`) is replaced by one on an
+ *   in-process [StubEngine], so ApiServices built on the injected `ApiClient`s run with zero network. The
+ *   [ServerClock] is the demo's ticking [StubClock], so countdowns run. The client is closed with Koin.
+ * - [BackendMode.Real]: the [ServerClock] is the one from `coreModule`, synced from `serverNow` in responses.
+ *   Home, Waiting Room, My Queues, Queue, Device, Auth, Detail and Tickets are all network implementations.
+ *   PaymentRepository uses stub fallback (routes return 404), see [REPOSITORIES_STILL_ON_STUBS].
+ *
+ * The ApiServices and the `DeviceRepository` are bound in both modes: in stub mode the ApiServices run on the
+ * [StubEngine]. The [SessionManager] is bound per mode (Real: the secure `TokenStore`; Stub: an in-memory one).
+ * `AuthRepository` is the network one in Real and a hand-written demo
+ * (`StubAuthRepository`, code 123456) in Stub; both drive the same [SessionManager].
  *
  * Load it after `coreModule()`. A function, not a `val`, for the same reason as `coreModule()`.
  */
+@Suppress("LongMethod")
 fun dataModule(
     mode: BackendMode,
     allowStubFallback: Boolean = ALLOW_STUB_FALLBACK_UNTIL_REAL_REPOSITORIES,
     warn: (String) -> Unit = { println(it) },
 ): Module =
     module {
-        bindCommonServices()
+        single<AttestationProvider> { DevAttestationProvider() }
+
+        single { EventApiService(get(ApiClientQualifier.Api)) }
+        // Device registration and queue endpoints share the queue path prefix on the staging host.
+        single { DeviceApiService(get(ApiClientQualifier.Queue)) }
+        single { QueueApiService(get(ApiClientQualifier.Queue)) }
+        // Auth is served by the core (api) host, like the refresh call of the session layer.
+        single { AuthApiService(get(ApiClientQualifier.Api)) }
+        // Tickets API is served by the core (api) host.
+        single { TicketApiService(get(ApiClientQualifier.Api)) }
+        // Booking API (categories, attendee validation, booking create/get/cancel).
+        single { BookingApiService(get(ApiClientQualifier.Api), get()) }
+        // Payment API is served by the core (api) host.
+        single { PaymentApiService(get(ApiClientQualifier.Api)) }
+        // Auth state layer (both modes): the sign-out counter and the read-only session view the screens use.
+        single { AuthGeneration() }
+        single<SessionObserver> { SessionManagerObserver(get(), get()) }
+        single<DeviceRepository> {
+            RealDeviceRepository(
+                api = get(),
+                tokens = get(),
+                secureStore = get(),
+                cache = get(),
+                serverClock = get(),
+                platform = platformName,
+                attestationProvider = get(),
+            )
+        }
 
         when (mode) {
-            BackendMode.Stub -> bindStubRepositories()
-            BackendMode.Real -> bindRealRepositories(allowStubFallback, warn)
+            BackendMode.Stub -> {
+                // In-memory tokens: the placeholder tokens of the stub never reach the real secure store, and a stub
+                // run always starts signed out.
+                single { SessionManager(tokenStore = InMemoryTokenStore(), events = get()) } onClose { it?.close() }
+                single<SessionStateProvider> { get<SessionManager>() }
+                single { StubClock.ticking() }
+                single<ServerClock> { get<StubClock>() }
+                single { StubEngine(get()) }
+                single<HttpClient> { StubEngine.httpClient(get()) } onClose { it?.close() }
+                // shortcut: hand-written stub repositories until the feature tickets build the real ones.
+                single<HomeRepository> { StubHomeRepository() }
+                single<WaitingRoomRepository> { StubWaitingRoomRepository() }
+                single<QueueRepository> { StubQueueRepository(get()) }
+                single<TicketsRepository> { StubTicketsRepository() }
+                single<DetailRepository> { StubDetailRepository(get()) }
+                single<MyQueuesRepository> { StubMyQueuesRepository() }
+                single<AuthRepository> { StubAuthRepository(session = get(), clock = get()) }
+                single<PaymentRepository> { StubPaymentRepository(get()) }
+            }
+            BackendMode.Real -> {
+                single { SessionManager(tokenStore = get(), events = get()) } onClose { it?.close() }
+                single<SessionStateProvider> { get<SessionManager>() }
+                // ServerClock: coreModule's MonotonicServerClock, the instance the response plugin keeps in sync.
+                single<HomeRepository> { RealHomeRepository(get(), get(), get()) }
+                single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }
+                single<WaitingRoomRepository> { get<QueueRepository>() }
+                single<MyQueuesRepository> { RealMyQueuesRepository(get(), get(), get(), get(), get()) }
+                single<AuthRepository> {
+                    RealAuthRepository(
+                        api = get(),
+                        devices = get(),
+                        session = get(),
+                        refresher = get(),
+                    )
+                }
+                single<TicketsRepository> { RealTicketsRepository(get(), get(), get(), get()) }
+                single<DetailRepository> { RealDetailRepository(get(), get()) }
+                // PaymentRepository: routes NOT deployed on live staging (404). Uses stub until live.
+                // To flip: replace with `RealPaymentRepository(get())`, remove from REPOSITORIES_STILL_ON_STUBS.
+                single<PaymentRepository> {
+                    stubOrFail("PaymentRepository", allowStubFallback, warn) {
+                        StubPaymentRepository(StubClock.ticking())
+                    }
+                }
+            }
         }
     }
-
-/** Common services bound in both modes: API services, device repository, session observer. */
-private fun Module.bindCommonServices() {
-    single<AttestationProvider> { DevAttestationProvider() }
-    single { EventApiService(get(ApiClientQualifier.Api)) }
-    single { DeviceApiService(get(ApiClientQualifier.Queue)) }
-    single { QueueApiService(get(ApiClientQualifier.Queue)) }
-    single { AuthApiService(get(ApiClientQualifier.Api)) }
-    single { AuthGeneration() }
-    single<SessionObserver> { SessionManagerObserver(get(), get()) }
-    single<DeviceRepository> {
-        RealDeviceRepository(
-            api = get(),
-            tokens = get(),
-            secureStore = get(),
-            cache = get(),
-            serverClock = get(),
-            platform = platformName,
-            attestationProvider = get(),
-        )
-    }
-}
-
-/** Stub mode: in-memory tokens, StubEngine, stub repositories. */
-private fun Module.bindStubRepositories() {
-    single { SessionManager(tokenStore = InMemoryTokenStore(), events = get()) } onClose { it?.close() }
-    single<SessionStateProvider> { get<SessionManager>() }
-    single { StubClock.ticking() }
-    single<ServerClock> { get<StubClock>() }
-    single { StubEngine(get()) }
-    single<HttpClient> { StubEngine.httpClient(get()) } onClose { it?.close() }
-    single<HomeRepository> { StubHomeRepository() }
-    single<WaitingRoomRepository> { StubWaitingRoomRepository() }
-    single<QueueRepository> { StubQueueRepository(get()) }
-    single<TicketsRepository> { StubTicketsRepository() }
-    single<DetailRepository> { StubDetailRepository(get()) }
-    single<MyQueuesRepository> { StubMyQueuesRepository() }
-    single<AuthRepository> { StubAuthRepository(session = get(), clock = get()) }
-    single<PaymentRepository> { StubPaymentRepository(get()) }
-}
-
-/** Real mode: real session manager, real repositories with stub fallback for unimplemented ones. */
-private fun Module.bindRealRepositories(
-    allowStubFallback: Boolean,
-    warn: (String) -> Unit,
-) {
-    single { SessionManager(tokenStore = get(), events = get()) } onClose { it?.close() }
-    single<SessionStateProvider> { get<SessionManager>() }
-    // ServerClock: coreModule's MonotonicServerClock, the instance the response plugin keeps in sync.
-    single<HomeRepository> { RealHomeRepository(get(), get(), get()) }
-    single<QueueRepository> { RealQueueRepository(get(), get(), get(), get(), get(), get(), get()) }
-    single<WaitingRoomRepository> { get<QueueRepository>() }
-    single<MyQueuesRepository> { RealMyQueuesRepository(get(), get(), get(), get(), get()) }
-    single<AuthRepository> {
-        RealAuthRepository(api = get(), devices = get(), session = get(), refresher = get())
-    }
-    single<TicketsRepository> {
-        stubOrFail("TicketsRepository", allowStubFallback, warn) { StubTicketsRepository() }
-    }
-    single<DetailRepository> {
-        stubOrFail("DetailRepository", allowStubFallback, warn) { StubDetailRepository(get()) }
-    }
-    single { PaymentApiService(get(ApiClientQualifier.Api)) }
-    single<PaymentRepository> {
-        stubOrFail("PaymentRepository", allowStubFallback, warn) {
-            StubPaymentRepository(StubClock.ticking())
-        }
-    }
-}
 
 private fun <T> stubOrFail(
     repository: String,

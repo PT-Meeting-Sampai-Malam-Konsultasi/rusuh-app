@@ -96,30 +96,8 @@ data class PaymentStatusResult(
     val serverNow: Instant,
 )
 
-/**
- * Booking status as defined in the API contract.
- * SELECTION (5 min) → PAYMENT_PENDING (10 min) → PAID / EXPIRED / CANCELLED.
- */
-enum class BookingStatus {
-    SELECTION,
-    PAYMENT_PENDING,
-    HELD,
-    PAID,
-    EXPIRED,
-    CANCELLED,
-    ;
-
-    companion object {
-        fun fromWire(value: String?): BookingStatus =
-            value?.let { v -> entries.firstOrNull { it.name.equals(v, ignoreCase = true) } } ?: SELECTION
-    }
-
-    /** True when the booking is in a final state (no more changes possible). */
-    val isFinal: Boolean get() = this in setOf(PAID, EXPIRED, CANCELLED)
-
-    /** True when the payment arrived in time and tickets are issued. */
-    val isPaid: Boolean get() = this == PAID
-}
+// BookingStatus is defined in DetailModels.kt with values: SELECTION, PAYMENT_PENDING, HELD, PAID,
+// EXPIRED, CANCELLED, REFUND_PENDING, REFUNDED. It includes helper properties isFinal and isPaid.
 
 /**
  * Payment status as defined in the API contract.

@@ -113,6 +113,7 @@ fun RusuhNavGraph(navController: NavHostController) {
                         popUpTo(Screen.Detail.route) { inclusive = true }
                     }
                 },
+                // Navigate to payment, popping Detail so back from payment returns to the event list.
                 onPayment = { bookingId ->
                     navController.navigate(Screen.Payment.routeFor(bookingId)) {
                         popUpTo(Screen.Detail.route) { inclusive = true }
@@ -129,10 +130,12 @@ fun RusuhNavGraph(navController: NavHostController) {
             val orderId = backStackEntry.arguments?.getString(Screen.ETicket.ARG_ORDER_ID).orEmpty()
             val koin = getKoin()
             val viewModel = remember(orderId) { koin.get<ETicketViewModel> { parametersOf(orderId) } }
+            // Snackbar/Toast for NoCalendarApp is a future enhancement
             ETicketRoute(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onTabSelected = { tab -> navController.switchTab(tab) },
+                onNoCalendarApp = { /* Show message in future - for now the calendar was still attempted */ },
             )
         }
 

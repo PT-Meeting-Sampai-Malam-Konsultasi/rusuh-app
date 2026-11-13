@@ -55,6 +55,7 @@ import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
 import rusuh_app.shared.generated.resources.Res
 import rusuh_app.shared.generated.resources.eticket_add_to_calendar
+import rusuh_app.shared.generated.resources.eticket_add_to_calendar_description
 import rusuh_app.shared.generated.resources.eticket_at_door_title
 import rusuh_app.shared.generated.resources.eticket_doors_label
 import rusuh_app.shared.generated.resources.eticket_doors_value
@@ -87,7 +88,7 @@ import rusuh_app.shared.generated.resources.eticket_weekdays_short
 @Composable
 internal fun ETicketIntro(
     ui: ETicketUi,
-    onAddToCalendar: (() -> Unit)?,
+    onAddToCalendar: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(RusuhSpacing.xl)) {
         PaidStamp(ui.paidAt)
@@ -137,9 +138,10 @@ private fun PaidStamp(paidAt: EventMoment) {
     )
 }
 
-/** Outlined action; inert while [onClick] is null, but it keeps its Button role and 44dp+ target. */
+/** Outlined action with accessibility label for the calendar button. */
 @Composable
-private fun CalendarButton(onClick: (() -> Unit)?) {
+private fun CalendarButton(onClick: () -> Unit) {
+    val description = stringResource(Res.string.eticket_add_to_calendar_description)
     Box(modifier = Modifier.fillMaxWidth().padding(end = RusuhSpacing.shadowSm, bottom = RusuhSpacing.shadowSm)) {
         Box(
             contentAlignment = Alignment.Center,
@@ -153,8 +155,9 @@ private fun CalendarButton(onClick: (() -> Unit)?) {
                         shadow = RusuhBrandColors.Ink,
                         shadowOffset = RusuhSpacing.shadowSm,
                     )
-                    .clickable(role = Role.Button, onClick = onClick ?: {})
-                    .padding(horizontal = RusuhSpacing.xl, vertical = RusuhSpacing.md),
+                    .clickable(role = Role.Button, onClick = onClick)
+                    .padding(horizontal = RusuhSpacing.xl, vertical = RusuhSpacing.md)
+                    .semantics { contentDescription = description },
         ) {
             Text(
                 text = stringResource(Res.string.eticket_add_to_calendar),

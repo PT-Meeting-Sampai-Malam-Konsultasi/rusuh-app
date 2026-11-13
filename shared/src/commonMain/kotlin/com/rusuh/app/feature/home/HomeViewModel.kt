@@ -33,12 +33,11 @@ class HomeViewModel(
             val events = repository.getEvents()
             setState { copy(isLoading = false, events = events, error = null) }
         } catch (
-            // Intentionally broad: any repository/network failure maps to an error state.
-            @Suppress("TooGenericExceptionCaught") e: Exception,
+            @Suppress("TooGenericExceptionCaught", "SwallowedException") e: Exception,
         ) {
-            val message = e.message ?: "Failed to load events"
-            setState { copy(isLoading = false, error = message) }
-            sendEffect(HomeEffect.ShowError(message))
+            val error = HomeError.LoadFailed
+            setState { copy(isLoading = false, error = error) }
+            sendEffect(HomeEffect.ShowError(error))
         }
     }
 }

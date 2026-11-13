@@ -8,17 +8,27 @@ Shared screen tests run on the JVM with Robolectric and need no emulator:
 ./gradlew :shared:testDebugUnitTest
 ```
 
-The Android smoke test is opt-in and requires a running emulator or device. It launches the debug app with the Stub backend and walks through sign-in using the synthetic code `123456`:
+The Android smoke test is opt-in and requires a running emulator or device. With build flavors, the task name includes the flavor. For staging (the default development flavor), it launches the staging debug app with the Stub backend and walks through sign-in using the synthetic code `123456`:
 
 ```sh
-./gradlew :androidApp:connectedDebugAndroidTest -PbackendMode=Stub
+./gradlew :androidApp:connectedStagingDebugAndroidTest -PbackendMode=Stub
 ```
 
-The connected test is intentionally not part of CI. Build its APK without a device using `./gradlew :androidApp:assembleDebugAndroidTest`.
+For production flavor (testing production configuration without debug options):
+
+```sh
+./gradlew :androidApp:connectedProductionDebugAndroidTest
+```
+
+The connected tests are intentionally not part of CI. Build the test APKs without a device using `./gradlew :androidApp:assembleStagingDebugAndroidTest` or `./gradlew :androidApp:assembleProductionDebugAndroidTest`.
 
 ## Test task differences
 
-- `:shared:testDebugUnitTest` runs Android-specific unit tests in the `androidUnitTest` source set under Robolectric. This includes Compose UI tests that need Android resources and the Robolectric shadow framework.
+With build flavors (staging and production), the task names include the flavor:
+
+- `:shared:testDebugUnitTest` runs Android-specific unit tests in the `androidUnitTest` source set under Robolectric. This includes Compose UI tests that need Android resources and the Robolectric shadow framework. The shared module has no flavor dimension.
+- `:androidApp:testStagingDebugUnitTest` runs Android app unit tests for the staging debug variant.
+- `:androidApp:testProductionDebugUnitTest` runs Android app unit tests for the production debug variant.
 - `:shared:allTests` runs tests from all source sets: `commonTest` (pure Kotlin tests that run on every target), plus each platform's test source set. On Android it invokes `testDebugUnitTest`; on JVM/Native it runs the corresponding test tasks.
 
 In practice, `allTests` is a superset. CI runs both to ensure common tests pass on all targets and Android-specific tests pass with Robolectric.

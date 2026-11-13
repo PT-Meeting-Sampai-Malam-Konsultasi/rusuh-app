@@ -18,6 +18,11 @@ transaction, so no Midtrans server key is needed in the app.
 
 All endpoints require a Bearer token. Currently NOT deployed on live staging (404).
 
+**Stub fallback**: Because the payment routes return 404 on the live backend, `PaymentRepository` uses
+`StubPaymentRepository` in `BackendMode.Real` (listed in `REPOSITORIES_STILL_ON_STUBS` in `DataModule.kt`).
+Flipping to the real repository is a one-line change: replace the `stubOrFail` binding with
+`RealPaymentRepository(get())` and remove `"PaymentRepository"` from `REPOSITORIES_STILL_ON_STUBS`.
+
 ### GET /core/payments/{bookingId}
 
 Returns `PaymentView`: order summary, price breakdown, countdown, Snap client key.

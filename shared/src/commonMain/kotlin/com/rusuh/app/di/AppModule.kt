@@ -65,7 +65,7 @@ val appModule =
         factory { SignInViewModel(get(), get(), get(), get(), get()) }
         factory { AccountViewModel(get(), get(), get()) }
         factory { GetETicketUseCase(get()) }
-        factory { (orderId: String) -> ETicketViewModel(orderId, get()) }
+        factory { (orderId: String) -> ETicketViewModel(orderId, get(), get()) }
 
         // Detail ticket page (the ServerClock is bound per backend mode in dataModule).
         factory { GetDetailUseCase(get()) }
