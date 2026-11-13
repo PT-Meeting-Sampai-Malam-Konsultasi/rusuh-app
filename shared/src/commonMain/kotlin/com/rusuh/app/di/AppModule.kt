@@ -8,10 +8,13 @@ import com.rusuh.app.domain.usecase.GetDetailUseCase
 import com.rusuh.app.domain.usecase.GetMyQueuesUseCase
 import com.rusuh.app.domain.usecase.GetProfileUseCase
 import com.rusuh.app.domain.usecase.LeaveQueueUseCase
+import com.rusuh.app.domain.usecase.LoadPaymentUseCase
+import com.rusuh.app.domain.usecase.ObservePaymentStatusUseCase
 import com.rusuh.app.domain.usecase.ObserveSessionUseCase
 import com.rusuh.app.domain.usecase.RequestOtpUseCase
 import com.rusuh.app.domain.usecase.SaveDisplayNameUseCase
 import com.rusuh.app.domain.usecase.SignOutUseCase
+import com.rusuh.app.domain.usecase.StartSnapPaymentUseCase
 import com.rusuh.app.domain.usecase.ValidateAttendeeUseCase
 import com.rusuh.app.domain.usecase.VerifyOtpUseCase
 import com.rusuh.app.feature.account.AccountViewModel
@@ -20,6 +23,8 @@ import com.rusuh.app.feature.detail.DetailViewModel
 import com.rusuh.app.feature.eticket.ETicketViewModel
 import com.rusuh.app.feature.eticket.GetETicketUseCase
 import com.rusuh.app.feature.home.HomeViewModel
+import com.rusuh.app.feature.payment.PaymentResultViewModel
+import com.rusuh.app.feature.payment.PaymentViewModel
 import com.rusuh.app.feature.queues.MyQueuesViewModel
 import com.rusuh.app.feature.tickets.GetMyTicketsUseCase
 import com.rusuh.app.feature.tickets.TicketsViewModel
@@ -72,4 +77,11 @@ val appModule =
         factory { GetMyQueuesUseCase(get()) }
         factory { MyQueuesViewModel(get()) }
         factory { TicketsViewModel(get()) }
+
+        // Payment (FR-06-M4 #45, #98, #85).
+        factory { LoadPaymentUseCase(get()) }
+        factory { StartSnapPaymentUseCase(get()) }
+        factory { ObservePaymentStatusUseCase(get()) }
+        factory { (bookingId: String) -> PaymentViewModel(bookingId, get(), get(), get()) }
+        factory { (bookingId: String) -> PaymentResultViewModel(bookingId, get(), get()) }
     }

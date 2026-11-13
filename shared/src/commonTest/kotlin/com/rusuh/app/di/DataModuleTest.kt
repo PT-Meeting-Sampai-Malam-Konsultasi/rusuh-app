@@ -30,6 +30,7 @@ import com.rusuh.app.domain.repository.AuthRepository
 import com.rusuh.app.domain.repository.DetailRepository
 import com.rusuh.app.domain.repository.DeviceRepository
 import com.rusuh.app.domain.repository.MyQueuesRepository
+import com.rusuh.app.domain.repository.PaymentRepository
 import com.rusuh.app.domain.repository.QueueRepository
 import com.rusuh.app.feature.home.HomeRepository
 import com.rusuh.app.feature.home.StubHomeRepository
@@ -104,6 +105,7 @@ class DataModuleTest {
         mapOf(
             "TicketsRepository" to TicketsRepository::class,
             "DetailRepository" to DetailRepository::class,
+            "PaymentRepository" to PaymentRepository::class,
         )
 
     private val repositories: Map<String, KClass<*>> = realRepositories + stubOnlyRepositories

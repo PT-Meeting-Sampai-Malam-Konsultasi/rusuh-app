@@ -402,4 +402,33 @@
     <string name="error_code_tiket_sudah_digunakan">Request failed (tiket sudah digunakan). Please try again.</string>
     <string name="error_code_tiket_tidak_berlaku">Request failed (tiket tidak berlaku). Please try again.</string>
     <string name="error_code_unknown">Request failed (unknown). Please try again.</string>
+
+    <!-- Payment screen -->
+    <string name="payment_title">Payment</string>
+    <string name="payment_loading">Verifying your order…</string>
+    <string name="payment_timer_description">Time left %1$s</string>
+    <string name="payment_pay_via_midtrans">Pay via Midtrans</string>
+    <string name="payment_time_hint">The 10-minute window includes choosing a method and retrying.</string>
+    <string name="payment_order_section">Order</string>
+    <string name="payment_admin_fee">Service fee</string>
+    <string name="payment_total">Total</string>
+    <string name="payment_midtrans_hint">Payment is processed by Midtrans. Rusuh does not store your card data. By paying, you agree to the Terms &amp; Conditions and Refund Policy.</string>
+    <string name="payment_continue_button">Continue to payment →</string>
+    <string name="payment_not_paid_badge">NOT PAID</string>
+    <string name="payment_snap_closed_headline">Payment window closed.</string>
+    <string name="payment_snap_closed_body">Your tickets are still held until the timer runs out. Open again to choose a method — a payment already started (e.g., a VA number) is still valid.</string>
+    <string name="payment_busy_error">Payment service is temporarily busy. Please try again.</string>
+    <string name="payment_verifying_headline">Verifying your payment…</string>
+    <string name="payment_verifying_body">Funds sent. Waiting for Midtrans confirmation — usually a few seconds. Do not pay again.</string>
+    <string name="payment_verifying_note">Your tickets are held during this check.</string>
+    <string name="payment_success_headline">Payment confirmed!</string>
+    <string name="payment_success_body">Your tickets are issued and emailed. Show the QR at the door.</string>
+    <string name="payment_success_cta">View e-ticket →</string>
+    <string name="payment_expired_badge">TIME IS UP</string>
+    <string name="payment_expired_headline">Order cancelled.</string>
+    <string name="payment_expired_body">The 10-minute payment window has passed. The tickets you held are released for other buyers.</string>
+    <string name="payment_expired_refund_notice">Balance deducted? If your payment arrived after the deadline, it is refunded automatically to the same method. Details will be sent to %1$s.</string>
+    <string name="payment_expired_queue_again">Queue again →</string>
+    <string name="payment_expired_home">Go home</string>
+    <string name="payment_error_load">Could not load payment details. Please try again.</string>
 </resources>

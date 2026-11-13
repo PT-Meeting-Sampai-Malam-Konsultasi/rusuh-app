@@ -71,6 +71,28 @@ sealed class Screen(val route: String) {
         fun routeFor(eventId: String? = null): String =
             if (eventId == null) "sign-in" else "sign-in?eventId=${eventId.encodeURLParameter()}"
     }
+
+    /**
+     * Payment screen showing the order summary and Midtrans Snap handoff.
+     * Opened from the Detail screen after booking is held.
+     */
+    data object Payment : Screen("payment/{bookingId}") {
+        const val ARG_BOOKING_ID = "bookingId"
+
+        /** Build the concrete route for [bookingId]. */
+        fun routeFor(bookingId: String): String = "payment/${encodePathSegment(bookingId)}"
+    }
+
+    /**
+     * Payment result screen reached via App Link / Universal Link after returning from Midtrans Snap.
+     * NEVER trusts the URL: only takes the bookingId and fetches actual status from the server.
+     */
+    data object PaymentResult : Screen("payment-result?bookingId={bookingId}") {
+        const val ARG_BOOKING_ID = "bookingId"
+
+        /** Build the concrete route for [bookingId]. */
+        fun routeFor(bookingId: String): String = "payment-result?bookingId=${bookingId.encodeURLParameter()}"
+    }
 }
 
 /**
