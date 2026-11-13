@@ -7,6 +7,7 @@ import com.rusuh.app.data.cache.QueueCache
 import com.rusuh.app.data.cache.TicketsCache
 import com.rusuh.app.data.storage.SecureTokenStore
 import com.rusuh.app.data.storage.TokenStore
+import com.rusuh.app.domain.repository.AccountEmailStore
 import com.rusuh.app.domain.repository.DisplayNameStore
 import org.koin.dsl.module
 
@@ -18,5 +19,7 @@ val storageModule =
         single { QueueCache(get()) }
         single { DeviceCache(get()) }
         single { TicketsCache(get()) }
-        single<DisplayNameStore> { AuthCache(get()) }
+        single { AuthCache(get()) }
+        single<DisplayNameStore> { get<AuthCache>() }
+        single<AccountEmailStore> { get<AuthCache>() }
     }
