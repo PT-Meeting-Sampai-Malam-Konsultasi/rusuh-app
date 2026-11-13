@@ -102,27 +102,39 @@ ApiClient(baseUrl, client = HttpClient(MockEngine { respond(...) }) { configure(
 
 See `ApiClientTest` for success, 204, problem+json, 5xx, timeout, malformed body and cancellation examples.
 
-## Environments and hosts
+## Environments, flavors and hosts
 
-`AppEnvironment { Mock, Staging, Production }` picks the backend. The ONE switch between the local mock and the real
-host is `NetworkConfig.MOCK_API` (`data/network/NetworkConfig.kt`). Android debug builds can override it with
-`-PmockApi=true` or `-PmockApi=false`; an empty property uses the constant.
+`AppEnvironment { Mock, Staging, Production }` picks the backend. Android has two product flavors in the `environment`
+dimension:
 
-| Build | `MOCK_API = true` | `MOCK_API = false` |
-|---|---|---|
-| Debug | `Mock` + `BackendMode.Real`: HTTP to the local Mockoon | `Staging` + `BackendMode.Real`: HTTP to the real host |
-| Release | `Production` + `Real` (the flag is ignored) | `Production` + `Real` |
+| Flavor | `ENVIRONMENT` | `ALLOW_DEBUG_OPTIONS` | Launcher name |
+|--------|---------------|-----------------------|---------------|
+| `staging` | `"Staging"` | `true` | Rusuh Staging |
+| `production` | `"Production"` | `false` | Rusuh |
 
-Run modes: Stub `./gradlew :androidApp:assembleDebug -PbackendMode=Stub`; Mock `./gradlew :androidApp:assembleDebug -PmockApi=true`;
-Live staging `./gradlew :androidApp:assembleDebug -PmockApi=false`.
+Both flavors share the same `applicationId` (`com.rusuh.app.android`) and Firebase app.
 
-The platform entry points only say whether the build is debug and pass the optional debug-only backend mode override
-to `initKoinForBuild(isDebug, backendModeName)`, which asks `NetworkConfig.startup`: Android `RusuhApplication` passes
-`BuildConfig.DEBUG`, `BuildConfig.BACKEND_MODE` and the optional debug `MOCK_API_OVERRIDE`, iOS `iOSApp.swift` calls `KoinIosKt.doInitKoin(isDebug:backendModeName:)`
-inside `#if DEBUG` / `#else`. A release build can never select the mock or stub data: `startup` ignores the flag and
-the override unless `isDebug`, `NetworkConfigTest` covers every combination, and `./gradlew
-:androidApp:verifyReleaseNeverUsesMockApi` (part of `:androidApp:check`) checks the generated release `BuildConfig`
-(`DEBUG = false`, empty `BACKEND_MODE` and `MOCK_API_OVERRIDE`).
+The **staging** flavor in a **debug** build can switch between mock/stub/live:
+
+| Option | Command | Environment + mode |
+|--------|---------|-------------------|
+| Mock (Mockoon) | `./gradlew :androidApp:assembleStagingDebug -PmockApi=true` | `Mock` + `Real` |
+| Live staging | `./gradlew :androidApp:assembleStagingDebug -PmockApi=false` | `Staging` + `Real` |
+| Stub (offline) | `./gradlew :androidApp:assembleStagingDebug -PbackendMode=Stub` | uses `Stub` mode |
+
+The **production** flavor is **always** `Production` + `Real`, even in debug builds. The `-PmockApi` and `-PbackendMode`
+flags have no effect on production variants. Gradle guards verify this:
+- `verifyProductionFlavorHasNoDebugOptions`: checks `ALLOW_DEBUG_OPTIONS = false` and empty overrides in all production variants.
+- `verifyReleaseNeverUsesMockApi`: checks all release variants have `DEBUG = false` and empty overrides.
+
+Release builds (any flavor) always use `Production` + `Real`.
+
+The platform entry points pass the flavor's `BuildConfig` fields to `initKoinForBuild`:
+- Android `RusuhApplication` passes `DEBUG`, `ALLOW_DEBUG_OPTIONS`, `ENVIRONMENT`, `BACKEND_MODE` and `MOCK_API_OVERRIDE`.
+- iOS `iOSApp.swift` calls `KoinIosKt.doInitKoin(isDebug:backendModeName:)` inside `#if DEBUG` / `#else`. iOS has no
+  flavors yet (follow-up: xcconfig per environment); it behaves like the staging flavor (`allowDebugOptions = true`).
+
+`NetworkConfigTest` covers every flavor × build-type × override combination.
 
 `ApiConfig.forEnvironment(env)` returns three independently configured hosts: `baseUrl` (api), `queueBaseUrl`
 (`q.`) and `payBaseUrl` (`pay.`). Every URL is validated at construction (blank, malformed or non-http(s) throws

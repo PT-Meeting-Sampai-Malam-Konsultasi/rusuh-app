@@ -20,8 +20,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Run shared module tests with coverage
         run: ./gradlew :shared:allTests koverXmlReport --stacktrace
-      - name: Run Android unit tests
-        run: ./gradlew :androidApp:testDebugUnitTest --stacktrace
+      - name: Run Android unit tests (staging debug)
+        run: ./gradlew :androidApp:testStagingDebugUnitTest --stacktrace
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
