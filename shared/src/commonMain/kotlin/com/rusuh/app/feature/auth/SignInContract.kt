@@ -29,8 +29,8 @@ object SignInPolicy {
     /** Wrong codes allowed on one code (ADR-0006). */
     const val MAX_ATTEMPTS = 5
 
-    /** Sender shown in the "not in your inbox" hint (synthetic until the mail domain is confirmed). */
-    const val SENDER_ADDRESS = "no-reply@rusuh.id"
+    /** Sender of the OTP email, shown in the "not in your inbox" hint. */
+    const val SENDER_ADDRESS = "no-reply@rusuh-tiket.web.id"
 }
 
 /**
