@@ -21,7 +21,7 @@ All endpoints require a Bearer token. Currently NOT deployed on live staging (40
 **Stub fallback**: Because the payment routes return 404 on the live backend, `PaymentRepository` uses
 `StubPaymentRepository` in `BackendMode.Real` (listed in `REPOSITORIES_STILL_ON_STUBS` in `DataModule.kt`).
 Flipping to the real repository is a one-line change: replace the `stubOrFail` binding with
-`RealPaymentRepository(get())` and remove `"PaymentRepository"` from `REPOSITORIES_STILL_ON_STUBS`.
+`PaymentRepositoryImpl(get())` and remove `"PaymentRepository"` from `REPOSITORIES_STILL_ON_STUBS`.
 
 ### GET /core/payments/{bookingId}
 
@@ -208,7 +208,7 @@ To test the payment flow locally:
 - `data/remote/PaymentApiService.kt` — HTTP calls
 - `data/remote/dto/PaymentDtos.kt` — DTOs (uses `MoneyDto` from EventDtos)
 - `data/remote/mapper/PaymentMapper.kt` — DTO → domain
-- `data/repository/RealPaymentRepository.kt` — network implementation
+- `data/repository/PaymentRepositoryImpl.kt` — network implementation
 - `data/repository/StubPaymentRepository.kt` — offline demo
 
 ### Domain Layer

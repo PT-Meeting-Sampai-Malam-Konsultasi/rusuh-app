@@ -28,7 +28,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class RealQueueRepositoryTest {
+class QueueRepositoryImplTest {
     private val joinLine = "POST /queue/$EVT/join"
     private val frontierLine = "GET /queue/$EVT/frontier"
     private val meLine = "GET /queue/$EVT/me"
@@ -460,7 +460,7 @@ class RealQueueRepositoryTest {
             val waiting = CompletableDeferred<Unit>()
             var waitWasCancelled = false
             val queue =
-                RealQueueRepository(
+                QueueRepositoryImpl(
                     queueApi = QueueApiService(h.backend.api),
                     eventApi = EventApiService(h.backend.api),
                     devices = h.devices,

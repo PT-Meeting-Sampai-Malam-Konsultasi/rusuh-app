@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.flow
 import kotlin.random.Random
 
 /**
- * Real implementation of [PaymentRepository] that calls the payment API endpoints.
+ * [PaymentRepositoryImpl] that calls the payment API endpoints.
  *
  * Note: The payment routes are not yet deployed on the live staging backend (404), so this
  * implementation works only against mock/stub servers for now.
@@ -24,7 +24,7 @@ import kotlin.random.Random
  * @param jitterMs maximum jitter to add to the polling interval (default: 2 seconds)
  * @param random random source for jitter (injectable for testing)
  */
-class RealPaymentRepository(
+class PaymentRepositoryImpl(
     private val api: PaymentApiService,
     private val pollIntervalMs: Long = DEFAULT_POLL_INTERVAL_MS,
     private val jitterMs: Long = DEFAULT_JITTER_MS,

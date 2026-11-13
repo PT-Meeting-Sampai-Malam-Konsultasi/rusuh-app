@@ -55,7 +55,7 @@ import kotlinx.coroutines.flow.flow
  * polling stays the source of truth.
  */
 @Suppress("LongParameterList") // the collaborators of one use case; each is a separate seam
-class RealQueueRepository(
+class QueueRepositoryImpl(
     queueApi: QueueApiService,
     eventApi: EventApiService,
     devices: DeviceRepository,

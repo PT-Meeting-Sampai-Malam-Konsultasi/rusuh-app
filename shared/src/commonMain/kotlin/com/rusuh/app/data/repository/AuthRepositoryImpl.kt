@@ -38,7 +38,7 @@ import kotlin.time.Duration.Companion.seconds
  * - [logoutTimeout] bounds the server call of [logout].
  */
 @Suppress("TooManyFunctions") // the four interface calls plus the small private steps of the logout and the gate
-class RealAuthRepository(
+class AuthRepositoryImpl(
     private val api: AuthApiService,
     private val devices: DeviceRepository,
     private val session: SessionManager,

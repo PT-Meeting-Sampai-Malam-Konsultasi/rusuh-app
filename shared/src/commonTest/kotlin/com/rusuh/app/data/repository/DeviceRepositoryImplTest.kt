@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 private const val DAY = 24 * 60 * 60 * 1_000L
 
-class RealDeviceRepositoryTest {
+class DeviceRepositoryImplTest {
     private val devicesLine = "POST /queue/devices"
 
     @Test
@@ -54,7 +54,7 @@ class RealDeviceRepositoryTest {
             var created = 0
             val h = QueueHarness()
             val devices =
-                RealDeviceRepository(
+                DeviceRepositoryImpl(
                     api = com.rusuh.app.data.remote.DeviceApiService(h.backend.api),
                     tokens = h.tokens,
                     secureStore = h.secure,
@@ -134,10 +134,10 @@ class RealDeviceRepositoryTest {
     private suspend fun unsyncedRepository(
         h: QueueHarness,
         expiresAt: Long,
-    ): RealDeviceRepository {
+    ): DeviceRepositoryImpl {
         h.tokens.setDeviceToken("old-token")
         h.deviceCache.setTokenExpiresAt(expiresAt)
-        return RealDeviceRepository(
+        return DeviceRepositoryImpl(
             api = com.rusuh.app.data.remote.DeviceApiService(h.backend.api),
             tokens = h.tokens,
             secureStore = h.secure,

@@ -31,7 +31,7 @@ import com.rusuh.app.domain.repository.DetailRepository
 private const val DEFAULT_RETRY_AFTER_SECONDS = 30
 
 /**
- * Real [DetailRepository] backed by the booking API.
+ * [DetailRepositoryImpl] backed by the booking API.
  *
  * - Categories: GET /core/events/{eventId}/categories (requires Bearer + X-Admission-Token).
  * - Attendee validation: POST /core/events/{eventId}/attendees/validate.
@@ -46,7 +46,7 @@ private const val DEFAULT_RETRY_AFTER_SECONDS = 30
  * supports sync) so Detail's countdown is server-aligned.
  */
 @Suppress("TooManyFunctions")
-class RealDetailRepository(
+class DetailRepositoryImpl(
     private val api: BookingApiService,
     private val serverClock: ServerClock,
 ) : DetailRepository {
