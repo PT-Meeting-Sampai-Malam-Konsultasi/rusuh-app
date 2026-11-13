@@ -1,6 +1,7 @@
 package com.rusuh.app.data.stub
 
 import com.rusuh.app.domain.clock.ServerClock
+import kotlinx.datetime.Instant
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -58,38 +59,10 @@ class StubClock(
         fun ticking(startMillis: Long = DEFAULT_START_MILLIS): StubClock = StubClock(startMillis, ticking = true)
 
         private const val MILLIS_PER_SECOND = 1000L
-        private const val SECONDS_PER_DAY = 86_400L
         private const val KIND_EPOCH = "epoch"
         private val PLACEHOLDER = Regex("""@\{(now|epoch)([+-]\d+)?}""")
 
-        private fun formatIso(epochMillis: Long): String {
-            val totalSeconds = epochMillis.floorDiv(MILLIS_PER_SECOND)
-            val days = totalSeconds.floorDiv(SECONDS_PER_DAY)
-            val secondOfDay = totalSeconds - days * SECONDS_PER_DAY
-            val (year, month, day) = civilFromDays(days)
-            return buildString {
-                append(year.pad(4)).append('-').append(month.pad(2)).append('-').append(day.pad(2))
-                append('T')
-                append((secondOfDay / 3600).pad(2)).append(':')
-                append((secondOfDay % 3600 / 60).pad(2)).append(':')
-                append((secondOfDay % 60).pad(2)).append('Z')
-            }
-        }
-
-        private fun Long.pad(width: Int): String = toString().padStart(width, '0')
-
-        /** Days since 1970-01-01 to (year, month, day); Howard Hinnant's civil_from_days. */
-        private fun civilFromDays(daysSinceEpoch: Long): Triple<Long, Long, Long> {
-            val z = daysSinceEpoch + 719_468
-            val era = z.floorDiv(146_097L)
-            val dayOfEra = z - era * 146_097
-            val yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36_524 - dayOfEra / 146_096) / 365
-            val dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
-            val monthPart = (5 * dayOfYear + 2) / 153
-            val day = dayOfYear - (153 * monthPart + 2) / 5 + 1
-            val month = if (monthPart < 10) monthPart + 3 else monthPart - 9
-            val year = yearOfEra + era * 400 + if (month <= 2) 1 else 0
-            return Triple(year, month, day)
-        }
+        private fun formatIso(epochMillis: Long): String =
+            Instant.fromEpochSeconds(epochMillis.floorDiv(MILLIS_PER_SECOND)).toString()
     }
 }
