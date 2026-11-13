@@ -519,6 +519,17 @@ and `TokenRefresher` can be rebound to replace the call. Tests inject a fake lam
 attempt, a new key only for a new user attempt. Never auto-retry a charging or creating POST with a different key: that
 is a second charge. Keep the key in the ViewModel/use case state for the attempt (not in the ApiService).
 
+**When to regenerate:**
+- New user attempt (fresh form submission, after fixing a validation error that requires user action).
+- Non-recoverable errors (admission expired, sold out) where the user must start over.
+
+**When to keep the same key:**
+- Transient errors (`NetworkError`, `ServiceUnavailable`, `RateLimited`): the original request may have succeeded
+  server-side, and the server de-duplicates by key. The user tapping "try again" after a timeout should use the
+  same key, not create a second booking.
+- The `DetailViewModel` keeps the key across network failures and only regenerates it for errors that require user
+  action (form changes, re-queueing).
+
 ### Server clock
 
 One clock, `MonotonicServerClock` (bound as `ServerClock` and `ServerTimeSink` in `coreModule()`): it stores the last

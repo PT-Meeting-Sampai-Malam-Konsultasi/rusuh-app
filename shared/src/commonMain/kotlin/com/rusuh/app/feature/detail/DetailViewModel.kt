@@ -95,8 +95,10 @@ class DetailViewModel(
         if (remaining <= 0) expire() else setState { copy(remainingSeconds = remaining) }
     }
 
-    /** Window elapsed: drop the selection and attendee data (PII) and show the expired sheet. */
+    /** Window elapsed: drop the selection, attendee data (PII), and validated tokens, then show the expired sheet. */
     private fun expire() {
+        // Clear validated attendees to prevent stale tokens from being reused if the user queues again.
+        validatedAttendees = mutableListOf()
         setState {
             copy(
                 phase = DetailPhase.Expired,
@@ -139,11 +141,15 @@ class DetailViewModel(
             throw cancelled
         } catch (
             // Intentionally broad: any repository/network failure maps to a transient error.
+            // Keep the same idempotency key for transient network failures so automatic retries
+            // with the same key are safe (the server de-duplicates them if the first succeeded).
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {
             if (isOrderActive()) {
-                idempotencyKey = newIdempotencyKey()
-                sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
+                // DO NOT regenerate idempotency key for network errors.
+                // The request may have succeeded server-side, and a retry with the same key
+                // will correctly detect the duplicate instead of creating a second booking.
+                sendEffect(DetailEffect.ShowError(DetailError.ServiceUnavailable))
             }
         } finally {
             setState { copy(isSubmitting = false) }
@@ -219,19 +225,43 @@ class DetailViewModel(
             }
             is BookingResult.AccountHasActiveBooking -> {
                 // User has an active booking; offer resume via getActiveBookings (UI follow-up).
+                // Regenerate key: user must start a new attempt after resolving the active booking.
+                idempotencyKey = newIdempotencyKey()
                 sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
             }
             is BookingResult.CategorySoldOut -> {
+                // User must pick a different category, so a new attempt.
+                idempotencyKey = newIdempotencyKey()
                 sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
             }
             is BookingResult.AdmissionInvalid,
             is BookingResult.SessionExpired,
             -> {
-                // Back to the waiting room.
+                // Back to the waiting room; no retry is possible, so regenerate for next time.
+                idempotencyKey = newIdempotencyKey()
                 sendEffect(DetailEffect.NavigateToQueue(eventId))
             }
-            else -> {
-                // Regenerate idempotency key for retry.
+            // Transient errors where the SAME idempotency key should be used for retry:
+            // - NetworkError: the request may not have reached the server
+            // - ServiceUnavailable: server is temporarily overloaded
+            // - RateLimited: can retry after the cooldown with the same key
+            is BookingResult.NetworkError,
+            is BookingResult.ServiceUnavailable,
+            is BookingResult.RateLimited,
+            -> {
+                // Keep the same idempotency key for transient errors so retry is safe.
+                // If the original request succeeded server-side, the duplicate is detected.
+                sendEffect(DetailEffect.ShowError(DetailError.ServiceUnavailable))
+            }
+            // Non-retryable errors that require user action (changing the form):
+            is BookingResult.QuantityOverReservation,
+            is BookingResult.AttendeeNotValidated,
+            is BookingResult.NikSeatTaken,
+            is BookingResult.DuplicateNik,
+            is BookingResult.BookingNotHeld,
+            is BookingResult.ServerError,
+            -> {
+                // Regenerate idempotency key: user must fix the issue and it's a new attempt.
                 idempotencyKey = newIdempotencyKey()
                 sendEffect(DetailEffect.ShowError(DetailError.BookingFailed))
             }

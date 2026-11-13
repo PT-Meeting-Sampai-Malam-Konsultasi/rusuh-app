@@ -59,19 +59,35 @@ data class DetailOffering(
     val expiresAtMillis: Long,
 )
 
-/** One ticket of a booking request: category plus the holder (name + NIK as on the KTP). */
+/**
+ * One ticket of a booking request: category plus the holder (name + NIK as on the KTP).
+ *
+ * NIK is PII: [toString] redacts it to prevent accidental leaks in logs or error messages.
+ */
 data class BookingTicket(
     val categoryId: String,
     val holderName: String,
     val holderNik: String,
     /** Validation token from server validation, required for booking. */
     val validationToken: String = "",
-)
+) {
+    override fun toString(): String {
+        return "BookingTicket(categoryId=$categoryId, holderName=$holderName, " +
+            "holderNik=<redacted>, validationToken=$validationToken)"
+    }
+}
 
+/**
+ * A booking request with tickets (each carrying a NIK).
+ *
+ * NIK is PII: [toString] redacts ticket details to prevent accidental leaks in logs or error messages.
+ */
 data class BookingRequest(
     val eventId: String,
     val tickets: List<BookingTicket>,
-)
+) {
+    override fun toString(): String = "BookingRequest(eventId=$eventId, tickets=[${tickets.size} tickets])"
+}
 
 /** A created booking / stock hold; payment continues from [bookingId]. */
 data class Booking(
@@ -135,6 +151,9 @@ sealed interface BookingResult {
 
     /** Rate limited. */
     data class RateLimited(val retryAfterSeconds: Int?) : BookingResult
+
+    /** Service temporarily unavailable (5xx). The user can retry. */
+    data class ServiceUnavailable(val retryAfterSeconds: Int) : BookingResult
 
     /** Any other server error. */
     data class ServerError(val code: Int, val errorCode: ErrorCode) : BookingResult

@@ -155,6 +155,7 @@
     <string name="detail_error_admission_expired">Giliran Anda sudah habis. Antre lagi untuk mencoba lagi.</string>
     <string name="detail_error_category_sold_out">Salah satu kategori yang dipilih sudah habis.</string>
     <string name="detail_error_active_booking">Anda sudah punya pesanan aktif untuk acara ini.</string>
+    <string name="detail_error_service_unavailable">Layanan sedang tidak tersedia. Coba lagi.</string>
     <string name="detail_expired_description">Waktu habis. 5 menit sudah lewat. Pilihan Anda belum disimpan.</string>
     <string name="detail_expired_badge">Waktu habis</string>
     <string name="detail_expired_headline">5 menit sudah lewat.</string>

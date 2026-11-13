@@ -1,5 +1,6 @@
 package com.rusuh.app.data.repository
 
+import com.rusuh.app.data.clock.MonotonicServerClock
 import com.rusuh.app.data.network.ApiResult
 import com.rusuh.app.data.network.isNetworkFailure
 import com.rusuh.app.data.remote.BookingApiService
@@ -7,8 +8,10 @@ import com.rusuh.app.data.remote.dto.BookingTicketDto
 import com.rusuh.app.data.remote.dto.CreateBookingRequestDto
 import com.rusuh.app.data.remote.dto.ValidateAttendeeRequestDto
 import com.rusuh.app.data.remote.mapper.expiresAtMillis
+import com.rusuh.app.data.remote.mapper.serverNowMillis
 import com.rusuh.app.data.remote.mapper.toDomain
 import com.rusuh.app.data.remote.mapper.toDomainCategories
+import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.AccountProfile
 import com.rusuh.app.domain.model.AttendeeValidation
 import com.rusuh.app.domain.model.Booking
@@ -22,6 +25,12 @@ import com.rusuh.app.domain.model.EventDetail
 import com.rusuh.app.domain.repository.DetailRepository
 
 /**
+ * Default retry-after seconds when the server returns 429 without a Retry-After header.
+ * The UI must never display "null"; this is a reasonable minimum backoff.
+ */
+private const val DEFAULT_RETRY_AFTER_SECONDS = 30
+
+/**
  * Real [DetailRepository] backed by the booking API.
  *
  * - Categories: GET /core/events/{eventId}/categories (requires Bearer + X-Admission-Token).
@@ -32,16 +41,22 @@ import com.rusuh.app.domain.repository.DetailRepository
  * The event detail (title, subtitle, meta) comes from the Home cache or is fetched separately;
  * the categories endpoint only provides category data. For now, we use placeholder event data
  * until the event detail API lands.
+ *
+ * The categories response also carries `serverNow`; this is fed to the [ServerClock] (when it
+ * supports sync) so Detail's countdown is server-aligned.
  */
 @Suppress("TooManyFunctions")
 class RealDetailRepository(
     private val api: BookingApiService,
+    private val serverClock: ServerClock,
 ) : DetailRepository {
     override suspend fun getDetail(eventId: String): DetailOffering {
         val result = api.getCategories(eventId)
         when (result) {
             is ApiResult.Success -> {
                 val dto = result.data
+                // Sync the server clock from the categories response.
+                syncClock(dto.serverNowMillis())
                 return DetailOffering(
                     // TODO(FR-05-M4 #38): fetch event detail from cache or dedicated endpoint.
                     event =
@@ -139,16 +154,42 @@ class RealDetailRepository(
 
     private fun mapValidationError(error: ApiResult.Error): AttendeeValidation {
         val errorCode = error.problem?.code ?: ErrorCode.UNKNOWN
-        return when {
-            error.code == 422 && errorCode == ErrorCode.NIK_INVALID -> AttendeeValidation.NikInvalid
-            error.code == 409 && errorCode == ErrorCode.NIK_SEAT_TAKEN -> AttendeeValidation.NikSeatTaken
-            error.code == 409 && errorCode == ErrorCode.DUPLICATE_NIK -> AttendeeValidation.ServerDuplicateNik
-            error.code == 503 && errorCode == ErrorCode.DUKCAPIL_UNAVAILABLE -> AttendeeValidation.DukcapilUnavailable
-            error.code == 403 && errorCode == ErrorCode.ADMISSION_INVALID -> AttendeeValidation.AdmissionInvalid
-            error.code == 429 -> AttendeeValidation.RateLimited(error.retryAfterSeconds)
-            else -> AttendeeValidation.ServerError(error.code, errorCode)
-        }
+        return mapValidationByStatusCode(error, errorCode)
+            ?: mapValidationByErrorCode(error.code, errorCode)
+            ?: AttendeeValidation.ServerError(error.code, errorCode)
     }
+
+    /** Maps validation errors by HTTP status code (410, 429). Returns null if not matched. */
+    private fun mapValidationByStatusCode(
+        error: ApiResult.Error,
+        errorCode: ErrorCode,
+    ): AttendeeValidation? =
+        when (error.code) {
+            HTTP_FORBIDDEN ->
+                if (errorCode == ErrorCode.ADMISSION_INVALID) {
+                    AttendeeValidation.AdmissionInvalid
+                } else {
+                    null
+                }
+            HTTP_GONE -> AttendeeValidation.AdmissionInvalid
+            HTTP_TOO_MANY_REQUESTS ->
+                AttendeeValidation.RateLimited(error.retryAfterSeconds ?: DEFAULT_RETRY_AFTER_SECONDS)
+            else -> null
+        }
+
+    /** Maps validation errors by error code (NIK_INVALID, etc). Returns null if not matched. */
+    private fun mapValidationByErrorCode(
+        statusCode: Int,
+        errorCode: ErrorCode,
+    ): AttendeeValidation? =
+        when {
+            statusCode == 422 && errorCode == ErrorCode.NIK_INVALID -> AttendeeValidation.NikInvalid
+            statusCode == 409 && errorCode == ErrorCode.NIK_SEAT_TAKEN -> AttendeeValidation.NikSeatTaken
+            statusCode == 409 && errorCode == ErrorCode.DUPLICATE_NIK -> AttendeeValidation.ServerDuplicateNik
+            statusCode == HTTP_SERVICE_UNAVAILABLE && errorCode == ErrorCode.DUKCAPIL_UNAVAILABLE ->
+                AttendeeValidation.DukcapilUnavailable
+            else -> null
+        }
 
     private fun mapBookingError(error: ApiResult.Error): BookingResult {
         val errorCode = error.problem?.code ?: ErrorCode.UNKNOWN
@@ -157,21 +198,31 @@ class RealDetailRepository(
             ?: BookingResult.ServerError(error.code, errorCode)
     }
 
-    /** Maps errors by HTTP status code (401, 403, 429). Returns null if not matched. */
+    /**
+     * Maps errors by HTTP status code (401, 403, 410, 429, 5xx). Returns null if not matched.
+     */
     private fun mapByStatusCode(
         statusCode: Int,
         errorCode: ErrorCode,
         error: ApiResult.Error,
     ): BookingResult? =
         when (statusCode) {
-            401 -> BookingResult.SessionExpired
-            403 ->
+            HTTP_UNAUTHORIZED -> BookingResult.SessionExpired
+            HTTP_FORBIDDEN ->
                 if (errorCode == ErrorCode.ADMISSION_INVALID) {
                     BookingResult.AdmissionInvalid
                 } else {
                     null
                 }
-            429 -> BookingResult.RateLimited(error.retryAfterSeconds)
+            // 410: admission expired mid-booking
+            HTTP_GONE -> BookingResult.AdmissionInvalid
+            // 429: rate limited, default to sane constant when Retry-After is missing
+            HTTP_TOO_MANY_REQUESTS ->
+                BookingResult.RateLimited(error.retryAfterSeconds ?: DEFAULT_RETRY_AFTER_SECONDS)
+            // 5xx server errors: map to a retryable error with the server's retry hint
+            HTTP_SERVICE_UNAVAILABLE ->
+                BookingResult.ServiceUnavailable(error.retryAfterSeconds ?: DEFAULT_RETRY_AFTER_SECONDS)
+            in HTTP_SERVER_ERROR_RANGE -> BookingResult.ServiceUnavailable(DEFAULT_RETRY_AFTER_SECONDS)
             else -> null
         }
 
@@ -194,6 +245,25 @@ class RealDetailRepository(
             ErrorCode.BOOKING_NOT_HELD -> BookingResult.BookingNotHeld
             else -> null
         }
+    }
+
+    /**
+     * Syncs the server clock from the categories response if the clock supports it.
+     * The [MonotonicServerClock] is the only implementation that supports sync; others (stub/test) ignore this.
+     */
+    private fun syncClock(serverNowMillis: Long) {
+        if (serverNowMillis > 0 && serverClock is MonotonicServerClock) {
+            serverClock.recordServerNow(serverNowMillis)
+        }
+    }
+
+    private companion object {
+        const val HTTP_UNAUTHORIZED = 401
+        const val HTTP_FORBIDDEN = 403
+        const val HTTP_GONE = 410
+        const val HTTP_TOO_MANY_REQUESTS = 429
+        const val HTTP_SERVICE_UNAVAILABLE = 503
+        val HTTP_SERVER_ERROR_RANGE = 500..599
     }
 }
 

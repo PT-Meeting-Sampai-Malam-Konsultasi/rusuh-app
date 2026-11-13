@@ -31,13 +31,20 @@ data class CategoryDto(
 
 // --- POST /events/{eventId}/attendees/validate ---
 
-/** `POST /core/events/{eventId}/attendees/validate` request. */
+/**
+ * `POST /core/events/{eventId}/attendees/validate` request.
+ *
+ * NIK is PII: [toString] redacts it to prevent accidental leaks in logs or error messages.
+ */
 @Serializable
 data class ValidateAttendeeRequestDto(
     @SerialName("fieldIndex") val fieldIndex: Int = 0,
     @SerialName("fullName") val fullName: String = "",
     @SerialName("nik") val nik: String = "",
-)
+) {
+    override fun toString(): String =
+        "ValidateAttendeeRequestDto(fieldIndex=$fieldIndex, fullName=$fullName, nik=<redacted>)"
+}
 
 /** `POST /core/events/{eventId}/attendees/validate` response. */
 @Serializable
