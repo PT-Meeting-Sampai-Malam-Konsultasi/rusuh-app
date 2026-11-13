@@ -122,7 +122,7 @@ fun liveDataModule(): Module =
                 refresher = get(),
             )
         }
-        single<TicketsRepository> { TicketsRepositoryImpl(get(), get(), get(), get()) }
+        single<TicketsRepository> { TicketsRepositoryImpl(get(), get(), get(), get(), get()) }
         single<DetailRepository> { DetailRepositoryImpl(get(), get(), get(), get(), get()) }
         single<PaymentRepository> { PaymentRepositoryImpl(get(), get()) }
     }

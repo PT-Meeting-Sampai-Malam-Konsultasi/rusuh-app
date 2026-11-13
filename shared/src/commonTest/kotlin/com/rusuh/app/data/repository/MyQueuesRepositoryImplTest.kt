@@ -373,4 +373,61 @@ class MyQueuesRepositoryImplTest {
             val failure = assertFailsWith<DomainException> { offline.myQueues.getMyQueues() }
             assertEquals(DomainResult.NetworkError, failure.result)
         }
+
+    @Test
+    fun aSelectionOrPaymentPendingBookingResumesAtPaymentAndReplacesTheStoredAdmission() =
+        runTest {
+            listOf("SELECTION", "PAYMENT_PENDING").forEach { status ->
+                val h = QueueHarness()
+                h.queueCache.setAdmission(AdmissionInfo("evt_pay", "slot-1", 3, 1_794_653_100_000))
+                h.backend.on(
+                    "GET /core/bookings/active",
+                    Reply.ok(
+                        "{\"serverNow\":\"2026-11-14T10:40:00Z\",\"items\":[{" +
+                            "\"bookingId\":\"booking-1\",\"eventId\":\"evt_pay\",\"status\":\"$status\"," +
+                            "\"expiresAt\":\"2026-11-14T10:50:00Z\",\"serverNow\":\"2026-11-14T10:40:00Z\"}]}",
+                    ),
+                )
+
+                val order = h.myQueues.getOrdersInProgress().single()
+
+                assertEquals("booking-1", order.bookingId, status)
+                assertEquals(600_000, order.remainingMillis, status)
+            }
+        }
+
+    private fun bookingJson(
+        id: String,
+        event: String,
+        status: String,
+        expiresAt: String?,
+    ): String {
+        val expires = expiresAt?.let { "\"expiresAt\":\"$it\"," }.orEmpty()
+        return "{\"bookingId\":\"$id\",\"eventId\":\"$event\",\"status\":\"$status\",$expires" +
+            "\"serverNow\":\"2026-11-14T10:40:00Z\"}"
+    }
+
+    @Test
+    fun onlyLiveResumableBookingsAreListedAndOtherEventsKeepTheirAdmission() =
+        runTest {
+            val h = QueueHarness()
+            h.queueCache.setAdmission(AdmissionInfo("evt_other", "slot-1", 3, 1_794_653_100_000))
+            val items =
+                listOf(
+                    bookingJson("paid", "evt_a", "PAID", "2026-11-14T10:50:00Z"),
+                    bookingJson("late", "evt_b", "PAYMENT_PENDING", "2026-11-14T10:30:00Z"),
+                    bookingJson("noexpiry", "evt_c", "SELECTION", null),
+                    bookingJson("ok", "evt_d", "payment_pending", "2026-11-14T10:50:00Z"),
+                ).joinToString(",")
+            h.backend.on(
+                "GET /core/bookings/active",
+                Reply.ok("{\"serverNow\":\"2026-11-14T10:40:00Z\",\"items\":[$items]}"),
+            )
+
+            val rows = h.myQueues.getOrdersInProgress()
+
+            assertEquals(listOf("evt_other", "evt_d"), rows.map { it.eventId })
+            assertNull(rows.first().bookingId)
+            assertEquals("ok", rows.last().bookingId)
+        }
 }

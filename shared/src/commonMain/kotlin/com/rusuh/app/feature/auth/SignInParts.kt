@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -83,22 +84,44 @@ internal fun FieldLabel(text: String) {
 
 /** Small supporting line; [emphasis] parts render bold in ink, [underline] parts underlined (inert links). */
 @Composable
+@Suppress("LongParameterList")
 internal fun HintText(
     text: String,
     modifier: Modifier = Modifier,
     emphasis: List<String> = emptyList(),
     underline: List<String> = emptyList(),
+    links: Map<String, String> = emptyMap(),
     textAlign: TextAlign = TextAlign.Start,
 ) {
     val emphasised = styledParts(AnnotatedString(text), emphasis, EMPHASIS_STYLE)
+    val underlined = styledParts(emphasised, underline, SpanStyle(textDecoration = TextDecoration.Underline))
     Text(
-        text = styledParts(emphasised, underline, SpanStyle(textDecoration = TextDecoration.Underline)),
+        text = withLinks(underlined, links),
         style = RusuhBrandTextStyles.note.body(),
         color = RusuhColors.BrandMuted,
         textAlign = textAlign,
         modifier = modifier,
     )
 }
+
+/** Makes each key of [links] in [text] open its URL in the browser. */
+private fun withLinks(
+    text: AnnotatedString,
+    links: Map<String, String>,
+): AnnotatedString =
+    if (links.isEmpty()) {
+        text
+    } else {
+        buildAnnotatedString {
+            append(text)
+            links.forEach { (part, url) ->
+                findPartRanges(
+                    text.text,
+                    listOf(part),
+                ).forEach { addLink(LinkAnnotation.Url(url), it.first, it.last + 1) }
+            }
+        }
+    }
 
 private val EMPHASIS_STYLE = SpanStyle(fontWeight = FontWeight.Bold, color = RusuhColors.BrandInk)
 

@@ -7,6 +7,7 @@ import com.rusuh.app.data.storage.AppPreferences
 import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.DomainResult
+import com.rusuh.app.feature.auth.FakeAccountEmails
 import com.rusuh.app.feature.eticket.EventZone
 import com.rusuh.app.feature.eticket.Seating
 import com.rusuh.app.feature.tickets.PosterTone
@@ -26,11 +27,13 @@ class TicketsRepositoryImplTest {
         language: AppLanguage = AppLanguage.Indonesian,
         now: Long = FIXTURE_NOW_MILLIS,
         cache: TicketsCache = TicketsCache(FakeAppPreferences()),
+        emails: FakeAccountEmails = FakeAccountEmails(),
     ) = TicketsRepositoryImpl(
         TicketApiService(backend.api),
         cache,
         { language },
         TestServerClock(now),
+        emails,
     )
 
     private fun backendWith(vararg replies: Pair<String, Reply>): FakeBackend =
@@ -294,4 +297,26 @@ class TicketsRepositoryImplTest {
                "priceFrom":{"amount":750000,"currency":"IDR"},"capacity":12000,"soldOutAt":null,
                "imageUrl":"https://cdn.rusuh.id/events/evt_2026_gbk/hero.jpg"}"""
     }
+
+    @Test
+    fun eticketOrderCarriesTheAccountEmailSavedAtSignIn() =
+        runTest {
+            val backend = ticketsBackend(Reply.ok(TICKETS_JSON))
+            val emails = FakeAccountEmails().apply { stored = "saved@example.test" }
+            val orderId = repository(backend, emails = emails).getMyOrders().single().orderId
+
+            assertEquals(
+                "saved@example.test",
+                repository(backend, emails = emails).getOrderTickets(orderId)?.contactEmail,
+            )
+        }
+
+    @Test
+    fun eticketOrderHasNoEmailWhenNoneIsSaved() =
+        runTest {
+            val backend = ticketsBackend(Reply.ok(TICKETS_JSON))
+            val orderId = repository(backend).getMyOrders().single().orderId
+
+            assertEquals("", repository(backend).getOrderTickets(orderId)?.contactEmail)
+        }
 }

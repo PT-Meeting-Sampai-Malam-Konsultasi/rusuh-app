@@ -258,6 +258,10 @@
         <item quantity="one">Tiket %2$s sudah atas nama pemegang NIK. Kami juga mengirim e-tiket ke %3$s.</item>
         <item quantity="other">%1$d tiket %2$s sudah atas nama pemegang NIK masing-masing. Kami juga mengirim e-tiket ke %3$s.</item>
     </plurals>
+    <plurals name="eticket_intro_no_email">
+        <item quantity="one">Tiket %2$s sudah atas nama pemegang NIK.</item>
+        <item quantity="other">%1$d tiket %2$s sudah atas nama pemegang NIK masing-masing.</item>
+    </plurals>
     <string name="eticket_add_to_calendar">Tambah ke kalender</string>
     <string name="eticket_add_to_calendar_description">Tambahkan acara ke kalender</string>
     <string name="eticket_no_calendar_app">Tidak ada aplikasi kalender</string>
