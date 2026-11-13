@@ -273,9 +273,7 @@ Release builds always use `Production` + `Real` over HTTPS.
   Timing constants live in `QueuePacing`. The stream auto-reconnects with `Last-Event-ID` when the server sends an `id`
   field. Cancelling the `observePlace` flow closes the stream. A claim guard (`claimStarted` flag) ensures only one
   claim attempt starts across both the stream and polling transports.
-- **To verify on iOS simulator**: whether `bodyAsChannel` delivers SSE lines incrementally on the Darwin engine or
-  buffers the entire response. Ktor's Darwin engine historically buffers; if so, streaming falls back to polling on
-  iOS and the experience is acceptable but not real-time. Test with a local SSE server before the release.
+- Verified on the iOS simulator (Ktor 3.0.1 Darwin): the body arrives incrementally; the per-request timeout override keeps the stream alive.
 
 ### Stub payloads and the test harness (`data/stub`)
 

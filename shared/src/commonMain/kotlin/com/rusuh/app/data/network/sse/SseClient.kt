@@ -43,8 +43,8 @@ sealed interface SseConnection {
 /**
  * Opens an SSE stream and emits parsed events. Uses `prepareGet` + `bodyAsChannel` to work on both
  * OkHttp (Android) and Darwin (iOS) engines; Ktor's SSE plugin is not used because its support for
- * custom headers and Darwin is inconsistent. Darwin engine streaming is unverified: it may buffer
- * the response; fallback to polling is acceptable on iOS until verified with a local SSE server.
+ * custom headers and Darwin is inconsistent. Verified on the iOS simulator (Ktor 3.0.1 Darwin): the body arrives
+ * incrementally; the per-request timeout override keeps the stream alive.
  *
  * The stream uses [STREAM_TIMEOUT_MS] request timeout (long enough to keep it open for minutes).
  * The caller sets shorter read timeouts via the pacing layer.

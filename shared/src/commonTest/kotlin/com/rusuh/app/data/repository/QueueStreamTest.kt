@@ -1,7 +1,9 @@
 package com.rusuh.app.data.repository
 
 import com.rusuh.app.feature.waitingroom.domain.model.QueueState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -44,6 +46,49 @@ class QueueStreamTest {
             assertEquals(QueueState.Open, places[0].state)
             assertEquals(QueueState.Closed, places[1].state)
             assertTrue(h.delays.isNotEmpty())
+        }
+
+    @Test
+    fun injectedStreamFrontierUpdatesPlaceWithoutPollingWhileHealthy() =
+        runTest {
+            var opens = 0
+            val h =
+                QueueHarness(
+                    streamOpener = {
+                        opens++
+                        StreamOutcome.Healthy(
+                            flow {
+                                emit(QueueStreamEvent.Heartbeat)
+                                delay(6_000)
+                                emit(
+                                    QueueStreamEvent.Frontier(
+                                        com.rusuh.app.data.remote.dto.FrontierDto(
+                                            event = evt,
+                                            state = "open",
+                                            served = 395,
+                                            streamFrom = 200,
+                                            ts = 10,
+                                        ),
+                                    ),
+                                )
+                            },
+                        )
+                    },
+                )
+            h.scriptWithStream(
+                frontiers =
+                    listOf(
+                        frontierJson(390, streamFrom = 200),
+                        frontierJson(400, state = "closed", reason = "sold_out"),
+                    ),
+                join = placeJson(evt, seq = 400, served = 390),
+            )
+
+            val places = h.queue.observePlace(evt).toList()
+
+            assertEquals(1, opens)
+            assertEquals(2, h.backend.callsTo(frontierLine))
+            assertEquals(listOf(10, 5, 0), places.map { it.seq - it.served })
         }
 
     @Test

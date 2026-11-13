@@ -29,17 +29,15 @@ import com.rusuh.app.domain.repository.QueueRepository
 import com.rusuh.app.feature.waitingroom.domain.model.QueueEventInfo
 import com.rusuh.app.feature.waitingroom.domain.model.QueuePlace
 import com.rusuh.app.feature.waitingroom.domain.model.QueueState
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 
 /**
@@ -74,6 +72,7 @@ class RealQueueRepository(
     private val localeProvider: LocaleProvider,
     private val pacing: QueuePacing = QueuePacing(),
     private val json: Json = ApiClient.defaultJson,
+    private val streamOpener: suspend (QueueStreamParams) -> StreamOutcome = ::openQueueStream,
 ) : QueueRepository {
     private val calls = QueueCalls(queueApiService, eventApi, devices, tokens, cache)
 
@@ -171,8 +170,8 @@ class RealQueueRepository(
                     lastEventId = lastEventId,
                     json = json,
                 )
-            return when (val outcome = openQueueStream(params)) {
-                is StreamOutcome.Healthy -> consumeStream(outcome.events, initialFrontier)
+            return when (val outcome = streamOpener(params)) {
+                is StreamOutcome.Healthy -> consumeStream(outcome.events)
                 StreamOutcome.TooFar -> {
                     streamConnectFailures = QueuePacing.SSE_MAX_CONNECT_FAILURES
                     false
@@ -198,93 +197,54 @@ class RealQueueRepository(
             }
         }
 
-        @Suppress("CyclomaticComplexMethod", "ThrowsCount", "UnusedParameter")
-        private suspend fun consumeStream(
-            events: Flow<QueueStreamEvent>,
-            @Suppress("UNUSED_PARAMETER") initialFrontier: FrontierDto,
-        ): Boolean {
-            val activity = StreamActivity(pacing)
-            return try {
-                runStreamWithWatchdog(events, activity)
-            } catch (_: StreamFinished) {
-                true
-            } catch (_: FallbackToPolling) {
-                false
-            } catch (_: SilenceTimeout) {
-                onStreamFailure()
-                false
-            } catch (_: TimeoutCancellationException) {
-                onStreamFailure()
-                false
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                nextStreamRetryAt = pacing.nowMillis() + serverRetryMillis
-                false
-            }
-        }
-
-        private suspend fun runStreamWithWatchdog(
-            events: Flow<QueueStreamEvent>,
-            activity: StreamActivity,
-        ): Boolean {
-            var finished = false
+        private suspend fun consumeStream(events: Flow<QueueStreamEvent>): Boolean =
             coroutineScope {
-                val watchdog =
-                    launch {
-                        while (true) {
-                            pacing.delay(WATCHDOG_CHECK_INTERVAL_MILLIS)
-                            if (activity.timeSinceLastEvent() > QueuePacing.SSE_SILENCE_TIMEOUT_MILLIS) {
-                                throw SilenceTimeout
-                            }
-                        }
-                    }
+                val channel = events.produceIn(this)
+                var first = true
                 try {
-                    finished = collectStreamEvents(events, activity)
-                } finally {
-                    watchdog.cancel()
-                }
-            }
-            return finished
-        }
-
-        @Suppress("ThrowsCount")
-        private suspend fun collectStreamEvents(
-            events: Flow<QueueStreamEvent>,
-            activity: StreamActivity,
-        ): Boolean {
-            var firstEventReceived = false
-            var finished = false
-            try {
-                withTimeout(QueuePacing.SSE_FIRST_EVENT_TIMEOUT_MILLIS) {
-                    events.collect { event ->
-                        activity.touch()
-                        if (!firstEventReceived) {
-                            firstEventReceived = true
-                            streamConnectFailures = 0
-                            throw FirstEventReceived(event)
+                    while (true) {
+                        val timeout =
+                            if (first) {
+                                QueuePacing.SSE_FIRST_EVENT_TIMEOUT_MILLIS
+                            } else {
+                                QueuePacing.SSE_SILENCE_TIMEOUT_MILLIS
+                            }
+                        val item = withTimeoutOrNull(timeout) { channel.receiveCatching() }
+                        if (item == null) {
+                            if (first) {
+                                onStreamFailure()
+                            } else {
+                                streamConnectFailures = 0
+                                nextStreamRetryAt = pacing.nowMillis() + QueuePacing.SSE_RETRY_DELAY_MILLIS
+                            }
+                            return@coroutineScope false
                         }
+                        if (item.isClosed) {
+                            val cause = item.exceptionOrNull()
+                            if (cause != null) {
+                                nextStreamRetryAt = pacing.nowMillis() + serverRetryMillis
+                                return@coroutineScope false
+                            }
+                            if (!first) {
+                                streamConnectFailures = 0
+                                nextStreamRetryAt = pacing.nowMillis() + serverRetryMillis
+                            } else {
+                                onStreamFailure()
+                            }
+                            return@coroutineScope false
+                        }
+                        val event = item.getOrThrow()
+                        first = false
+                        streamConnectFailures = 0
+                        if (handleStreamEvent(event)) return@coroutineScope true
+                        if (position != null && (position ?: 0) > (streamFrom ?: 0)) return@coroutineScope false
                     }
+                    @Suppress("UNREACHABLE_CODE")
+                    false
+                } finally {
+                    channel.cancel()
                 }
-            } catch (e: FirstEventReceived) {
-                finished = handleStreamEvent(e.event)
-                if (finished) throw StreamFinished
-                checkPositionFallback()
             }
-            events.collect { event ->
-                activity.touch()
-                finished = handleStreamEvent(event)
-                if (finished) throw StreamFinished
-                checkPositionFallback()
-            }
-            return finished
-        }
-
-        private fun checkPositionFallback() {
-            val pos = position
-            val sf = streamFrom ?: 0
-            if (pos != null && pos > sf) throw FallbackToPolling
-        }
 
         private suspend fun handleStreamEvent(event: QueueStreamEvent): Boolean =
             when (event) {
@@ -320,22 +280,13 @@ class RealQueueRepository(
         @Suppress("ReturnCount")
         private suspend fun handleStreamTurn(turn: QueueTurnDto): Boolean {
             val frontier = lastFrontier ?: return false
-            val acquired =
-                claimMutex.withLock {
-                    if (claimStarted) {
-                        false
-                    } else {
-                        claimStarted = true
-                        true
-                    }
-                }
-            if (!acquired) return false
+            if (!acquireClaim()) return false
             val turnExpiresAt =
                 turn.turnExpiresAt?.let(::parseRfc3339Millis) ?: (serverNow(frontier) + TURN_WINDOW_MILLIS)
             val turnPlace =
                 place(QueueState.Turn, frontier).copy(turnExpiresAtEpochMillis = turnExpiresAt)
             out.emit(turnPlace)
-            return claim(frontier)
+            return claimAndRelease(frontier)
         }
 
         private suspend fun handleStreamClosed(
@@ -425,18 +376,26 @@ class RealQueueRepository(
             }
         }
 
+        private suspend fun acquireClaim(): Boolean =
+            claimMutex.withLock {
+                if (claimStarted) {
+                    false
+                } else {
+                    claimStarted = true
+                    true
+                }
+            }
+
+        /** One claim at a time across both transports; a claim that goes back to waiting (NO_STOCK) can run again. */
+        private suspend fun claimAndRelease(frontier: FrontierDto): Boolean {
+            val over = claim(frontier)
+            if (!over) claimMutex.withLock { claimStarted = false }
+            return over
+        }
+
         /** The turn. Returns true when the run is over; false when the claim says to go back to waiting (NO_STOCK). */
         private suspend fun onTurn(frontier: FrontierDto): Boolean {
-            val acquired =
-                claimMutex.withLock {
-                    if (claimStarted) {
-                        false
-                    } else {
-                        claimStarted = true
-                        true
-                    }
-                }
-            if (!acquired) return false
+            if (!acquireClaim()) return false
             return when (val me = calls.me(eventId, lenient = true)) {
                 MeResult.Missed -> end(QueueState.Missed, frontier)
                 MeResult.Closed -> end(QueueState.Closed, frontier)
@@ -446,7 +405,7 @@ class RealQueueRepository(
                         place(QueueState.Turn, frontier)
                             .copy(turnExpiresAtEpochMillis = shown ?: (serverNow(frontier) + TURN_WINDOW_MILLIS))
                     out.emit(turn)
-                    claim(frontier)
+                    claimAndRelease(frontier)
                 }
             }
         }
@@ -515,26 +474,6 @@ class RealQueueRepository(
             return place(QueueState.PreOpen, frontier)
                 .copy(opensAtEpochMillis = opensAt, opensAtLabel = label.orEmpty(), ratePerMinute = null)
         }
-    }
-
-    private object StreamFinished : Throwable()
-
-    private object FallbackToPolling : Throwable()
-
-    private object SilenceTimeout : Throwable()
-
-    private class FirstEventReceived(val event: QueueStreamEvent) : Throwable()
-
-    /** Tracks last event time for the silence watchdog. */
-    private class StreamActivity(private val pacing: QueuePacing) {
-        private val lock = Mutex()
-        private var lastEventAt = pacing.nowMillis()
-
-        suspend fun touch() {
-            lock.withLock { lastEventAt = pacing.nowMillis() }
-        }
-
-        suspend fun timeSinceLastEvent(): Long = lock.withLock { pacing.nowMillis() - lastEventAt }
     }
 
     private companion object {

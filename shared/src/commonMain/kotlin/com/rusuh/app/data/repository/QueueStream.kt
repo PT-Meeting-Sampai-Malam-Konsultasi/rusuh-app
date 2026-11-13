@@ -48,7 +48,7 @@ sealed interface StreamOutcome {
 }
 
 /** Parameters for opening the queue SSE stream. */
-internal data class QueueStreamParams(
+data class QueueStreamParams(
     val api: ApiClient,
     val eventId: String,
     val queueToken: String,

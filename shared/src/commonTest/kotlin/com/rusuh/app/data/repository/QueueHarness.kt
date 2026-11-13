@@ -11,25 +11,33 @@ import com.rusuh.app.data.storage.FakeAppPreferences
 import com.rusuh.app.data.storage.FakeSecureStore
 import com.rusuh.app.data.storage.SecureTokenStore
 import com.rusuh.app.domain.clock.ServerClock
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlin.random.Random
 
 /** A settable server clock; the harness advances it by every pacing delay, like real time would. */
 class TestServerClock(
     var now: Long = FIXTURE_NOW_MILLIS,
     private val synced: Boolean = true,
+    private val scheduler: TestCoroutineScheduler? = null,
 ) : ServerClock {
-    override fun nowMillis(): Long = now
+    override fun nowMillis(): Long = now + (scheduler?.currentTime ?: 0L)
 
     override val isSynced: Boolean get() = synced
 }
 
 /** Everything the real repositories need, on one [FakeBackend], with recorded pacing delays and no real waiting. */
+@Suppress("LongParameterList")
 class QueueHarness(
     language: AppLanguage = AppLanguage.Indonesian,
     seed: Int = 7,
     synced: Boolean = true,
     clockStart: Long = FIXTURE_NOW_MILLIS,
     wallClock: () -> Long = { FIXTURE_NOW_MILLIS },
+    scheduler: TestCoroutineScheduler? = null,
+    streamOpener: suspend (
+        QueueStreamParams,
+    ) -> StreamOutcome = { StreamOutcome.Failed(IllegalStateException("unused")) },
 ) {
     val backend = FakeBackend()
     val secure = FakeSecureStore()
@@ -37,7 +45,7 @@ class QueueHarness(
     val tokens = SecureTokenStore(secure)
     val queueCache = QueueCache(prefs)
     val deviceCache = DeviceCache(prefs)
-    val clock = TestServerClock(clockStart, synced)
+    val clock = TestServerClock(clockStart, synced, scheduler)
     val locale = LocaleProvider { language }
     val delays = mutableListOf<Long>()
 
@@ -45,10 +53,10 @@ class QueueHarness(
         QueuePacing(
             delay = { millis ->
                 delays += millis
-                clock.now += millis
+                if (scheduler != null) delay(millis) else clock.now += millis
             },
             random = Random(seed),
-            nowMillis = { clock.now },
+            nowMillis = { clock.nowMillis() },
         )
 
     val devices =
@@ -73,6 +81,7 @@ class QueueHarness(
             serverClock = clock,
             localeProvider = locale,
             pacing = pacing,
+            streamOpener = streamOpener,
         )
 
     val myQueues =
