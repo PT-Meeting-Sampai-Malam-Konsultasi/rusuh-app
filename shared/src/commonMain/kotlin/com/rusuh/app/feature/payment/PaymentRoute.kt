@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -120,7 +121,7 @@ fun PaymentRoute(
             onCancelBooking = { viewModel.dispatch(PaymentIntent.CancelBooking) },
         )
     } else {
-        Column(Modifier.fillMaxSize().background(RusuhColors.BrandPaper)) {
+        Column(Modifier.fillMaxSize().background(RusuhColors.BrandPaper).safeDrawingPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
