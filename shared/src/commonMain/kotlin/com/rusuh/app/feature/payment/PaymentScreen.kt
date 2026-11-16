@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -96,7 +97,8 @@ fun PaymentScreen(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(RusuhColors.BrandPaper),
+                .background(RusuhColors.BrandPaper)
+                .safeDrawingPadding(),
     ) {
         // Top bar with timer (unless expired/success)
         val showTimer = state.ui !is PaymentUiState.Success && state.ui !is PaymentUiState.Expired
