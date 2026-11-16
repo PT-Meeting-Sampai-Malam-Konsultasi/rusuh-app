@@ -4,6 +4,7 @@ import com.rusuh.app.crash.CrashReporter
 import com.rusuh.app.data.network.LocaleProvider
 import com.rusuh.app.data.network.session.SessionManager
 import com.rusuh.app.domain.model.UserLocale
+import com.rusuh.app.domain.usecase.CancelBookingUseCase
 import com.rusuh.app.domain.usecase.ClaimQueueUseCase
 import com.rusuh.app.domain.usecase.CreateBookingUseCase
 import com.rusuh.app.domain.usecase.GetDetailUseCase
@@ -89,6 +90,7 @@ val appModule =
         factory { LoadPaymentUseCase(get()) }
         factory { StartSnapPaymentUseCase(get()) }
         factory { ObservePaymentStatusUseCase(get()) }
+        factory { CancelBookingUseCase(get()) }
         factory {
                 (bookingId: String) ->
             PaymentViewModel(bookingId, get(), get(), get(), tracker = get(), cancelBooking = get())

@@ -261,6 +261,10 @@
         <item quantity="one">Your %2$s ticket is issued to the holder’s NIK. We also emailed the e-ticket to %3$s.</item>
         <item quantity="other">%1$d %2$s tickets are issued, each under its own holder’s NIK. We also emailed the e-ticket to %3$s.</item>
     </plurals>
+    <plurals name="eticket_intro_no_email">
+        <item quantity="one">Your %2$s ticket is issued to the holder’s NIK.</item>
+        <item quantity="other">%1$d %2$s tickets are issued, each under its own holder’s NIK.</item>
+    </plurals>
     <string name="eticket_add_to_calendar">Add to calendar</string>
     <string name="eticket_add_to_calendar_description">Add event to calendar</string>
     <string name="eticket_no_calendar_app">No calendar app available</string>

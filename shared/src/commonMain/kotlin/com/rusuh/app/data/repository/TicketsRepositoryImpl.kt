@@ -12,6 +12,7 @@ import com.rusuh.app.data.remote.mapper.toCachedEventFacts
 import com.rusuh.app.domain.clock.ServerClock
 import com.rusuh.app.domain.model.DomainException
 import com.rusuh.app.domain.model.DomainResult
+import com.rusuh.app.domain.repository.AccountEmailStore
 import com.rusuh.app.feature.eticket.ETicketOrder
 import com.rusuh.app.feature.tickets.TicketOrder
 import com.rusuh.app.feature.tickets.TicketsRepository
@@ -37,6 +38,7 @@ class TicketsRepositoryImpl(
     private val cache: TicketsCache,
     private val localeProvider: LocaleProvider,
     private val serverClock: ServerClock,
+    private val accountEmails: AccountEmailStore,
 ) : TicketsRepository {
     /** In-memory cache for event facts during a session, keyed by eventId. */
     private val eventFactsMemory = mutableMapOf<String, CachedEventFacts>()
@@ -73,6 +75,7 @@ class TicketsRepositoryImpl(
             bookingId = orderId,
             tickets = orderTickets,
             eventFacts = getEventFacts(eventId),
+            contactEmail = accountEmails.email().orEmpty(),
         )
     }
 

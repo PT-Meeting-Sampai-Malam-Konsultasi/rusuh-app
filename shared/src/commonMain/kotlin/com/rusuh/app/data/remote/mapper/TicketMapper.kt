@@ -118,6 +118,7 @@ internal fun ticketGroupToETicketOrder(
     bookingId: String,
     tickets: List<TicketDto>,
     eventFacts: CachedEventFacts?,
+    contactEmail: String = "",
 ): ETicketOrder {
     val first = tickets.first()
     val eventName = eventFacts?.eventName ?: first.eventId
@@ -137,7 +138,7 @@ internal fun ticketGroupToETicketOrder(
         // shortcut: not in Ticket schema
         totalLabel = "",
         paymentMethod = "",
-        contactEmail = "",
+        contactEmail = contactEmail,
         tickets = tickets.map { it.toETicket() },
     )
 }
